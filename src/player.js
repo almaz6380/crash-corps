@@ -3,12 +3,13 @@ import { resolveCollisions } from './world.js';
 import { Weapon } from './weapons.js';
 import { SPECIALS } from './classes.js';
 import { buildViewmodel } from './characters.js';
+import { ViewmodelAnimator } from './animation.js';
 
 const EYE = 1.6, GRAVITY = 22, JUMP = 8;
 
 export class Player {
-  constructor(camera, cls, world) {
-    this.camera = camera; this.cls = cls; this.world = world;
+  constructor(camera, cls, world, scene) {
+    this.camera = camera; this.cls = cls; this.world = world; this.scene = scene;
     this.pos = new THREE.Vector3(); this.vel = new THREE.Vector3();
     this.yaw = 0; this.pitch = 0; this.grounded = true;
     this.hp = cls.hp; this.dead = false; this.respawnIn = 0;
@@ -16,20 +17,39 @@ export class Player {
     this.special = { def: SPECIALS[cls.special], cool: 0, active: 0 };
     this.keys = {}; this.firing = false; this.baseFov = camera.fov;
     this.viewmodel = buildViewmodel(cls); camera.add(this.viewmodel);
-    this.kick = 0;
+    this.vmAnim = new ViewmodelAnimator(this.viewmodel);
+    // Unsichtbarer Trefferkörper – ohne ihn können die Bots den Spieler nicht anvisieren.
+    this.mesh = new THREE.Mesh(
+      new THREE.BoxGeometry(cls.body.width, cls.body.height, cls.body.width * 0.6),
+      new THREE.MeshBasicMaterial({ visible: false }),
+    );
+    this.mesh.userData.target = this;
+    scene.add(this.mesh);
     this.kills = 0; this.deaths = 0;
     this._bind();
   }
   _bind() {
-    addEventListener('keydown', e => { this.keys[e.code] = true; if (e.code === 'KeyR') this.weapon.reload(); if (e.code === 'KeyQ') this.useSpecial(); });
-    addEventListener('keyup', e => { this.keys[e.code] = false; });
-    addEventListener('mousemove', e => {
+    this._onKeyDown = e => { this.keys[e.code] = true; if (e.code === 'KeyR') this.weapon.reload(); if (e.code === 'KeyQ') this.useSpecial(); };
+    this._onKeyUp = e => { this.keys[e.code] = false; };
+    this._onMove = e => {
       if (document.pointerLockElement !== this.camera.userData.canvas) return;
       this.yaw -= e.movementX * 0.0022; this.pitch -= e.movementY * 0.0022;
       this.pitch = Math.max(-1.45, Math.min(1.45, this.pitch));
-    });
-    addEventListener('mousedown', e => { if (e.button === 0) this.firing = true; });
-    addEventListener('mouseup', e => { if (e.button === 0) this.firing = false; });
+    };
+    this._onDown = e => { if (e.button === 0) this.firing = true; };
+    this._onUp = e => { if (e.button === 0) this.firing = false; };
+    addEventListener('keydown', this._onKeyDown); addEventListener('keyup', this._onKeyUp);
+    addEventListener('mousemove', this._onMove);
+    addEventListener('mousedown', this._onDown); addEventListener('mouseup', this._onUp);
+  }
+  /** Abräumen beim Klassenwechsel: Viewmodel, Trefferkörper und Eingaben lösen. */
+  dispose() {
+    this.camera.remove(this.viewmodel);
+    this.scene.remove(this.mesh);
+    this.mesh.geometry.dispose(); this.mesh.material.dispose();
+    removeEventListener('keydown', this._onKeyDown); removeEventListener('keyup', this._onKeyUp);
+    removeEventListener('mousemove', this._onMove);
+    removeEventListener('mousedown', this._onDown); removeEventListener('mouseup', this._onUp);
   }
   spawn(at) { this.pos.copy(at); this.pos.y = 0; this.vel.set(0, 0, 0); this.hp = this.cls.hp; this.dead = false; this.weapon = new Weapon(this.cls.weapon); }
   useSpecial() { if (this.special.cool > 0 || this.dead) return; this.special.active = this.special.def.duration; this.special.cool = this.special.def.cooldown; }
@@ -54,13 +74,15 @@ export class Player {
     let speed = this.cls.speed * (this.keys.ShiftLeft ? 1.35 : 1);
     const sp = this.special;
     if (sp.active > 0 && sp.def.speedMul) { speed *= sp.def.speedMul; if (move.lengthSq() === 0) move.copy(f); }
-    if (move.lengthSq() > 0) move.normalize().multiplyScalar(speed);
+    const moving = move.lengthSq() > 0;
+    if (moving) move.normalize().multiplyScalar(speed);
     this.vel.x = move.x; this.vel.z = move.z;
     if (this.keys.Space && this.grounded) { this.vel.y = JUMP; this.grounded = false; }
     this.vel.y -= GRAVITY * dt;
     this.pos.addScaledVector(this.vel, dt);
     if (this.pos.y <= 0) { this.pos.y = 0; this.vel.y = 0; this.grounded = true; }
     resolveCollisions(this.pos, 0.45, this.world);
+    this.mesh.position.set(this.pos.x, this.pos.y + this.cls.body.height / 2, this.pos.z);
 
     // Kamera
     this.camera.position.copy(this.eye);
@@ -68,18 +90,20 @@ export class Player {
     const zoom = sp.active > 0 && sp.def.fovZoom ? sp.def.fovZoom : 1;
     this.camera.fov += (this.baseFov * zoom - this.camera.fov) * Math.min(1, dt * 10);
     this.camera.updateProjectionMatrix();
-    this.kick = Math.max(0, this.kick - dt * 6);
-    this.viewmodel.position.z = -0.7 + this.kick * 0.15;
-    this.viewmodel.rotation.x = this.kick * 0.5;
-    const bob = move.lengthSq() > 0 && this.grounded ? Math.sin(performance.now() / 90) * 0.015 : 0;
-    this.viewmodel.position.y = -0.32 + bob;
 
     // Feuern
     if (this.firing) {
       const dmgMul = sp.active > 0 && sp.def.damageMul ? sp.def.damageMul : 1;
       const hits = this.weapon.fire(this.eye, this.aim, targets, this.world, dmgMul);
-      if (hits) { this.kick = 1; fx.tracers(this.eye, hits, this.cls.accent); }
+      if (hits) { this.vmAnim.fire(); fx.tracers(this.eye, hits, this.cls.accent); }
       if (!this.weapon.def.auto) this.firing = false;
     }
+
+    // Waffenanimation
+    const w = this.weapon;
+    this.vmAnim.update(dt, {
+      moving, speed, grounded: this.grounded, yaw: this.yaw, pitch: this.pitch,
+      reload: w.reloading > 0 ? 1 - w.reloading / w.def.reload : 0,
+    });
   }
 }

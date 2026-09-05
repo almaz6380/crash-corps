@@ -17,6 +17,7 @@ src/
   weapons.js   Waffenlogik (Raycast-Hitscan, Cooldown, Spread, Schaden)
   bots.js      Bot-Gegner (Zustandsautomat: patrol → chase → shoot)
   characters.js Prozedurale Low-Poly-Figur pro Klasse
+  animation.js Prozedurale Animation (Figuren-Rig + Ego-Waffe)
   hud.js       DOM-HUD (HP, Munition, Fadenkreuz, Killfeed, Score, Klassenwahl)
   style.css
 ```
@@ -32,7 +33,7 @@ src/
 1. [x] Prototyp: Arena, 3 Klassen, Bots, Deathmatch gegen Bots, HUD
 2. [ ] Domination-Modus (3 Kontrollpunkte, Team-Score)
 3. [ ] Cel-Shading + Outline-Pass
-4. [ ] Charakter-Animation (Laufen, Schießen, Tod) – erst prozedural, dann Mixamo
+4. [x] Charakter-Animation prozedural (Laufen, Anschlag/Rückstoß, Umfallen) – Mixamo später
 5. [ ] Sounds
 6. [ ] Touch-Controls (Mobile)
 7. [ ] Asset-Pipeline: echte Modelle in `public/assets/`, Loader in `characters.js`

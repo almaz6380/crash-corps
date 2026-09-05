@@ -54,9 +54,9 @@ function pickSpawn(avoid) {
 }
 
 function start(clsId) {
-  if (player) camera.remove(player.viewmodel);
+  if (player) player.dispose();
   for (const b of bots) scene.remove(b.mesh);
-  player = new Player(camera, CLASSES[clsId], world);
+  player = new Player(camera, CLASSES[clsId], world, scene);
   player.spawn(world.spawns[0]);
   const ids = Object.keys(CLASSES);
   bots = Array.from({ length: 5 }, (_, i) => {
