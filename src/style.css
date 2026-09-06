@@ -32,3 +32,9 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #9fd7f7; fon
 #special.ready { background: var(--sun); }
 #dead { position: absolute; inset: 0; display: grid; place-items: center; font-size: 36px; font-weight: bold; color: var(--paper); text-shadow: 4px 4px 0 var(--ink); background: rgba(43,33,24,.35); }
 #hint { position: absolute; left: 50%; top: 62%; transform: translateX(-50%); background: var(--paper); border: 3px solid var(--ink); padding: 6px 14px; border-radius: 10px; }
+
+#loading {
+  position: fixed; inset: 0; display: grid; place-items: center;
+  background: #10141a; color: #f6f0e8; font: 600 18px/1.4 system-ui, sans-serif;
+  letter-spacing: 0.02em; text-align: center; padding: 24px; z-index: 20;
+}

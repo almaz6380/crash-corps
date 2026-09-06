@@ -1,6 +1,8 @@
 import * as THREE from 'three';
+import { celRamp, buildSky } from './render.js';
 
-const toon = (c) => new THREE.MeshToonMaterial({ color: c });
+const RAMP = celRamp(4);
+const toon = (c) => new THREE.MeshToonMaterial({ color: c, gradientMap: RAMP });
 
 /** Baut die Arena. Gibt {group, colliders, spawns, bounds} zurück. */
 export function buildWorld(scene) {
@@ -8,15 +10,24 @@ export function buildWorld(scene) {
   const colliders = [];
   const SIZE = 60;
 
-  // Boden mit Canvas-Schachbrett-Textur (prozedural, kein Asset)
-  const c = document.createElement('canvas'); c.width = c.height = 256;
+  // Boden: prozedurale Canvas-Textur mit Grasbüscheln und Erdflecken
+  const c = document.createElement('canvas'); c.width = c.height = 1024;
   const ctx = c.getContext('2d');
-  ctx.fillStyle = '#8fb85c'; ctx.fillRect(0, 0, 256, 256);
-  ctx.fillStyle = '#7fa64f';
-  for (let i = 0; i < 400; i++) ctx.fillRect(Math.random() * 256, Math.random() * 256, 6, 3);
+  ctx.fillStyle = '#82a95a'; ctx.fillRect(0, 0, 1024, 1024);
+  for (let i = 0; i < 5000; i++) {
+    ctx.fillStyle = ['#7ba054', '#8fb264', '#6e9149', '#97b972'][i % 4];
+    ctx.fillRect(Math.random() * 1024, Math.random() * 1024, 3 + Math.random() * 9, 2 + Math.random() * 4);
+  }
+  for (let i = 0; i < 26; i++) {
+    const px = Math.random() * 1024, py = Math.random() * 1024, r = 30 + Math.random() * 90;
+    const g = ctx.createRadialGradient(px, py, 0, px, py, r);
+    g.addColorStop(0, 'rgba(150,116,72,0.6)'); g.addColorStop(1, 'rgba(150,116,72,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(px, py, r, 0, 7); ctx.fill();
+  }
   const tex = new THREE.CanvasTexture(c);
-  tex.wrapS = tex.wrapT = THREE.RepeatWrapping; tex.repeat.set(12, 12);
-  const ground = new THREE.Mesh(new THREE.PlaneGeometry(SIZE, SIZE), new THREE.MeshToonMaterial({ map: tex }));
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping; tex.repeat.set(14, 14);
+  tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 8;
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(SIZE, SIZE), new THREE.MeshToonMaterial({ map: tex, gradientMap: RAMP }));
   ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true;
   group.add(ground);
 
@@ -53,13 +64,16 @@ export function buildWorld(scene) {
   }
 
   // Licht: Sonne + Himmel
-  const sun = new THREE.DirectionalLight(0xfff2d6, 2.2);
+  const sun = new THREE.DirectionalLight(0xfff2d6, 2.6);
   sun.position.set(25, 40, 15); sun.castShadow = true;
   sun.shadow.mapSize.set(2048, 2048);
   Object.assign(sun.shadow.camera, { left: -40, right: 40, top: 40, bottom: -40, far: 120 });
-  group.add(sun, new THREE.HemisphereLight(0xbfe6ff, 0x6b8f3a, 0.9));
-  scene.background = new THREE.Color(0x9fd7f7);
-  scene.fog = new THREE.Fog(0x9fd7f7, 60, 140);
+  sun.shadow.bias = -0.0006; sun.shadow.normalBias = 0.02; sun.shadow.radius = 3;
+  sun.shadow.camera.updateProjectionMatrix();
+  const rim = new THREE.DirectionalLight(0xbcd8ff, 0.8); rim.position.set(-20, 14, -25);
+  group.add(sun, rim, new THREE.HemisphereLight(0xbfe6ff, 0x6b8f3a, 1.1));
+  group.add(buildSky());
+  scene.fog = new THREE.Fog(0xa9d3ea, 55, 170);
 
   scene.add(group);
   const spawns = [

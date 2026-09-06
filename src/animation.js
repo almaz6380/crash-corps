@@ -1,118 +1,166 @@
 import * as THREE from 'three';
 
 /**
- * Prozedurale Animation. Enthält nur Optik-Werte (Ausschläge, Zeiten) –
- * Gameplay-Werte bleiben in classes.js / weapons.js.
+ * Prozedurale Animation über den Modell-Clips. Die Clips liefern Stehen, Gehen
+ * und Rennen; alles was ein Shooter sonst braucht – Anschlag, Rückstoß,
+ * Treffer, Umfallen – legt diese Ebene per Knochen darüber. Reine Optik-Werte,
+ * Gameplay bleibt in classes.js / weapons.js.
  */
 const ANIM = {
-  stepBase: 2.6,     // Schrittfrequenz im Stand-Gehen
-  stepPerSpeed: 1.1, // zusätzliche Frequenz pro m/s
-  legSwing: 0.8,     // max. Beinausschlag (rad)
-  armSwing: 0.5,     // max. Armausschlag beim Laufen (rad)
-  bounce: 0.07,      // Hüpfen des Körpers (m)
-  gaitBlend: 9,      // wie schnell Lauf/Stand ineinander blenden
-  aimBlend: 11,      // wie schnell in/aus dem Anschlag geblendet wird
-  aimPitch: -Math.PI / 2 + 0.12, // Arm waagerecht nach vorn (+z)
+  runFrom: 3.2, runTo: 7.0,   // ab welchem Tempo von Gehen auf Rennen geblendet wird
+  blend: 7,                   // Tempo der Gewichtswechsel
+  aimBlend: 10,
   recoilDecay: 6.5,
-  recoilArm: 0.45,
-  deathTime: 0.9,
+  deathTime: 0.95,
   hurtTime: 0.3,
+  walkCycleSpeed: 2.4,        // Tempo, für das der Geh-Clip gebaut ist
+  runCycleSpeed: 6.5,
 };
 
-const lerp = THREE.MathUtils.lerp;
-const damp = (a, b, rate, dt) => lerp(a, b, 1 - Math.exp(-rate * dt));
+const clamp01 = (v) => Math.min(1, Math.max(0, v));
+const damp = (a, b, rate, dt) => THREE.MathUtils.lerp(a, b, 1 - Math.exp(-rate * dt));
+
+const _v1 = new THREE.Vector3(), _v2 = new THREE.Vector3(), _v3 = new THREE.Vector3();
+const _q1 = new THREE.Quaternion(), _m1 = new THREE.Matrix4();
+const FORWARD = new THREE.Vector3(0, 0, 1), UP = new THREE.Vector3(0, 1, 0);
 
 /**
- * Animiert eine mit buildCharacter() gebaute Figur.
- * Zustände: Laufen (Schrittzyklus), Anschlag + Rückstoß beim Schießen,
- * Treffer-Zucken und Umfallen beim Tod.
+ * Richtet einen Knochen so aus, dass seine Gliedmaßen-Achse in eine
+ * Weltrichtung zeigt, und blendet das mit Gewicht w über die Clip-Pose.
+ * Modellunabhängig: die Achse kommt aus der Ruhelage des Kindknochens.
  */
+function pointBone(bone, axis, worldDir, w) {
+  if (!bone || !bone.parent) return;
+  _m1.copy(bone.parent.matrixWorld).invert();
+  _v3.copy(worldDir).transformDirection(_m1).normalize();
+  _q1.setFromUnitVectors(axis, _v3);
+  bone.quaternion.slerp(_q1, w);
+  bone.updateMatrixWorld(true);
+}
+
 export class CharacterAnimator {
   constructor(mesh) {
-    this.rig = mesh.userData.rig;
-    this.phase = Math.random() * Math.PI * 2; // versetzt, damit Bots nicht im Gleichschritt laufen
-    this.t = Math.random() * 10;
-    this.gait = 0; this.aim = 0; this.recoil = 0; this.hurt = 0;
-    this.death = 0; this.fallDir = 1;
+    const rig = mesh.userData.rig;
+    this.rig = rig;
+    this.inst = rig.inst;
+    this.bones = rig.inst.bones;
+    this.mesh = mesh;
+    this.tune = rig.inst.def.aimTune || {};
+    const b = this.bones;
+    // Gliedmaßen-Achsen aus der Ruhelage: Richtung vom Knochen zu seinem Kind
+    this.axis = {
+      rightArm: b.rightForeArm ? b.rightForeArm.position.clone().normalize() : null,
+      rightForeArm: b.rightHand ? b.rightHand.position.clone().normalize() : null,
+      leftArm: b.leftForeArm ? b.leftForeArm.position.clone().normalize() : null,
+      leftForeArm: b.leftHand ? b.leftHand.position.clone().normalize() : null,
+    };
+    this.w = { idle: 1, walk: 0, run: 0 };
+    this.aim = 0; this.recoil = 0; this.hurt = 0; this.death = 0; this.fallDir = 1;
+    this.inst.mixer.setTime(Math.random() * 3);   // Bots nicht im Gleichschritt
   }
 
-  /** Schuss abgefeuert: Rückstoß + sofort in den Anschlag. */
   fire() { this.recoil = 1; this.aim = 1; }
-  /** Treffer einstecken: kurzes Aufleuchten und Zucken. */
   hit() { this.hurt = 1; }
-  /** Tod: Figur kippt nach vorn oder hinten um. */
-  die() { if (this.death === 0) { this.death = 1e-4; this.fallDir = Math.random() < 0.5 ? 1 : -1; } }
-  /** Sterbeanimation durchgelaufen – die Figur darf verschwinden. */
+  die() {
+    if (this.death > 0) return;
+    this.death = 1e-4;
+    this.fallDir = Math.random() < 0.5 ? 1 : -1;
+    this.inst.mixer.timeScale = 0;                // Pose einfrieren, dann kippen
+  }
   get fallen() { return this.death >= 1; }
 
-  /** Zurück auf Anfang (Respawn). */
   reset() {
     const r = this.rig;
-    this.gait = this.aim = this.recoil = this.hurt = this.death = 0;
+    this.w = { idle: 1, walk: 0, run: 0 };
+    this.aim = this.recoil = this.hurt = this.death = 0;
     r.frame.rotation.set(0, 0, 0); r.frame.position.set(0, 0, 0);
-    r.upper.rotation.set(0, 0, 0); r.neck.rotation.set(0, 0, 0);
-    r.legL.rotation.set(0, 0, 0); r.legR.rotation.set(0, 0, 0);
-    r.armL.rotation.set(0, 0, 0); r.armR.rotation.set(0, 0, 0);
-    r.gun.position.y = r.gunY;
-    r.bodyMat.emissive?.setScalar(0);
+    r.weapon.position.copy(r.weaponRest);
+    this.inst.mixer.timeScale = 1;
+    for (const [k, a] of Object.entries(this.inst.actions)) a.setEffectiveWeight(k === 'idle' ? 1 : 0);
+    for (const m of this.inst.materials) m.emissive?.setScalar(0);
   }
 
-  /** @param {{speed?:number, moving?:boolean, aiming?:boolean}} state */
   update(dt, state = {}) {
-    const r = this.rig;
-    this.t += dt;
+    const { actions, mixer, materials } = this.inst;
     this.recoil = Math.max(0, this.recoil - dt * ANIM.recoilDecay);
     this.hurt = Math.max(0, this.hurt - dt / ANIM.hurtTime);
-    r.bodyMat.emissive?.setScalar(this.hurt * 0.45);
+    for (const m of materials) m.emissive?.setScalar(this.hurt * 0.5);
 
     if (this.death > 0) return this._death(dt);
 
-    const speed = state.speed || 0;
-    const target = state.moving ? Math.min(1, 0.4 + speed / 9) : 0;
-    this.gait = damp(this.gait, target, ANIM.gaitBlend, dt);
-    this.phase += dt * (ANIM.stepBase + speed * ANIM.stepPerSpeed) * (state.moving ? 1 : 0.35);
+    // Fortbewegung: Stehen → Gehen → Rennen nach Tempo
+    const speed = state.moving ? (state.speed || 0) : 0;
+    const run = state.moving ? clamp01((speed - ANIM.runFrom) / (ANIM.runTo - ANIM.runFrom)) : 0;
+    const walk = state.moving ? 1 - run : 0;
+    this.w.run = damp(this.w.run, run, ANIM.blend, dt);
+    this.w.walk = damp(this.w.walk, walk, ANIM.blend, dt);
+    this.w.idle = damp(this.w.idle, 1 - run - walk, ANIM.blend, dt);
+    actions.run?.setEffectiveWeight(this.w.run);
+    actions.walk?.setEffectiveWeight(this.w.walk);
+    actions.idle?.setEffectiveWeight(this.w.idle);
+    // Schrittfrequenz ans Tempo koppeln, sonst rutschen die Füße
+    actions.walk?.setEffectiveTimeScale(THREE.MathUtils.clamp(speed / ANIM.walkCycleSpeed, 0.6, 1.8));
+    actions.run?.setEffectiveTimeScale(THREE.MathUtils.clamp(speed / ANIM.runCycleSpeed, 0.7, 1.6));
+
+    mixer.update(dt);
+
+    // Overlays auf die Clip-Pose
     this.aim = damp(this.aim, state.aiming ? 1 : 0, ANIM.aimBlend, dt);
+    this._aim(this.aim);
+    this.rig.weapon.position.z = this.rig.weaponRest.z - 0.12 * this.recoil;
+  }
 
-    const sw = Math.sin(this.phase), g = this.gait;
-    const breathe = Math.sin(this.t * 1.9) * 0.022 * (1 - g);
+  /** Arme in den Anschlag führen und die Waffe nach vorn ausrichten. */
+  _aim(w) {
+    const b = this.bones, t = this.tune, rig = this.rig;
+    if (!b.chest) return;
+    if (w < 0.002 && this.recoil <= 0) {
+      // Nichts zu tun – Waffe zurück in die Ruhelage, Matrizen sparen
+      if (this._posed && rig.holder) { rig.holder.quaternion.copy(rig.holderRest); this._posed = false; }
+      return;
+    }
+    this._posed = true;
 
-    // Beine: gegenläufiger Schrittzyklus
-    r.legL.rotation.x = sw * ANIM.legSwing * g;
-    r.legR.rotation.x = -sw * ANIM.legSwing * g;
+    // Bezugssystem der Figur
+    this.mesh.updateWorldMatrix(true, true);
+    const fwd = _v1.copy(FORWARD).transformDirection(this.mesh.matrixWorld).normalize().clone();
+    const right = fwd.clone().cross(UP).normalize();
+    const chestPos = b.chest.getWorldPosition(new THREE.Vector3());
+    const target = (o) => chestPos.clone()
+      .addScaledVector(fwd, o[0]).addScaledVector(UP, o[1]).addScaledVector(right, o[2]);
 
-    // Körper: Hüpfen, Vorlage, Schulter-Gegenrotation
-    r.frame.position.y = Math.abs(sw) * ANIM.bounce * g;
-    r.upper.rotation.x = 0.13 * g + breathe - this.recoil * 0.12 - this.hurt * 0.1;
-    r.upper.rotation.y = -sw * 0.13 * g;
-    r.upper.rotation.z = Math.cos(this.phase) * 0.05 * g;
-    r.neck.rotation.x = -0.06 * g + this.recoil * 0.18;
+    if (w > 0.002) {
+      const hand = target(t.hand), elbow = target(t.elbow);
+      const offHand = target(t.offHand), offElbow = target(t.offElbow);
+      const chain = (arm, fore, elbowT, handT) => {
+        const a = b[arm], f = b[fore];
+        if (!a || !f || !this.axis[arm] || !this.axis[fore]) return;
+        pointBone(a, this.axis[arm], elbowT.clone().sub(a.getWorldPosition(_v2)), w);
+        pointBone(f, this.axis[fore], handT.clone().sub(f.getWorldPosition(_v2)), w);
+      };
+      chain('rightArm', 'rightForeArm', elbow, hand);
+      chain('leftArm', 'leftForeArm', offElbow, offHand);
+    }
 
-    // Arme: Pendeln im Lauf, Anschlag beim Zielen, Rückstoß beim Schuss
-    const swing = sw * ANIM.armSwing * g;
-    const aimX = ANIM.aimPitch + this.recoil * ANIM.recoilArm;
-    r.armR.rotation.x = lerp(-swing, aimX, this.aim);
-    r.armR.rotation.z = lerp(0.09, -0.12, this.aim);
-    r.armL.rotation.x = lerp(swing, aimX + 0.22, this.aim);
-    r.armL.rotation.z = lerp(-0.09, 0.34, this.aim);
-    r.gun.position.y = r.gunY + this.recoil * 0.12 * this.aim; // Rückstoß schiebt die Waffe zurück
+    // Waffe: Ruhelage in der Hand, im Anschlag Lauf nach vorn, Rückstoß nach oben
+    if (rig.holder && b.rightHand) {
+      b.rightHand.updateMatrixWorld(true);
+      rig.holder.quaternion.copy(rig.holderRest);
+      if (w > 0.002) {
+        _m1.copy(b.rightHand.matrixWorld).invert();
+        _v3.copy(fwd).transformDirection(_m1).normalize();
+        rig.holder.quaternion.slerp(_q1.setFromUnitVectors(FORWARD, _v3), w);
+      }
+      if (this.recoil > 0) rig.holder.rotateX(-0.35 * this.recoil * Math.max(w, 0.4));
+    }
   }
 
   _death(dt) {
-    const r = this.rig;
     this.death = Math.min(1, this.death + dt / ANIM.deathTime);
-    const e = 1 - Math.pow(1 - this.death, 3); // easeOutCubic
-    r.frame.rotation.x = e * (Math.PI / 2) * this.fallDir;
-    r.frame.position.y = -e * 0.12;
-    // Gliedmaßen werden schlaff und legen sich zum Körper
-    const limp = (o, x, z = 0) => {
-      o.rotation.x = damp(o.rotation.x, x, 5, dt);
-      o.rotation.y = damp(o.rotation.y, 0, 5, dt);
-      o.rotation.z = damp(o.rotation.z, z, 5, dt);
-    };
-    limp(r.upper, -0.12 * this.fallDir);
-    limp(r.neck, 0.25 * this.fallDir);
-    limp(r.legL, 0.12); limp(r.legR, -0.18);
-    limp(r.armL, -0.25, 0.3); limp(r.armR, -0.15, -0.3);
+    const e = 1 - Math.pow(1 - this.death, 3);
+    this.inst.mixer.update(0);                       // eingefrorene Pose halten
+    this.rig.frame.rotation.x = e * (Math.PI / 2) * this.fallDir;
+    this.rig.frame.position.y = -e * 0.1;
   }
 }
 
@@ -123,32 +171,22 @@ export class ViewmodelAnimator {
     this.t = 0; this.kick = 0; this.sway = new THREE.Vector2();
     this.bobAmt = 0; this.lastYaw = 0; this.lastPitch = 0;
   }
-  /** Schuss: Waffe schlägt nach hinten/oben aus. */
   fire() { this.kick = 1; }
 
-  /**
-   * @param {{moving:boolean, speed:number, grounded:boolean,
-   *          yaw:number, pitch:number, reload:number}} state
-   *        reload = 0..1 Fortschritt, 0 wenn nicht nachgeladen wird
-   */
   update(dt, state) {
     const vm = this.vm;
     this.t += dt;
     this.kick = Math.max(0, this.kick - dt * 6);
 
-    // Maus-Nachlauf: Waffe hinkt der Blickrichtung minimal hinterher
     const dYaw = state.yaw - this.lastYaw, dPitch = state.pitch - this.lastPitch;
     this.lastYaw = state.yaw; this.lastPitch = state.pitch;
     this.sway.x = damp(this.sway.x, THREE.MathUtils.clamp(dYaw * 4, -0.06, 0.06), 8, dt);
     this.sway.y = damp(this.sway.y, THREE.MathUtils.clamp(-dPitch * 4, -0.06, 0.06), 8, dt);
 
-    // Laufwippen
     const want = state.moving && state.grounded ? Math.min(1, state.speed / 7) : 0;
     this.bobAmt = damp(this.bobAmt, want, 8, dt);
     const bobY = Math.abs(Math.sin(this.t * 9)) * 0.018 * this.bobAmt;
     const bobX = Math.sin(this.t * 4.5) * 0.02 * this.bobAmt;
-
-    // Nachladen: Waffe kippt nach unten weg und kommt zurück
     const dip = state.reload > 0 ? Math.sin(state.reload * Math.PI) : 0;
 
     vm.position.set(
@@ -156,6 +194,6 @@ export class ViewmodelAnimator {
       this.home.y + this.sway.y + bobY - dip * 0.3,
       this.home.z + this.kick * 0.15,
     );
-    vm.rotation.set(this.kick * 0.5 + dip * 0.5, -this.sway.x * 3, dip * 0.7 + this.sway.x * 2);
+    vm.rotation.set(this.kick * 0.5 + dip * 0.5, -0.06 - this.sway.x * 3, dip * 0.7 + this.sway.x * 2);
   }
 }

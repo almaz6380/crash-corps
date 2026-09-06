@@ -39,6 +39,12 @@ export class Bot {
   }
   get eye() { return this.pos.clone().setY(this.pos.y + this.cls.body.height * 0.9); }
 
+  /** Figur aus der Szene nehmen und ihre geklonten Materialien freigeben. */
+  dispose() {
+    this.scene.remove(this.mesh);
+    for (const m of this.mesh.userData.rig.inst.materials) m.dispose();
+  }
+
   canSee(p) {
     const from = this.eye, to = p.eye, dir = to.clone().sub(from), dist = dir.length();
     if (dist > this.weapon.def.range) return false;
@@ -92,7 +98,12 @@ export class Bot {
       const aim = player.eye.clone().sub(this.eye);
       aim.x += (Math.random() - 0.5) * 0.6; aim.y += (Math.random() - 0.5) * 0.4; aim.z += (Math.random() - 0.5) * 0.6;
       const hits = this.weapon.fire(this.eye, aim.normalize(), [player], this.world);
-      if (hits) { this.anim.fire(); fx.tracers(this.eye, hits, this.cls.accent); }
+      if (hits) {
+        this.anim.fire();
+        fx.tracers(this.eye, hits, this.cls.accent);
+        const rig = this.mesh.userData.rig;
+        if (rig.muzzle) fx.flash(rig.muzzle.getWorldPosition(new THREE.Vector3()));
+      }
     } else if (!sees && this.weapon.ammo < this.weapon.def.mag) this.weapon.reload();
 
     this.anim.update(dt, { moving: walking, speed, aiming });

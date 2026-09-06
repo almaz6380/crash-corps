@@ -4,6 +4,7 @@ export class Hud {
   constructor(root) {
     this.root = root;
     root.innerHTML = `
+      <div id="loading" hidden></div>
       <div id="menu">
         <h1>Crash Corps</h1>
         <p class="sub">Wähl deine Klasse. Dann rein.</p>
@@ -33,6 +34,12 @@ export class Hud {
     }
     this.feed = root.querySelector('#feed');
     this.feedItems = [];
+  }
+  /** Ladeanzeige: Text zeigen, null blendet sie aus. */
+  loading(text) {
+    const el = this.root.querySelector('#loading');
+    el.hidden = text == null;
+    if (text != null) el.textContent = text;
   }
   showMenu(on) { this.root.querySelector('#menu').hidden = !on; this.root.querySelector('#play').hidden = on; }
   hint(on) { this.root.querySelector('#hint').hidden = !on; }
