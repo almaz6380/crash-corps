@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { CLASSES } from './classes.js';
+import { CLASSES, SPECIALS } from './classes.js';
 import { Weapon } from './weapons.js';
 import { buildCharacter } from './characters.js';
 import { CharacterAnimator } from './animation.js';
@@ -22,15 +22,19 @@ export class Bot {
     this.target = null; this.wander = new THREE.Vector3();
     this.retarget = 0; this.reaction = 0; this.kills = 0;
     this.ray = new THREE.Raycaster();
+    // Ausweichrolle (nur Klassen mit Dash-Spezial), Werte aus classes.js
+    this.dodge = 0; this.dodgeCool = 0; this.dodgeDir = new THREE.Vector3(); this.dodgeSpeed = 0;
   }
   spawn(at) {
     this.pos.copy(at); this.hp = this.cls.hp; this.dead = false; this.mesh.visible = true;
     this.weapon = new Weapon(this.cls.weapon); this.retarget = 0; this.reaction = 0;
+    this.dodge = 0; this.dodgeCool = 0;
     this.anim.reset();
   }
   onHit(dmg) {
     if (this.dead) return;
     this.hp -= dmg; this.anim.hit();
+    if (this.hp > 0) this.tryDodge();
     if (this.hp <= 0) {
       this.hp = 0; this.dead = true; this.respawnIn = 4;
       this.anim.die(); // Leiche bleibt sichtbar, bis sie umgefallen ist
@@ -38,6 +42,23 @@ export class Bot {
     }
   }
   get eye() { return this.pos.clone().setY(this.pos.y + this.cls.body.height * 0.9); }
+
+  /** Seitlich wegrollen, wenn die Klasse Dash hat, die Abklingzeit um ist und der Zufall will. */
+  tryDodge() {
+    const sp = SPECIALS[this.cls.special];
+    if (!sp?.speedMul || this.dodge > 0 || this.dodgeCool > 0 || Math.random() > 0.6) return;
+    const dur = this.anim.roll();
+    if (!dur) return;
+    // Gleiche Strecke wie der Spieler-Dash, gestreckt auf die Dauer des Roll-Clips
+    const dist = this.cls.speed * sp.speedMul * sp.duration;
+    const yaw = this.mesh.rotation.y;
+    this.dodgeDir.set(Math.cos(yaw), 0, -Math.sin(yaw)).multiplyScalar(Math.random() < 0.5 ? 1 : -1);
+    this.dodgeSpeed = dist / dur;
+    this.dodge = dur; this.dodgeCool = sp.cooldown;
+    // Der Clip ist eine Vorwärtsrolle: für die Dauer in die Ausweichrichtung drehen,
+    // danach dreht die weiche Blickführung wieder zum Ziel zurück
+    this.mesh.rotation.y = Math.atan2(this.dodgeDir.x, this.dodgeDir.z);
+  }
 
   /** Figur aus der Szene nehmen und ihre geklonten Materialien freigeben. */
   dispose() {
@@ -58,6 +79,15 @@ export class Bot {
       // Leiche bleibt bis zum Respawn liegen
       this.respawnIn -= dt;
       this.anim.update(dt);
+      return;
+    }
+
+    this.dodgeCool = Math.max(0, this.dodgeCool - dt);
+    if (this.dodge > 0) {
+      this.dodge -= dt;
+      this.pos.addScaledVector(this.dodgeDir, this.dodgeSpeed * dt);
+      resolveCollisions(this.pos, 0.5, this.world);
+      this.anim.update(dt, { moving: false, speed: 0 });
       return;
     }
 
@@ -117,6 +147,6 @@ export class Bot {
       }
     } else if (!sees && this.weapon.ammo < this.weapon.def.mag) this.weapon.reload();
 
-    this.anim.update(dt, { moving: walking, speed, aiming, advance, strafe });
+    this.anim.update(dt, { moving: walking, speed, aiming, advance, strafe, lookAt: sees ? player.eye : null });
   }
 }

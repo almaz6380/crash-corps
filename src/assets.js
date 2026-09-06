@@ -24,7 +24,7 @@ export const CHARACTER_MODELS = {
     clips: {
       idle: 'Idle_Gun', walk: 'Walk', run: 'Run',
       runLeft: 'Run_Left', runRight: 'Run_Right', runBack: 'Run_Back',
-      death: 'Death',
+      death: 'Death', roll: 'Roll',
     },
     // Oberkörper-Ebene: diese Clips laufen nur auf den Knochen ab Rumpf aufwärts,
     // die Beine behalten die Gangart. Zielen liegt dauerhaft drüber, Schuss und
@@ -50,7 +50,7 @@ export const CHARACTER_MODELS = {
     clips: {
       idle: 'Idle_Gun', walk: 'Walk', run: 'Run',
       runLeft: 'Run_Left', runRight: 'Run_Right', runBack: 'Run_Back',
-      death: 'Death',
+      death: 'Death', roll: 'Roll',
     },
     // Oberkörper-Ebene: diese Clips laufen nur auf den Knochen ab Rumpf aufwärts,
     // die Beine behalten die Gangart. Zielen liegt dauerhaft drüber, Schuss und
@@ -76,7 +76,7 @@ export const CHARACTER_MODELS = {
     clips: {
       idle: 'Idle_Gun', walk: 'Walk', run: 'Run',
       runLeft: 'Run_Left', runRight: 'Run_Right', runBack: 'Run_Back',
-      death: 'Death',
+      death: 'Death', roll: 'Roll',
     },
     // Oberkörper-Ebene: diese Clips laufen nur auf den Knochen ab Rumpf aufwärts,
     // die Beine behalten die Gangart. Zielen liegt dauerhaft drüber, Schuss und
@@ -284,7 +284,7 @@ export function instantiate(id, { height, tint, weapon } = {}) {
     const clip = THREE.AnimationClip.findByName(entry.clips, clipName);
     if (!clip) continue;
     const a = mixer.clipAction(clip);
-    if (key === 'death' || key === 'hit') { a.setLoop(THREE.LoopOnce, 1); a.clampWhenFinished = true; }
+    if (key === 'death' || key === 'hit' || key === 'roll') { a.setLoop(THREE.LoopOnce, 1); a.clampWhenFinished = key === 'death'; }
     else { a.play(); a.setEffectiveWeight(0); }
     actions[key] = a;
   }

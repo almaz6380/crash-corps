@@ -86,7 +86,9 @@ export class Player {
 
     // Kamera
     this.camera.position.copy(this.eye);
-    this.camera.rotation.set(this.pitch, this.yaw, 0, 'YXZ');
+    // Dash: Kamera kippt kurz zur Seite, sonst fühlt sich der Sprint nach nichts an
+    const dashTilt = sp.active > 0 && sp.def.speedMul ? (this.keys.KeyA ? 1 : this.keys.KeyD ? -1 : 0) * 0.09 * (sp.active / sp.def.duration) : 0;
+    this.camera.rotation.set(this.pitch, this.yaw, dashTilt, 'YXZ');
     const zoom = sp.active > 0 && sp.def.fovZoom ? sp.def.fovZoom : 1;
     this.camera.fov += (this.baseFov * zoom - this.camera.fov) * Math.min(1, dt * 10);
     this.camera.updateProjectionMatrix();
