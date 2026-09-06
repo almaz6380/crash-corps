@@ -13,6 +13,7 @@ const ANIM = {
   recoilDecay: 6.5,
   deathTime: 0.95,
   hurtTime: 0.3,
+  layerWeight: 6,             // Gewicht der Oberkörper-Ebene gegenüber der Gangart
   walkCycleSpeed: 2.4,        // Tempo, für das der Geh-Clip gebaut ist
   runCycleSpeed: 6.5,
 };
@@ -55,18 +56,27 @@ export class CharacterAnimator {
       leftArm: b.leftForeArm ? b.leftForeArm.position.clone().normalize() : null,
       leftForeArm: b.leftHand ? b.leftHand.position.clone().normalize() : null,
     };
-    this.w = { idle: 1, walk: 0, run: 0 };
+    this.w = { idle: 1 };
     this.aim = 0; this.recoil = 0; this.hurt = 0; this.death = 0; this.fallDir = 1;
     this.inst.mixer.setTime(Math.random() * 3);   // Bots nicht im Gleichschritt
   }
 
-  fire() { this.recoil = 1; this.aim = 1; }
-  hit() { this.hurt = 1; }
+  fire() {
+    this.recoil = 1; this.aim = 1;
+    const l = this.inst.layers;
+    if (l.shoot) l.shoot.reset().setEffectiveWeight(ANIM.layerWeight * 1.5).play();
+  }
+  hit() {
+    this.hurt = 1;
+    const l = this.inst.layers;
+    if (l.hit && this.death === 0) l.hit.reset().setEffectiveWeight(ANIM.layerWeight).play();
+  }
   die() {
     if (this.death > 0) return;
     this.death = 1e-4;
     this.fallDir = Math.random() < 0.5 ? 1 : -1;
-    const { actions, mixer } = this.inst;
+    const { actions, mixer, layers } = this.inst;
+    for (const a of Object.values(layers)) a.stop();
     if (actions.death) {
       // Sterbe-Clip: alles andere ausblenden, Clip einmal abspielen und Endpose halten
       for (const [k, a] of Object.entries(actions)) if (k !== 'death') a.setEffectiveWeight(0);
@@ -80,7 +90,7 @@ export class CharacterAnimator {
 
   reset() {
     const r = this.rig;
-    this.w = { idle: 1, walk: 0, run: 0 };
+    this.w = { idle: 1 };
     this.aim = this.recoil = this.hurt = this.death = 0;
     r.frame.rotation.set(0, 0, 0); r.frame.position.set(0, 0, 0);
     if (r.weaponRest) r.weapon.position.copy(r.weaponRest);
@@ -89,48 +99,80 @@ export class CharacterAnimator {
       if (k === 'death' || k === 'hit') a.stop();
       else { a.play(); a.setEffectiveWeight(k === 'idle' ? 1 : 0); }
     }
+    for (const [k, a] of Object.entries(this.inst.layers)) {
+      a.stop();
+      if (k === 'aim') { a.play(); a.setEffectiveWeight(0); }
+    }
     for (const m of this.inst.materials) m.emissive?.setScalar(0);
   }
 
   update(dt, state = {}) {
-    const { actions, mixer, materials } = this.inst;
+    const { actions, layers, mixer, materials, def } = this.inst;
     this.recoil = Math.max(0, this.recoil - dt * ANIM.recoilDecay);
     this.hurt = Math.max(0, this.hurt - dt / ANIM.hurtTime);
     for (const m of materials) m.emissive?.setScalar(this.hurt * 0.5);
 
     if (this.death > 0) return this._death(dt);
 
-    // Fortbewegung: Stehen → Gehen → Rennen nach Tempo
-    const speed = state.moving ? (state.speed || 0) : 0;
-    const run = state.moving ? clamp01((speed - ANIM.runFrom) / (ANIM.runTo - ANIM.runFrom)) : 0;
-    const walk = state.moving ? 1 - run : 0;
-    this.w.run = damp(this.w.run, run, ANIM.blend, dt);
-    this.w.walk = damp(this.w.walk, walk, ANIM.blend, dt);
-    this.w.idle = damp(this.w.idle, 1 - run - walk, ANIM.blend, dt);
-    this.aim = damp(this.aim, state.aiming ? 1 : 0, ANIM.aimBlend, dt);
+    // ---- Gangart: Stehen → Gehen → Rennen nach Tempo ----
+    const moving = !!state.moving;
+    const speed = moving ? (state.speed || 0) : 0;
+    const run = moving ? clamp01((speed - ANIM.runFrom) / (ANIM.runTo - ANIM.runFrom)) : 0;
+    const walk = moving ? 1 - run : 0;
 
-    // Mit Ziel-Clips: jede Gangart hat eine Anschlag-Variante, gemischt über das Zielgewicht
-    const a = this.hasAimClips ? this.aim : 0;
-    const pair = (plain, aimed, w) => {
-      if (actions[aimed]) { actions[plain]?.setEffectiveWeight(w * (1 - a)); actions[aimed].setEffectiveWeight(w * a); }
-      else actions[plain]?.setEffectiveWeight(w);
+    // ---- Richtung: vor / zurück / seitwärts, wenn das Modell Richtungs-Clips hat ----
+    let fwdW = 1, backW = 0, leftW = 0, rightW = 0;
+    if (actions.runLeft && moving) {
+      const adv = state.advance ?? 1, str = state.strafe ?? 0;
+      fwdW = Math.max(0, adv); backW = Math.max(0, -adv);
+      rightW = Math.max(0, str); leftW = Math.max(0, -str);
+      const sum = fwdW + backW + leftW + rightW || 1;
+      fwdW /= sum; backW /= sum; leftW /= sum; rightW /= sum;
+    }
+    // Seit- und Rückwärtsclips gibt es nur als Lauf: bei Gehtempo laufen sie langsamer ab
+    const side = run + walk;
+    const target = {
+      idle: 1 - run - walk,
+      walk: walk * fwdW, run: run * fwdW,
+      runLeft: side * leftW, runRight: side * rightW, runBack: side * backW,
     };
-    pair('idle', 'aimIdle', this.w.idle);
-    pair('walk', 'aimWalk', this.w.walk);
-    pair('run', 'aimRun', this.w.run);
-    // Schrittfrequenz ans Tempo koppeln, sonst rutschen die Füße
-    const ws = THREE.MathUtils.clamp(speed / ANIM.walkCycleSpeed, 0.6, 1.8);
-    const rs = THREE.MathUtils.clamp(speed / ANIM.runCycleSpeed, 0.7, 1.6);
+    this.aim = damp(this.aim, state.aiming ? 1 : 0, ANIM.aimBlend, dt);
+    const a = this.hasAimClips ? this.aim : 0;   // Modelle mit Vollkörper-Zielclips
+    const pair = (plain, aimed, w) => {
+      this.w[plain] = damp(this.w[plain] || 0, w, ANIM.blend, dt);
+      if (actions[aimed]) {
+        actions[plain]?.setEffectiveWeight(this.w[plain] * (1 - a));
+        actions[aimed].setEffectiveWeight(this.w[plain] * a);
+      } else actions[plain]?.setEffectiveWeight(this.w[plain]);
+    };
+    pair('idle', 'aimIdle', target.idle);
+    pair('walk', 'aimWalk', target.walk);
+    pair('run', 'aimRun', target.run);
+    for (const k of ['runLeft', 'runRight', 'runBack']) {
+      if (!actions[k]) continue;
+      this.w[k] = damp(this.w[k] || 0, target[k], ANIM.blend, dt);
+      actions[k].setEffectiveWeight(this.w[k]);
+    }
+
+    // ---- Schrittfrequenz ans Tempo koppeln, sonst rutschen die Füße ----
+    const cyc = def.cycle || {};
+    const ws = THREE.MathUtils.clamp(speed / (cyc.walkSpeed || ANIM.walkCycleSpeed), 0.6, 1.8);
+    const rs = THREE.MathUtils.clamp(speed / (cyc.runSpeed || ANIM.runCycleSpeed), 0.55, 1.6);
     actions.walk?.setEffectiveTimeScale(ws); actions.aimWalk?.setEffectiveTimeScale(ws);
-    actions.run?.setEffectiveTimeScale(rs); actions.aimRun?.setEffectiveTimeScale(rs);
+    for (const k of ['run', 'aimRun', 'runLeft', 'runRight', 'runBack']) actions[k]?.setEffectiveTimeScale(rs);
+
+    // ---- Oberkörper-Ebene: Anschlag über jeder Gangart ----
+    // Der Mixer normiert Gewichte pro Knochen; ein hohes Gewicht auf der
+    // Ebene lässt den Oberkörper fast vollständig dem Zielclip folgen.
+    if (layers.aim) layers.aim.setEffectiveWeight(this.aim * ANIM.layerWeight);
 
     mixer.update(dt);
 
-    // Overlays auf die Clip-Pose (nur ohne eigene Ziel-Clips)
+    // ---- Overlays per Knochen, nur für Modelle ohne eigene Zielclips ----
     if (this.tune) {
       this._aim(this.aim);
       if (this.rig.weaponRest) this.rig.weapon.position.z = this.rig.weaponRest.z - 0.12 * this.recoil;
-    } else if (this.recoil > 0 && this.bones.chest) {
+    } else if (!layers.shoot && this.recoil > 0 && this.bones.chest) {
       this.bones.chest.rotateX(-0.12 * this.recoil);   // kleiner Ruck beim Schuss
     }
   }

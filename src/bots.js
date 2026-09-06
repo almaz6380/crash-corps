@@ -88,9 +88,20 @@ export class Bot {
       const d = this.pos.clone().sub(o.pos).setY(0); const l = d.length();
       if (l < 1.4 && l > 0) this.pos.addScaledVector(d.normalize(), (1.4 - l) * 0.5);
     }
-    // Blickrichtung
+    // Blickrichtung: weich drehen statt umschnappen
     const look = sees ? player.pos : this.pos.clone().add(mv);
-    this.mesh.rotation.y = Math.atan2(look.x - this.pos.x, look.z - this.pos.z);
+    if (walking || sees) {
+      const want = Math.atan2(look.x - this.pos.x, look.z - this.pos.z);
+      let d = want - this.mesh.rotation.y;
+      d = Math.atan2(Math.sin(d), Math.cos(d));                 // kürzester Weg
+      this.mesh.rotation.y += d * Math.min(1, dt * (sees ? 12 : 7));
+    }
+    // Bewegungsrichtung relativ zur Blickrichtung (für Seitwärts-/Rückwärtslaufen)
+    const yaw = this.mesh.rotation.y;
+    const fwd = new THREE.Vector3(Math.sin(yaw), 0, Math.cos(yaw));
+    const right = new THREE.Vector3(fwd.z, 0, -fwd.x);
+    const advance = walking ? mv.dot(fwd) : 0;
+    const strafe = walking ? mv.dot(right) : 0;
 
     // Schießen mit Reaktionszeit + Streuung
     const aiming = sees && this.reaction > 0.35;
@@ -106,6 +117,6 @@ export class Bot {
       }
     } else if (!sees && this.weapon.ammo < this.weapon.def.mag) this.weapon.reload();
 
-    this.anim.update(dt, { moving: walking, speed, aiming });
+    this.anim.update(dt, { moving: walking, speed, aiming, advance, strafe });
   }
 }

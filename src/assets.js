@@ -23,9 +23,16 @@ export const CHARACTER_MODELS = {
     },
     clips: {
       idle: 'Idle_Gun', walk: 'Walk', run: 'Run',
-      aimIdle: 'Idle_Gun_Pointing', aimRun: 'Run_Shoot',
-      death: 'Death', hit: 'HitRecieve',
+      runLeft: 'Run_Left', runRight: 'Run_Right', runBack: 'Run_Back',
+      death: 'Death',
     },
+    // Oberkörper-Ebene: diese Clips laufen nur auf den Knochen ab Rumpf aufwärts,
+    // die Beine behalten die Gangart. Zielen liegt dauerhaft drüber, Schuss und
+    // Treffer als Einmal-Clips.
+    upperBones: ['Torso', 'Chest', 'Neck', 'Head', 'Shoulder', 'UpperArm', 'LowerArm', 'Wrist',
+                 'Index', 'Middle', 'Ring', 'Pinky', 'Thumb'],
+    layers: { aim: 'Idle_Gun_Pointing', shoot: 'Gun_Shoot', hit: 'HitRecieve' },
+    cycle: { walk: 1.33, run: 0.8, walkSpeed: 1.9, runSpeed: 5.5 },   // Clip-Dauer und Tempo, für das der Zyklus gebaut ist
     grip: { pos: [0, 0.06, 0.02], rot: [-1.5708, 0, 0], scale: 0.62 },
     tintMaterials: ['SciFi_Main'],
   },
@@ -42,9 +49,16 @@ export const CHARACTER_MODELS = {
     },
     clips: {
       idle: 'Idle_Gun', walk: 'Walk', run: 'Run',
-      aimIdle: 'Idle_Gun_Pointing', aimRun: 'Run_Shoot',
-      death: 'Death', hit: 'HitRecieve',
+      runLeft: 'Run_Left', runRight: 'Run_Right', runBack: 'Run_Back',
+      death: 'Death',
     },
+    // Oberkörper-Ebene: diese Clips laufen nur auf den Knochen ab Rumpf aufwärts,
+    // die Beine behalten die Gangart. Zielen liegt dauerhaft drüber, Schuss und
+    // Treffer als Einmal-Clips.
+    upperBones: ['Torso', 'Chest', 'Neck', 'Head', 'Shoulder', 'UpperArm', 'LowerArm', 'Wrist',
+                 'Index', 'Middle', 'Ring', 'Pinky', 'Thumb'],
+    layers: { aim: 'Idle_Gun_Pointing', shoot: 'Gun_Shoot', hit: 'HitRecieve' },
+    cycle: { walk: 1.33, run: 0.8, walkSpeed: 1.9, runSpeed: 5.5 },   // Clip-Dauer und Tempo, für das der Zyklus gebaut ist
     grip: { pos: [0, 0.06, 0.02], rot: [-1.5708, 0, 0], scale: 0.62 },
     tintMaterials: ['White'],
   },
@@ -61,9 +75,16 @@ export const CHARACTER_MODELS = {
     },
     clips: {
       idle: 'Idle_Gun', walk: 'Walk', run: 'Run',
-      aimIdle: 'Idle_Gun_Pointing', aimRun: 'Run_Shoot',
-      death: 'Death', hit: 'HitRecieve',
+      runLeft: 'Run_Left', runRight: 'Run_Right', runBack: 'Run_Back',
+      death: 'Death',
     },
+    // Oberkörper-Ebene: diese Clips laufen nur auf den Knochen ab Rumpf aufwärts,
+    // die Beine behalten die Gangart. Zielen liegt dauerhaft drüber, Schuss und
+    // Treffer als Einmal-Clips.
+    upperBones: ['Torso', 'Chest', 'Neck', 'Head', 'Shoulder', 'UpperArm', 'LowerArm', 'Wrist',
+                 'Index', 'Middle', 'Ring', 'Pinky', 'Thumb'],
+    layers: { aim: 'Idle_Gun_Pointing', shoot: 'Gun_Shoot', hit: 'HitRecieve' },
+    cycle: { walk: 1.33, run: 0.8, walkSpeed: 1.9, runSpeed: 5.5 },   // Clip-Dauer und Tempo, für das der Zyklus gebaut ist
     grip: { pos: [0, 0.06, 0.02], rot: [-1.5708, 0, 0], scale: 0.62 },
     tintMaterials: ['Swat'],
   },
@@ -129,6 +150,27 @@ export const CHARACTER_MODELS = {
 const cache = new Map();
 
 /**
+ * Baut aus Vollkörper-Clips Oberkörper-Clips: es bleiben nur die Tracks der in
+ * def.upperBones genannten Knochen. So kann der Anschlag über jede Gangart
+ * gelegt werden, ohne dass die Beine stehen bleiben.
+ */
+function buildLayerClips(def, clips) {
+  if (!def.layers || !def.upperBones) return {};
+  const isUpper = (trackName) => {
+    const node = trackName.split('.')[0];
+    return def.upperBones.some(b => node.startsWith(b));
+  };
+  const out = {};
+  for (const [key, clipName] of Object.entries(def.layers)) {
+    const src = THREE.AnimationClip.findByName(clips, clipName);
+    if (!src) continue;
+    const tracks = src.tracks.filter(t => isUpper(t.name)).map(t => t.clone());
+    if (tracks.length) out[key] = new THREE.AnimationClip(`${clipName}__upper`, src.duration, tracks);
+  }
+  return out;
+}
+
+/**
  * Lädt Modelle. Ohne Liste alle aus CHARACTER_MODELS, sonst nur die genannten –
  * main.js übergibt die Modelle der Klassen, damit nichts Unbenutztes geladen wird.
  */
@@ -141,7 +183,8 @@ export async function preloadCharacters(onProgress, ids = Object.keys(CHARACTER_
     const gltf = await loader.loadAsync(def.url);
     // Grundhöhe messen, damit sich Figuren später auf die Klassengröße skalieren lassen
     const box = new THREE.Box3().setFromObject(gltf.scene);
-    cache.set(id, { def, scene: gltf.scene, clips: gltf.animations, height: box.max.y - box.min.y });
+    const layers = buildLayerClips(def, gltf.animations);
+    cache.set(id, { def, scene: gltf.scene, clips: gltf.animations, layers, height: box.max.y - box.min.y });
     onProgress?.(++done / ids.length, id);
   }
 }
@@ -246,7 +289,14 @@ export function instantiate(id, { height, tint, weapon } = {}) {
     actions[key] = a;
   }
   if (actions.idle) actions.idle.setEffectiveWeight(1);
+  const layers = {};
+  for (const [key, clip] of Object.entries(entry.layers || {})) {
+    const a = mixer.clipAction(clip);
+    if (key === 'aim') { a.play(); a.setEffectiveWeight(0); }
+    else { a.setLoop(THREE.LoopOnce, 1); a.clampWhenFinished = false; }
+    layers[key] = a;
+  }
   if (root.userData) root.userData.yaw = def.yaw || 0;
 
-  return { root, mixer, actions, bones, materials, hand: bones.rightHand, builtinWeapon, def };
+  return { root, mixer, actions, layers, bones, materials, hand: bones.rightHand, builtinWeapon, def };
 }
