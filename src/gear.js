@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { cloneWeaponMesh } from './assets.js';
 
 /**
  * Waffen und Ausrüstung. Die Figuren kommen als Modelle aus public/assets/,
@@ -66,29 +67,42 @@ export function buildWeapon(kind, accent) {
   return g;
 }
 
-/** Ego-Waffe: dieselbe Waffe, nur für die Kamera gesetzt. */
+/**
+ * Ego-Waffe. Bringt das Modell der Klasse eigene Waffen-Meshes mit, wird das
+ * passende geklont – so passt die Ego-Waffe zum Stil der Figuren. Sonst die
+ * prozedurale Waffe.
+ */
 export function buildViewmodel(cls) {
   const g = new THREE.Group();
-  const w = buildWeapon(cls.weapon, cls.accent);
+  const builtin = cloneWeaponMesh(cls.model, cls.weapon);
+  const w = builtin || buildWeapon(cls.weapon, cls.accent);
   // Im Ego-Bild darf die Waffe nicht in der dunkelsten Toon-Stufe verschwinden
   w.traverse(o => {
     if (!o.isMesh) return;
-    o.material = o.material.clone();
-    o.material.color.lerp(new THREE.Color(0xffffff), 0.35);
+    const mats = Array.isArray(o.material) ? o.material : [o.material];
+    for (const m of mats) { if (m.color) m.color.lerp(new THREE.Color(0xffffff), 0.12); }
     o.castShadow = false;
   });
-  w.rotation.y = Math.PI;            // Lauf nach -z, also weg von der Kamera
-  w.scale.setScalar(0.24);
+  if (builtin) {
+    // Toon-Kit-Waffen liegen auf der Seite: Lauf entlang -x, Oberseite +z.
+    // Erst aufrichten (z → y), dann den Lauf von der Kamera weg drehen (-x → -z).
+    const roll = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), -Math.PI / 2);
+    const yaw = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), -Math.PI / 2);
+    w.quaternion.multiplyQuaternions(yaw, roll);
+    w.scale.multiplyScalar(0.42);
+  } else {
+    w.rotation.y = Math.PI;
+    w.scale.setScalar(0.24);
+    const glove = new THREE.MeshToonMaterial({ color: 0x6b5c4c });
+    const hand = (x, y, z) => {
+      const m = new THREE.Mesh(roundedBox(0.06, 0.07, 0.075, 0.02), glove);
+      m.position.set(x, y, z); g.add(m);
+    };
+    hand(0, -0.06, 0.05);
+    hand(-0.01, -0.04, -0.09);
+  }
   g.add(w);
-  // Handschuhe an der Waffe, damit sie nicht frei schwebt
-  const glove = new THREE.MeshToonMaterial({ color: 0x6b5c4c });
-  const hand = (x, y, z) => {
-    const m = new THREE.Mesh(roundedBox(0.06, 0.07, 0.075, 0.02), glove);
-    m.position.set(x, y, z); g.add(m);
-  };
-  hand(0, -0.06, 0.05);
-  hand(-0.01, -0.04, -0.09);
-  g.position.set(0.34, -0.3, -0.82);
+  g.position.set(0.3, -0.27, -0.6);
   g.rotation.set(0.02, -0.16, 0.03);   // leicht eingedreht, sonst sieht man nur den Schaft
   // Eigenes Nahlicht: die Waffe hängt an der Kamera und läge sonst je nach
   // Blickrichtung im Schatten der Sonne. Kurze Reichweite, damit die Arena

@@ -45,7 +45,8 @@ export class CharacterAnimator {
     this.inst = rig.inst;
     this.bones = rig.inst.bones;
     this.mesh = mesh;
-    this.tune = rig.inst.def.aimTune || {};
+    this.tune = rig.inst.def.aimTune || null;      // null: Modell bringt eigene Ziel-Clips mit
+    this.hasAimClips = !!(rig.inst.actions.aimIdle || rig.inst.actions.aimWalk || rig.inst.actions.aimRun);
     const b = this.bones;
     // Gliedmaßen-Achsen aus der Ruhelage: Richtung vom Knochen zu seinem Kind
     this.axis = {
@@ -65,7 +66,15 @@ export class CharacterAnimator {
     if (this.death > 0) return;
     this.death = 1e-4;
     this.fallDir = Math.random() < 0.5 ? 1 : -1;
-    this.inst.mixer.timeScale = 0;                // Pose einfrieren, dann kippen
+    const { actions, mixer } = this.inst;
+    if (actions.death) {
+      // Sterbe-Clip: alles andere ausblenden, Clip einmal abspielen und Endpose halten
+      for (const [k, a] of Object.entries(actions)) if (k !== 'death') a.setEffectiveWeight(0);
+      actions.death.reset().setEffectiveWeight(1).play();
+      this.deathClip = actions.death.getClip().duration;
+    } else {
+      mixer.timeScale = 0;                          // Pose einfrieren, dann kippen
+    }
   }
   get fallen() { return this.death >= 1; }
 
@@ -74,9 +83,12 @@ export class CharacterAnimator {
     this.w = { idle: 1, walk: 0, run: 0 };
     this.aim = this.recoil = this.hurt = this.death = 0;
     r.frame.rotation.set(0, 0, 0); r.frame.position.set(0, 0, 0);
-    r.weapon.position.copy(r.weaponRest);
+    if (r.weaponRest) r.weapon.position.copy(r.weaponRest);
     this.inst.mixer.timeScale = 1;
-    for (const [k, a] of Object.entries(this.inst.actions)) a.setEffectiveWeight(k === 'idle' ? 1 : 0);
+    for (const [k, a] of Object.entries(this.inst.actions)) {
+      if (k === 'death' || k === 'hit') a.stop();
+      else { a.play(); a.setEffectiveWeight(k === 'idle' ? 1 : 0); }
+    }
     for (const m of this.inst.materials) m.emissive?.setScalar(0);
   }
 
@@ -95,19 +107,32 @@ export class CharacterAnimator {
     this.w.run = damp(this.w.run, run, ANIM.blend, dt);
     this.w.walk = damp(this.w.walk, walk, ANIM.blend, dt);
     this.w.idle = damp(this.w.idle, 1 - run - walk, ANIM.blend, dt);
-    actions.run?.setEffectiveWeight(this.w.run);
-    actions.walk?.setEffectiveWeight(this.w.walk);
-    actions.idle?.setEffectiveWeight(this.w.idle);
+    this.aim = damp(this.aim, state.aiming ? 1 : 0, ANIM.aimBlend, dt);
+
+    // Mit Ziel-Clips: jede Gangart hat eine Anschlag-Variante, gemischt über das Zielgewicht
+    const a = this.hasAimClips ? this.aim : 0;
+    const pair = (plain, aimed, w) => {
+      if (actions[aimed]) { actions[plain]?.setEffectiveWeight(w * (1 - a)); actions[aimed].setEffectiveWeight(w * a); }
+      else actions[plain]?.setEffectiveWeight(w);
+    };
+    pair('idle', 'aimIdle', this.w.idle);
+    pair('walk', 'aimWalk', this.w.walk);
+    pair('run', 'aimRun', this.w.run);
     // Schrittfrequenz ans Tempo koppeln, sonst rutschen die Füße
-    actions.walk?.setEffectiveTimeScale(THREE.MathUtils.clamp(speed / ANIM.walkCycleSpeed, 0.6, 1.8));
-    actions.run?.setEffectiveTimeScale(THREE.MathUtils.clamp(speed / ANIM.runCycleSpeed, 0.7, 1.6));
+    const ws = THREE.MathUtils.clamp(speed / ANIM.walkCycleSpeed, 0.6, 1.8);
+    const rs = THREE.MathUtils.clamp(speed / ANIM.runCycleSpeed, 0.7, 1.6);
+    actions.walk?.setEffectiveTimeScale(ws); actions.aimWalk?.setEffectiveTimeScale(ws);
+    actions.run?.setEffectiveTimeScale(rs); actions.aimRun?.setEffectiveTimeScale(rs);
 
     mixer.update(dt);
 
-    // Overlays auf die Clip-Pose
-    this.aim = damp(this.aim, state.aiming ? 1 : 0, ANIM.aimBlend, dt);
-    this._aim(this.aim);
-    this.rig.weapon.position.z = this.rig.weaponRest.z - 0.12 * this.recoil;
+    // Overlays auf die Clip-Pose (nur ohne eigene Ziel-Clips)
+    if (this.tune) {
+      this._aim(this.aim);
+      if (this.rig.weaponRest) this.rig.weapon.position.z = this.rig.weaponRest.z - 0.12 * this.recoil;
+    } else if (this.recoil > 0 && this.bones.chest) {
+      this.bones.chest.rotateX(-0.12 * this.recoil);   // kleiner Ruck beim Schuss
+    }
   }
 
   /** Arme in den Anschlag führen und die Waffe nach vorn ausrichten. */
@@ -156,6 +181,11 @@ export class CharacterAnimator {
   }
 
   _death(dt) {
+    if (this.inst.actions.death) {
+      this.inst.mixer.update(dt);
+      this.death = Math.min(1, this.death + dt / Math.max(0.2, this.deathClip || ANIM.deathTime));
+      return;
+    }
     this.death = Math.min(1, this.death + dt / ANIM.deathTime);
     const e = 1 - Math.pow(1 - this.death, 3);
     this.inst.mixer.update(0);                       // eingefrorene Pose halten

@@ -55,9 +55,9 @@ export class Bot {
   update(dt, player, others, fx) {
     this.weapon.update(dt);
     if (this.dead) {
+      // Leiche bleibt bis zum Respawn liegen
       this.respawnIn -= dt;
       this.anim.update(dt);
-      if (this.anim.fallen) this.mesh.visible = false;
       return;
     }
 

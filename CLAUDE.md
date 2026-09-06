@@ -4,7 +4,7 @@ Class-based Cartoon-Arena-Shooter im Browser. Inspiriert von Team-Fortress-artig
 
 ## Stack
 - Vite + Three.js (ES-Module, kein Framework)
-- Figuren als glTF-Modelle aus `public/assets/characters/`, geladen über `assets.js`. Arena, Waffen und Effekte weiterhin prozedural per Code.
+- Figuren als glTF-Modelle aus `public/assets/characters/` (Quaternius Toon Shooter Kit, CC0), geladen über `assets.js`. Waffen kommen mit den Modellen; Arena und Effekte weiterhin prozedural per Code.
 - Look: Cel-Shading mit Lichtstufen-Rampe, Outline aus Tiefe/Normalen, ACES-Tone-Mapping (`render.js`).
 - Kein TypeScript im Prototyp, JSDoc wo sinnvoll.
 
@@ -19,9 +19,9 @@ src/
   bots.js      Bot-Gegner (Zustandsautomat: patrol → chase → shoot)
   characters.js Prozedurale Low-Poly-Figur pro Klasse
   assets.js    Modell-Manifest, Laden, Klonen pro Figur (Knochen, Clips, Materialien)
-  gear.js      Waffen pro Klasse + Ego-Waffe (prozedural)
+  gear.js      Ego-Waffe (Klon aus dem Modell) + prozedurale Ersatzwaffen für Modelle ohne eigene
   render.js    Cel-Shading, Outline-Pass, Himmel, Tone-Mapping
-  animation.js Skelett-Clips (Stehen/Gehen/Rennen) + Knochen-Overlays (Anschlag, Rückstoß, Umfallen)
+  animation.js Skelett-Clips (Stehen/Gehen/Rennen, Anschlag-Varianten, Tod) + Knochen-Overlays als Ersatz
   hud.js       DOM-HUD (HP, Munition, Fadenkreuz, Killfeed, Score, Klassenwahl)
   style.css
 ```
@@ -30,7 +30,7 @@ src/
 - Gameplay-Werte (HP, Schaden, Cooldowns) leben nur in `classes.js` / `weapons.js`, nirgends hartcodiert.
 - Kein Server-Code in diesem Repo, bis der Single-Player-Loop sauber ist. Multiplayer kommt als separater Schritt (autoritativer Server, Colyseus oder eigenes WS-Protokoll).
 - Neue Klasse = Eintrag in `classes.js` (inkl. `model`) + ggf. Modell-Eintrag in `assets.js`. Sonst nichts anfassen.
-- Fremde Assets sind Platzhalter und müssen vor Veröffentlichung durch eigene ersetzt werden.
+- Die Toon-Kit-Figuren sind CC0 und dürfen bleiben. Eigene Modelle: siehe public/assets/README.md.
 - Performance-Ziel: 60 fps auf Mittelklasse-Laptop, spielbar auf Handy (Touch-Controls sind Roadmap, nicht Prototyp).
 - Nach Änderungen `npm run build` laufen lassen; muss ohne Fehler durchgehen.
 
@@ -41,7 +41,7 @@ src/
 4. [x] Charakter-Animation prozedural (Laufen, Anschlag/Rückstoß, Umfallen) – Mixamo später
 5. [ ] Sounds
 6. [ ] Touch-Controls (Mobile)
-7. [x] Asset-Pipeline: Modelle in `public/assets/`, Loader in `assets.js` (Modell derzeit Platzhalter, siehe public/assets/README.md)
+7. [x] Asset-Pipeline: Modelle in `public/assets/`, Loader in `assets.js` (Quaternius Toon Shooter Kit, CC0)
 8. [ ] Multiplayer-Server (eigenes Repo)
 
 ## Start

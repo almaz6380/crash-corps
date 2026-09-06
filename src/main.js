@@ -97,7 +97,7 @@ hud.onPick = start;
 
 // Figuren laden, bevor das Menü freigegeben wird
 hud.showMenu(false); hud.loading('Figuren werden geladen …');
-preloadCharacters((p) => hud.loading(`Figuren werden geladen … ${Math.round(p * 100)}%`))
+preloadCharacters((p) => hud.loading(`Figuren werden geladen … ${Math.round(p * 100)}%`), Object.values(CLASSES).map(c => c.model))
   .then(() => { hud.loading(null); hud.showMenu(true); })
   .catch((err) => {
     console.error(err);
