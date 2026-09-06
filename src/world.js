@@ -1,10 +1,22 @@
 import * as THREE from 'three';
 import { celRamp, buildSky } from './render.js';
+import { spawnProp } from './assets.js';
 
 const RAMP = celRamp(4);
-const toon = (c) => new THREE.MeshToonMaterial({ color: c, gradientMap: RAMP });
 
-/** Baut die Arena. Gibt {group, colliders, spawns, bounds} zurück. */
+/** Props, die die Arena braucht – main.js lädt sie vor dem Aufbau. */
+export const WORLD_PROPS = [
+  'Structure_1', 'Structure_2', 'Structure_4', 'Container_Long', 'Container_Small', 'Crate',
+  'SackTrench', 'SackTrench_Small', 'BrickWall_2', 'Barrier_Large', 'Barrier_Single',
+  'CardboardBoxes_2', 'Pallet', 'ExplodingBarrel', 'GasTank', 'Pipes', 'Debris_Tires',
+  'Debris_BrokenCar', 'Tank', 'TrafficCone', 'StreetLight', 'MetalFence', 'Tree_1', 'Tree_2', 'Sign',
+];
+
+/**
+ * Baut die Arena aus den Toon-Kit-Props. Gibt {group, colliders, spawns, bounds} zurück.
+ * colliders sind unsichtbare Quader (für Bewegung und Sichtlinie); die Props
+ * selbst sind reine Optik.
+ */
 export function buildWorld(scene) {
   const group = new THREE.Group();
   const colliders = [];
@@ -27,34 +39,87 @@ export function buildWorld(scene) {
   const tex = new THREE.CanvasTexture(c);
   tex.wrapS = tex.wrapT = THREE.RepeatWrapping; tex.repeat.set(14, 14);
   tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 8;
-  const ground = new THREE.Mesh(new THREE.PlaneGeometry(SIZE, SIZE), new THREE.MeshToonMaterial({ map: tex, gradientMap: RAMP }));
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(SIZE * 3, SIZE * 3), new THREE.MeshToonMaterial({ map: tex, gradientMap: RAMP }));
   ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true;
   group.add(ground);
 
-  // Außenmauern
-  const wallMat = toon(0xd9c8a9);
-  const addBox = (x, y, z, w, h, d, m = wallMat) => {
-    const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m);
-    mesh.position.set(x, y, z); mesh.castShadow = mesh.receiveShadow = true;
-    group.add(mesh); colliders.push(mesh); return mesh;
+  // Unsichtbarer Kollisionsquader. Bewegung und Raycasts laufen dagegen,
+  // die Box wird einmal berechnet und nicht pro Frame neu.
+  const solidBox = (box) => {
+    const size = box.getSize(new THREE.Vector3()), center = box.getCenter(new THREE.Vector3());
+    const proxy = new THREE.Mesh(new THREE.BoxGeometry(size.x, size.y, size.z), new THREE.MeshBasicMaterial({ visible: false }));
+    proxy.position.copy(center); proxy.updateMatrixWorld(true);
+    proxy.userData.box = box.clone();
+    group.add(proxy); colliders.push(proxy);
+    return proxy;
   };
+  const addBox = (x, y, z, w, h, d) => solidBox(new THREE.Box3(new THREE.Vector3(x - w / 2, y - h / 2, z - d / 2), new THREE.Vector3(x + w / 2, y + h / 2, z + d / 2)));
+
+  /**
+   * Prop setzen. solid: Kollisionsquader aus der Bounding-Box.
+   * pad: Quader schrumpfen (m), damit man Kanten nicht schon weit vorher berührt.
+   */
+  const place = (name, x, z, ry = 0, { solid = true, scale = 1, y = 0, pad = 0 } = {}) => {
+    const p = spawnProp(name, { ramp: RAMP });
+    p.position.set(x, y, z); p.rotation.y = ry; p.scale.setScalar(scale);
+    group.add(p); p.updateMatrixWorld(true);
+    if (solid) {
+      const box = new THREE.Box3().setFromObject(p);
+      box.min.x += pad; box.min.z += pad; box.max.x -= pad; box.max.z -= pad;
+      box.min.y = Math.min(box.min.y, 0);
+      solidBox(box);
+    }
+    return p;
+  };
+
+  // ---- Außengrenze: Zaunring + unsichtbare Wände ----
   const H = 4, T = 1;
   addBox(0, H / 2, -SIZE / 2, SIZE, H, T); addBox(0, H / 2, SIZE / 2, SIZE, H, T);
   addBox(-SIZE / 2, H / 2, 0, T, H, SIZE); addBox(SIZE / 2, H / 2, 0, T, H, SIZE);
+  for (let i = 0; i < 17; i++) {
+    const s = i * 3.5 - 28;
+    place('MetalFence', s, -SIZE / 2, 0, { solid: false });
+    place('MetalFence', s, SIZE / 2, 0, { solid: false });
+    place('MetalFence', -SIZE / 2, s, Math.PI / 2, { solid: false });
+    place('MetalFence', SIZE / 2, s, Math.PI / 2, { solid: false });
+  }
+  // Bäume außerhalb des Zauns als Kulisse
+  for (let i = 0; i < 28; i++) {
+    const a = (i / 28) * Math.PI * 2 + (i % 2) * 0.1;
+    const r = 36 + (i % 3) * 4;
+    place(i % 2 ? 'Tree_1' : 'Tree_2', Math.cos(a) * r, Math.sin(a) * r, a, { solid: false, scale: 0.9 + (i % 4) * 0.12 });
+  }
+  for (const [x, z] of [[-27, -27], [27, 27], [-27, 27], [27, -27]]) place('StreetLight', x, z, Math.atan2(-x, -z), { pad: 0.1 });
 
-  // Deckung: Kisten, Sandsäcke, Ruinen – symmetrisch für Fairness
-  const crate = toon(0xc98a4b), sand = toon(0xe3c78a), ruin = toon(0x9a8f86);
-  const layout = [
-    [0, 0, 6, 3, 6, ruin],        // Mitte
-    [10, 8, 3, 2, 3, crate], [-10, -8, 3, 2, 3, crate],
-    [-10, 8, 3, 2, 3, crate], [10, -8, 3, 2, 3, crate],
-    [0, 16, 8, 1.2, 1.5, sand], [0, -16, 8, 1.2, 1.5, sand],
-    [18, 0, 1.5, 1.2, 8, sand], [-18, 0, 1.5, 1.2, 8, sand],
-    [20, 18, 4, 5, 4, ruin], [-20, -18, 4, 5, 4, ruin],
-    [-20, 18, 2, 2, 2, crate], [20, -18, 2, 2, 2, crate],
-    [6, -22, 5, 2.5, 2, ruin], [-6, 22, 5, 2.5, 2, ruin],
-  ];
-  for (const [x, z, w, h, d, m] of layout) addBox(x, h / 2, z, w, h, d, m);
+  // ---- Deckung: symmetrisch für Fairness, Positionen wie im Prototyp ----
+  place('Structure_1', 0, 0, 0, { pad: 0.3 });                                  // Mitte
+  place('GasTank', 5.2, 3.4, 0.4); place('Pipes', -5.2, -3.2, 0, { y: 2.13, pad: 0.2 });
+
+  place('Container_Small', 10, 8, 0.25); place('Crate', 12.2, 6.6, 0.5);        // Kisten-Ecken
+  place('Container_Small', -10, -8, 0.25); place('Crate', -12.2, -6.6, 0.5);
+  place('CardboardBoxes_2', -10, 8, -0.4); place('Crate', -9.4, 9.6, 0.2); place('ExplodingBarrel', -11.6, 7.2, 0);
+  place('CardboardBoxes_2', 10, -8, -0.4); place('Crate', 9.4, -9.6, 0.2); place('ExplodingBarrel', 11.6, -7.2, 0);
+
+  place('SackTrench', -1.7, 16, 0); place('SackTrench', 1.7, 16, 0);            // Sandsäcke
+  place('SackTrench', -1.7, -16, Math.PI); place('SackTrench', 1.7, -16, Math.PI);
+  place('SackTrench_Small', 18, -1.3, Math.PI / 2); place('SackTrench_Small', 18, 1.3, Math.PI / 2);
+  place('SackTrench_Small', -18, -1.3, -Math.PI / 2); place('SackTrench_Small', -18, 1.3, -Math.PI / 2);
+
+  place('Structure_2', 19, 16, Math.PI, { pad: 0.3 });                          // große Ruinen
+  place('Structure_4', -19, -16, 0, { pad: 0.3 });
+
+  place('Container_Long', -20, 18, 0.35); place('Pallet', -16.5, 20.5, 0.3, { solid: false }); place('Crate', -16.5, 20.5, 0.3);
+  place('Container_Long', 20, -18, 0.35); place('Pallet', 16.5, -20.5, 0.3, { solid: false }); place('Crate', 16.5, -20.5, 0.3);
+
+  place('BrickWall_2', 6, -22, 0); place('Barrier_Large', 9.2, -22, 0);          // niedrige Deckung an den Enden
+  place('BrickWall_2', -6, 22, 0); place('Barrier_Large', -9.2, 22, 0);
+
+  place('Debris_BrokenCar', 25, -6, 1.2);                                       // Kulisse mit Kollision
+  place('Tank', -24, 7, 0.9);
+  place('Debris_Tires', 24, 24, 0.3); place('Debris_Tires', -24, -24, 1.1);
+  for (const [x, z] of [[4, -10], [-4, 10], [14, 2], [-14, -2]]) place('TrafficCone', x, z, 0, { solid: false });
+  place('Barrier_Single', 0, 25, 0); place('Barrier_Single', 0, -25, 0);
+  place('Sign', 7, 0.5, -0.8, { solid: false }); place('Sign', -7, -0.5, 2.3, { solid: false });
 
   // Kontrollpunkt-Marker (für Domination später) – jetzt nur Deko
   const ringMat = new THREE.MeshBasicMaterial({ color: 0xffd166 });
@@ -85,13 +150,13 @@ export function buildWorld(scene) {
 }
 
 /** Grobe Kollision: Kapsel (Kreis auf XZ) gegen AABB-Kollider. Schiebt pos raus. */
+const _box = new THREE.Box3();
 export function resolveCollisions(pos, radius, world) {
   const b = world.bounds;
   pos.x = Math.min(b, Math.max(-b, pos.x));
   pos.z = Math.min(b, Math.max(-b, pos.z));
-  const box = new THREE.Box3();
   for (const m of world.colliders) {
-    box.setFromObject(m);
+    const box = m.userData.box || _box.setFromObject(m);
     if (pos.y > box.max.y) continue;
     const cx = Math.max(box.min.x, Math.min(pos.x, box.max.x));
     const cz = Math.max(box.min.z, Math.min(pos.z, box.max.z));

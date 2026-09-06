@@ -300,3 +300,49 @@ export function instantiate(id, { height, tint, weapon } = {}) {
 
   return { root, mixer, actions, layers, bones, materials, hand: bones.rightHand, builtinWeapon, def };
 }
+
+// ---------------------------------------------------------------------------
+// Props (Arena-Ausstattung). Statische Modelle, werden einmal geladen und
+// per clone() beliebig oft gesetzt – Geometrie wird dabei geteilt.
+// ---------------------------------------------------------------------------
+const propCache = new Map();
+
+/** Lädt Props aus public/assets/props/<name>.glb. */
+export async function preloadProps(names, onProgress) {
+  const loader = new GLTFLoader();
+  const list = [...new Set(names)].filter(n => !propCache.has(n));
+  let done = 0;
+  await Promise.all(list.map(async (name) => {
+    const gltf = await loader.loadAsync(`assets/props/${name}.glb`);
+    const root = gltf.scene;
+    root.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+    propCache.set(name, root);
+    onProgress?.(++done / list.length, name);
+  }));
+}
+
+/**
+ * Setzt eine Instanz eines geladenen Props. Materialien werden pro Name auf
+ * Toon umgestellt (Cel-Rampe), damit die Arena zum Rest des Looks passt.
+ */
+export function spawnProp(name, { ramp } = {}) {
+  const src = propCache.get(name);
+  if (!src) throw new Error(`Prop "${name}" ist nicht geladen`);
+  const m = src.clone(true);
+  if (ramp) {
+    m.traverse(o => {
+      if (!o.isMesh) return;
+      const conv = (mat) => {
+        const key = mat.uuid;
+        if (!toonCache.has(key)) {
+          const t = new THREE.MeshToonMaterial({ color: mat.color, map: mat.map || null, gradientMap: ramp, transparent: mat.transparent, opacity: mat.opacity, side: mat.side });
+          toonCache.set(key, t);
+        }
+        return toonCache.get(key);
+      };
+      o.material = Array.isArray(o.material) ? o.material.map(conv) : conv(o.material);
+    });
+  }
+  return m;
+}
+const toonCache = new Map();

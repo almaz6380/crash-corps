@@ -30,6 +30,15 @@ Comic-Proportionen mit großem Kopf. 43 Knochen, 14 Waffen-Meshes am Knochen
 Sandsäcke, Kisten, Fässer, Zäune, Bäume) – noch nicht eingebunden.
 Quelle: https://quaternius.com/packs/toonshootergamekit.html
 
+## props/*.glb — Arena-Ausstattung aus dem „Toon Shooter Game Kit" (CC0)
+
+30 statische Props (Container, Structures, Sandsäcke, Zaun, Bäume, Panzer,
+Autowrack, Fässer, Kisten, Straßenlaterne, …), nach GLB gepackt. Geladen
+über `preloadProps()` in `assets.js`, gesetzt in `world.js` mit `place()`.
+Jedes solide Prop bekommt einen unsichtbaren Kollisionsquader aus seiner
+Bounding-Box; Bewegung und Sichtlinien laufen dagegen, das Modell ist Optik.
+Quelle: https://quaternius.com/packs/toonshootergamekit.html
+
 ## Eigene Figuren einhängen
 
 1. GLB nach `public/assets/characters/<name>.glb` legen.

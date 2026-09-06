@@ -4,7 +4,7 @@ Class-based Cartoon-Arena-Shooter im Browser. Inspiriert von Team-Fortress-artig
 
 ## Stack
 - Vite + Three.js (ES-Module, kein Framework)
-- Figuren als glTF-Modelle aus `public/assets/characters/` (Quaternius Ultimate Modular Men, CC0), geladen über `assets.js`. Waffen prozedural aus `gear.js` am Handknochen; Arena und Effekte weiterhin per Code.
+- Figuren als glTF-Modelle aus `public/assets/characters/` (Quaternius Ultimate Modular Men, CC0), geladen über `assets.js`. Waffen prozedural aus `gear.js` am Handknochen. Arena aus Toon-Kit-Props (`public/assets/props/`), Effekte per Code.
 - Look: Cel-Shading mit Lichtstufen-Rampe, Outline aus Tiefe/Normalen, ACES-Tone-Mapping (`render.js`).
 - Kein TypeScript im Prototyp, JSDoc wo sinnvoll.
 
@@ -12,7 +12,7 @@ Class-based Cartoon-Arena-Shooter im Browser. Inspiriert von Team-Fortress-artig
 ```
 src/
   main.js      Bootstrap, Game-Loop, Zustand (Menü → Match → Ende)
-  world.js     Arena-Aufbau (Boden, Deckung, Flaggenpunkte, Licht)
+  world.js     Arena-Aufbau aus Props (Zaun, Deckung, Kulisse), Kollisionsquader, Flaggenpunkte, Licht
   player.js    FPS-Controller (PointerLock, WASD, Sprung, Kollision grob)
   classes.js   Klassendefinitionen (HP, Speed, Waffe, Farbe, Spezial)
   weapons.js   Waffenlogik (Raycast-Hitscan, Cooldown, Spread, Schaden)

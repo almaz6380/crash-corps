@@ -1,11 +1,11 @@
 import * as THREE from 'three';
 import { CLASSES } from './classes.js';
-import { buildWorld } from './world.js';
+import { buildWorld, WORLD_PROPS } from './world.js';
 import { Player } from './player.js';
 import { Bot } from './bots.js';
 import { Hud } from './hud.js';
 import { Pipeline } from './render.js';
-import { preloadCharacters } from './assets.js';
+import { preloadCharacters, preloadProps } from './assets.js';
 
 const canvas = document.getElementById('game');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
@@ -16,7 +16,7 @@ camera.userData.canvas = canvas;
 scene.add(camera);
 const pipeline = new Pipeline(renderer, camera);
 
-const world = buildWorld(scene);
+let world = null;                      // wird nach dem Laden der Props gebaut
 const hud = new Hud(document.getElementById('hud'));
 
 // Effekte: kurze Leuchtspuren + Treffer-Funken
@@ -95,13 +95,16 @@ function start(clsId) {
 }
 hud.onPick = start;
 
-// Figuren laden, bevor das Menü freigegeben wird
-hud.showMenu(false); hud.loading('Figuren werden geladen …');
-preloadCharacters((p) => hud.loading(`Figuren werden geladen … ${Math.round(p * 100)}%`), Object.values(CLASSES).map(c => c.model))
-  .then(() => { hud.loading(null); hud.showMenu(true); })
+// Figuren und Arena-Props laden, dann Arena bauen, dann Menü freigeben
+hud.showMenu(false); hud.loading('Wird geladen …');
+Promise.all([
+  preloadCharacters((p) => hud.loading(`Figuren … ${Math.round(p * 100)}%`), Object.values(CLASSES).map(c => c.model)),
+  preloadProps(WORLD_PROPS, (p) => hud.loading(`Arena … ${Math.round(p * 100)}%`)),
+])
+  .then(() => { world = buildWorld(scene); hud.loading(null); hud.showMenu(true); })
   .catch((err) => {
     console.error(err);
-    hud.loading('Figuren konnten nicht geladen werden. Liegt das Modell in public/assets/characters/?');
+    hud.loading('Assets konnten nicht geladen werden. Liegen die Modelle in public/assets/?');
   });
 
 canvas.addEventListener('click', () => { if (running && document.pointerLockElement !== canvas) canvas.requestPointerLock(); });
