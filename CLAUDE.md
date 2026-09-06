@@ -4,7 +4,7 @@ Class-based Cartoon-Arena-Shooter im Browser. Inspiriert von Team-Fortress-artig
 
 ## Stack
 - Vite + Three.js (ES-Module, kein Framework)
-- Figuren als glTF-Modelle aus `public/assets/characters/` (Quaternius Toon Shooter Kit, CC0), geladen über `assets.js`. Waffen kommen mit den Modellen; Arena und Effekte weiterhin prozedural per Code.
+- Figuren als glTF-Modelle aus `public/assets/characters/` (Quaternius Ultimate Modular Men, CC0), geladen über `assets.js`. Waffen prozedural aus `gear.js` am Handknochen; Arena und Effekte weiterhin per Code.
 - Look: Cel-Shading mit Lichtstufen-Rampe, Outline aus Tiefe/Normalen, ACES-Tone-Mapping (`render.js`).
 - Kein TypeScript im Prototyp, JSDoc wo sinnvoll.
 
@@ -41,7 +41,7 @@ src/
 4. [x] Charakter-Animation prozedural (Laufen, Anschlag/Rückstoß, Umfallen) – Mixamo später
 5. [ ] Sounds
 6. [ ] Touch-Controls (Mobile)
-7. [x] Asset-Pipeline: Modelle in `public/assets/`, Loader in `assets.js` (Quaternius Toon Shooter Kit, CC0)
+7. [x] Asset-Pipeline: Modelle in `public/assets/`, Loader in `assets.js` (Quaternius Ultimate Modular Men, CC0)
 8. [ ] Multiplayer-Server (eigenes Repo)
 
 ## Start

@@ -5,19 +5,19 @@ export const CLASSES = {
     id: 'brawler', name: 'Rammbock', tagline: 'Viel Panzer, kurze Lunte.',
     hp: 160, speed: 5.2, color: 0xe0522a, accent: 0xffd166,
     weapon: 'shotgun', special: 'charge', body: { width: 1.3, height: 1.9, head: 0.5 },
-    model: 'toon_hazmat',
+    model: 'men_spacesuit',
   },
   scout: {
     id: 'scout', name: 'Flitzer', tagline: 'Schnell rein, schneller raus.',
     hp: 90, speed: 7.8, color: 0x2ab7ca, accent: 0xf6f0e8,
     weapon: 'smg', special: 'dash', body: { width: 0.9, height: 1.7, head: 0.42 },
-    model: 'toon_enemy',
+    model: 'men_punk',
   },
   marksman: {
     id: 'marksman', name: 'Adlerauge', tagline: 'Ein Schuss, ein Punkt.',
     hp: 110, speed: 5.8, color: 0x7bb661, accent: 0x3a2e2a,
     weapon: 'rifle', special: 'focus', body: { width: 1.0, height: 1.85, head: 0.44 },
-    model: 'toon_soldier',
+    model: 'men_swat',
   },
 };
 

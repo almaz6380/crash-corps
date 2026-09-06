@@ -10,6 +10,63 @@ import { clone as skinClone } from 'three/addons/utils/SkeletonUtils.js';
  * bei der Klasse `model: '<id>'` setzen. Siehe public/assets/README.md.
  */
 export const CHARACTER_MODELS = {
+  // Quaternius "Ultimate Modular Men" (CC0): menschliche Proportionen, eigene
+  // Clips für Waffe halten, zielen, schießen, Treffer, Tod. Ohne Waffen-Meshes,
+  // die Waffe kommt aus gear.js und hängt am Handgelenk.
+  men_spacesuit: {
+    url: 'assets/characters/men_spacesuit.glb',
+    yaw: 0,
+    bones: {
+      hips: 'Hips', spine: 'Abdomen', chest: 'Chest', head: 'Head',
+      rightArm: 'UpperArm.R', rightForeArm: 'LowerArm.R', rightHand: 'Wrist.R',
+      leftArm: 'UpperArm.L', leftForeArm: 'LowerArm.L', leftHand: 'Wrist.L',
+    },
+    clips: {
+      idle: 'Idle_Gun', walk: 'Walk', run: 'Run',
+      aimIdle: 'Idle_Gun_Pointing', aimRun: 'Run_Shoot',
+      death: 'Death', hit: 'HitRecieve',
+    },
+    grip: { pos: [0, 0.06, 0.02], rot: [-1.5708, 0, 0], scale: 0.62 },
+    tintMaterials: ['SciFi_Main'],
+  },
+  // Quaternius "Ultimate Modular Men" (CC0): menschliche Proportionen, eigene
+  // Clips für Waffe halten, zielen, schießen, Treffer, Tod. Ohne Waffen-Meshes,
+  // die Waffe kommt aus gear.js und hängt am Handgelenk.
+  men_punk: {
+    url: 'assets/characters/men_punk.glb',
+    yaw: 0,
+    bones: {
+      hips: 'Hips', spine: 'Abdomen', chest: 'Chest', head: 'Head',
+      rightArm: 'UpperArm.R', rightForeArm: 'LowerArm.R', rightHand: 'Wrist.R',
+      leftArm: 'UpperArm.L', leftForeArm: 'LowerArm.L', leftHand: 'Wrist.L',
+    },
+    clips: {
+      idle: 'Idle_Gun', walk: 'Walk', run: 'Run',
+      aimIdle: 'Idle_Gun_Pointing', aimRun: 'Run_Shoot',
+      death: 'Death', hit: 'HitRecieve',
+    },
+    grip: { pos: [0, 0.06, 0.02], rot: [-1.5708, 0, 0], scale: 0.62 },
+    tintMaterials: ['White'],
+  },
+  // Quaternius "Ultimate Modular Men" (CC0): menschliche Proportionen, eigene
+  // Clips für Waffe halten, zielen, schießen, Treffer, Tod. Ohne Waffen-Meshes,
+  // die Waffe kommt aus gear.js und hängt am Handgelenk.
+  men_swat: {
+    url: 'assets/characters/men_swat.glb',
+    yaw: 0,
+    bones: {
+      hips: 'Hips', spine: 'Abdomen', chest: 'Chest', head: 'Head',
+      rightArm: 'UpperArm.R', rightForeArm: 'LowerArm.R', rightHand: 'Wrist.R',
+      leftArm: 'UpperArm.L', leftForeArm: 'LowerArm.L', leftHand: 'Wrist.L',
+    },
+    clips: {
+      idle: 'Idle_Gun', walk: 'Walk', run: 'Run',
+      aimIdle: 'Idle_Gun_Pointing', aimRun: 'Run_Shoot',
+      death: 'Death', hit: 'HitRecieve',
+    },
+    grip: { pos: [0, 0.06, 0.02], rot: [-1.5708, 0, 0], scale: 0.62 },
+    tintMaterials: ['Swat'],
+  },
   // Quaternius "Toon Shooter Game Kit" (CC0). Waffen hängen bereits am Modell,
   // Clips für Zielen, Schießen, Treffer und Tod sind dabei.
   toon_soldier: {
