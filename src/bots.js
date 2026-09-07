@@ -25,11 +25,12 @@ export class Bot {
     // Ausweichrolle (nur Klassen mit Dash-Spezial), Werte aus classes.js
     this.dodge = 0; this.dodgeCool = 0; this.dodgeDir = new THREE.Vector3(); this.dodgeSpeed = 0;
     this.vy = 0;   // Fallgeschwindigkeit, damit Bots von Plattformen fallen
+    this.navPoint = null; this.navRefresh = 0;   // Zwischenziel beim Ebenenwechsel
   }
   spawn(at) {
     this.pos.copy(at); this.vy = 0; this.hp = this.cls.hp; this.dead = false; this.mesh.visible = true;
     this.weapon = new Weapon(this.cls.weapon); this.retarget = 0; this.reaction = 0;
-    this.dodge = 0; this.dodgeCool = 0;
+    this.dodge = 0; this.dodgeCool = 0; this.navPoint = null; this.navRefresh = 0;
     this.anim.reset();
   }
   onHit(dmg) {
@@ -43,6 +44,36 @@ export class Bot {
     }
   }
   get eye() { return this.pos.clone().setY(this.pos.y + this.cls.body.height * 0.9); }
+
+  /**
+   * Zwischenziel, wenn das eigentliche Ziel auf einer anderen Ebene liegt:
+   * erst zum Fuß der günstigsten Rampe, dann hinauf. Rampen, deren Fuß selbst
+   * höher liegt als der Bot steht, kommen nicht in Frage – so klettert er
+   * mehrstufige Aufgänge Stück für Stück.
+   */
+  routeTo(dst, dt) {
+    this.navRefresh -= dt;
+    // Ein gewähltes Zwischenziel wird gehalten, bis es erreicht ist. Ohne das
+    // verwirft der Bot es auf halber Rampe, weil der Höhenunterschied schrumpft.
+    if (this.navPoint) {
+      if (this.pos.distanceTo(this.navPoint) > 1.4 && this.navRefresh > -6) return this.navPoint;
+      this.navPoint = null;
+    }
+    if (dst.y - this.pos.y < 0.9) return dst;                   // gleiche Ebene oder Ziel tiefer
+
+    let best = null, bestCost = Infinity;
+    for (const r of this.world.ramps || []) {
+      if (r.top.y <= this.pos.y + 0.6) continue;                // führt nicht höher
+      if (r.bottom.y > this.pos.y + 0.9) continue;              // Fuß liegt über meiner Ebene
+      const cost = this.pos.distanceTo(r.bottom) + r.top.distanceTo(dst);
+      if (cost < bestCost) { bestCost = cost; best = r; }
+    }
+    if (!best) return dst;
+    this.navRefresh = 0.7;
+    // Am Fuß angekommen: Ziel ist die Rampenoberkante
+    this.navPoint = this.pos.distanceTo(best.bottom) > 2.2 ? best.bottom : best.top;
+    return this.navPoint;
+  }
 
   /** Schwerkraft und Bodenhöhe – Bots stehen auf Rampen und Dächern wie der Spieler. */
   applyGravity(dt) {
@@ -108,12 +139,16 @@ export class Bot {
     } else { this.reaction = Math.max(0, this.reaction - dt); if (this.retarget <= 0) { this.wander.set((Math.random() - 0.5) * 50, 0, (Math.random() - 0.5) * 50); this.retarget = 3 + Math.random() * 3; } }
 
     // Bewegung
-    const dst = sees ? player.pos : this.wander;
+    const goal = sees ? player.pos : this.wander;
+    const dst = this.routeTo(goal, dt);
+    const climbing = dst !== goal;                 // unterwegs zu einer Rampe
     const dir = dst.clone().sub(this.pos).setY(0);
     const dist = dir.length();
     const ideal = { shotgun: 4, smg: 9, rifle: 22 }[this.cls.weapon];
     let mv = new THREE.Vector3();
-    if (sees) {
+    if (climbing) {
+      mv.copy(dir).normalize();                    // direkt hin, kein Abstandsspiel
+    } else if (sees) {
       if (dist > ideal + 2) mv.copy(dir).normalize();
       else if (dist < ideal - 2) mv.copy(dir).normalize().negate();
       // seitliches Ausweichen
@@ -125,12 +160,12 @@ export class Bot {
     resolveCollisions(this.pos, 0.5, this.world, { height: this.cls.body.height });
     this.applyGravity(dt);
     // Bots untereinander leicht auseinanderdrücken
-    for (const o of others) if (o !== this && !o.dead && Math.abs(o.pos.y - this.pos.y) < 1.2) {
+    if (!climbing) for (const o of others) if (o !== this && !o.dead && Math.abs(o.pos.y - this.pos.y) < 1.2) {
       const d = this.pos.clone().sub(o.pos).setY(0); const l = d.length();
       if (l < 1.4 && l > 0) this.pos.addScaledVector(d.normalize(), (1.4 - l) * 0.5);
     }
     // Blickrichtung: weich drehen statt umschnappen
-    const look = sees ? player.pos : this.pos.clone().add(mv);
+    const look = sees && !climbing ? player.pos : this.pos.clone().add(mv);
     if (walking || sees) {
       const want = Math.atan2(look.x - this.pos.x, look.z - this.pos.z);
       let d = want - this.mesh.rotation.y;

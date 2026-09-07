@@ -79,6 +79,7 @@ function arenaFloorTexture() {
 export function buildWorld(scene) {
   const group = new THREE.Group();
   const colliders = [];
+  const ramps = [];   // Wegpunkte für die Bot-Navigation zwischen den Ebenen
 
   // Außenboden bis zum Horizont
   const outer = document.createElement('canvas'); outer.width = outer.height = 512;
@@ -142,7 +143,9 @@ export function buildWorld(scene) {
       const rim = new THREE.Mesh(new THREE.BoxGeometry(ew, 0.22, ed), metalDark);
       rim.position.set(x + ox, h + 0.08, z + oz); rim.castShadow = true; group.add(rim);
     }
-    box3(x - w / 2, h - 0.36, z - d / 2, x + w / 2, h, z + d / 2);
+    // Kollisionsquader dünner als die sichtbare Platte, damit auch die größte
+    // Klasse (1,9 m) unter den Dächern durchpasst
+    box3(x - w / 2, h - 0.2, z - d / 2, x + w / 2, h, z + d / 2);
     return slab;
   };
 
@@ -151,9 +154,9 @@ export function buildWorld(scene) {
    * jede niedriger als STEP_UP, dadurch läuft man sie ohne Sprung hoch.
    * `dir` ist die Aufstiegsrichtung in 90°-Schritten (0 = nach +z).
    */
-  const rampUp = (x, z, dir, { length = 5.2, width = 2.6, height = PLATFORM_H, steps = 6 } = {}) => {
+  const rampUp = (x, z, dir, { length = 5.2, width = 2.6, height = PLATFORM_H, steps = 6, base = 0 } = {}) => {
     const g = new THREE.Group();
-    g.position.set(x, 0, z); g.rotation.y = dir * Math.PI / 2;
+    g.position.set(x, base, z); g.rotation.y = dir * Math.PI / 2;
     const slope = Math.atan2(height, length);
     const plate = new THREE.Mesh(new THREE.BoxGeometry(width, 0.18, Math.hypot(length, height)), metalDark);
     plate.position.y = height / 2; plate.rotation.x = -slope;
@@ -174,11 +177,17 @@ export function buildWorld(scene) {
       }
     };
     for (let i = 0; i < steps; i++) {
-      const h = (height * (i + 1)) / steps;
+      const h = base + (height * (i + 1)) / steps;
       const lz0 = -length / 2 + (length * i) / steps, lz1 = -length / 2 + (length * (i + 1)) / steps;
       const a = toWorld(-width / 2, lz0), b = toWorld(width / 2, lz1);
       box3(Math.min(a[0], b[0]), 0, Math.min(a[1], b[1]), Math.max(a[0], b[0]), h, Math.max(a[1], b[1]));
     }
+    // Wegpunkte, damit Bots die Rampe finden statt gegen die Plattform zu laufen
+    const foot = toWorld(0, -length / 2 - 1.2), head = toWorld(0, length / 2 + 0.8);
+    ramps.push({
+      bottom: new THREE.Vector3(foot[0], base, foot[1]),
+      top: new THREE.Vector3(head[0], base + height, head[1]),
+    });
   };
 
   // ---- Außengrenze ----
@@ -244,8 +253,8 @@ export function buildWorld(scene) {
   place('CardboardBoxes_2', 14, -14, -0.4); place('Crate', 12.6, -15.4, 0.2);
   place('Barrier_Large', 0, 20, 0); place('Barrier_Large', 0, -20, 0);
   place('Barrier_Single', -24, 14, Math.PI / 2); place('Barrier_Single', 24, -14, Math.PI / 2);
-  place('Debris_BrokenCar', 25, -4, 1.2);
-  place('Tank', -25, 4, 0.9);
+  place('Debris_BrokenCar', 12, -25, 1.9);
+  place('Tank', -12, 25, 0.4);
   place('Debris_Tires', 23, 23, 0.3); place('Debris_Tires', -23, -23, 1.1);
   place('Pallet', -18, 24, 0.3, { solid: false }); place('Pallet', 18, -24, 0.3, { solid: false });
   for (const [x, z] of [[6, -12], [-6, 12], [15, 0], [-15, 0]]) place('TrafficCone', x, z, 0, { solid: false });
@@ -257,6 +266,39 @@ export function buildWorld(scene) {
   place('Container_Small', -18, -12, 0.6, { pad: 0.15 });
   place('Container_Small', 18, 12, 0.6, { pad: 0.15 });
   place('Crate', -16.4, -9.4, 0.2); place('Crate', 16.4, 9.4, 0.2);
+
+  // ---- Gedeckte Flankengänge an Ost- und Westkante, mit begehbarem Dach ----
+  for (const side of [1, -1]) {
+    const cx = side * 24;
+    for (const z of [-6.6, -2.2, 2.2, 6.6]) {
+      place('Container_Long', cx - 2.3, z, Math.PI / 2, { pad: 0.15 });
+      place('Container_Long', cx + 2.3, z, Math.PI / 2, { pad: 0.15 });
+    }
+    deck(cx, 0, 4.6, 17.6);
+    rampUp(cx, side > 0 ? -12.2 : 12.2, side > 0 ? 0 : 2, { length: 5.2, width: 2.4 });
+    place('SackTrench_Small', cx, side * 6.5, side > 0 ? 0 : Math.PI, { y: PLATFORM_H, solid: false });
+    box3(cx - 1.3, PLATFORM_H, side * 6.5 - 0.5, cx + 1.3, PLATFORM_H + 1, side * 6.5 + 0.5);
+    place('ExplodingBarrel', cx - 1.4, -side * 7.6, 0);
+  }
+
+  // ---- Aussichtsturm: gestapelte Container, höchster Punkt der Arena.
+  // Eine lange Rampe hinauf – wer oben steht, sieht über die halbe Arena,
+  // braucht aber Zeit für den Auf- und Abstieg.
+  for (const [tx, tz, dir] of [[-8, -22, 3], [8, 22, 1]]) {
+    const sx = dir === 3 ? 1 : -1;
+    for (const y of [0, 2.1]) {
+      place('Container_Long', tx, tz - 1.15, 0, { y, pad: 0.12 });
+      place('Container_Long', tx, tz + 1.15, 0, { y, pad: 0.12 });
+    }
+    deck(tx, tz, 4.8, 4.8, 4.4);
+    rampUp(tx + sx * 7.15, tz, dir, { length: 9.5, width: 2.4, height: 4.4, steps: 11 });
+    place('SackTrench_Small', tx, tz - Math.sign(tz) * 1.9, tz > 0 ? 0 : Math.PI, { y: 4.4, solid: false });
+    box3(tx - 1.3, 4.4, tz - Math.sign(tz) * 1.9 - 0.5, tx + 1.3, 5.4, tz - Math.sign(tz) * 1.9 + 0.5);
+  }
+
+  // ---- Deckung im Erdgeschoss der Mittelhalle ----
+  place('CardboardBoxes_2', -1.7, -2.6, 0.3); place('CardboardBoxes_2', 1.7, 2.6, -0.3);
+  place('Pallet', 0, -1.4, 0.2, { solid: false }); place('Pallet', 0, 1.4, -0.2, { solid: false });
 
   // Kontrollpunkt-Marker (für Domination später) – jetzt nur Deko
   const ringMat = new THREE.MeshBasicMaterial({ color: 0xffd166 });
@@ -283,7 +325,7 @@ export function buildWorld(scene) {
     new THREE.Vector3(-26, 0, 10), new THREE.Vector3(26, 0, -10),
     new THREE.Vector3(10, 0, -26), new THREE.Vector3(-10, 0, 26),
   ];
-  return { group, colliders, spawns, bounds: SIZE / 2 - 1.5 };
+  return { group, colliders, ramps, spawns, bounds: SIZE / 2 - 1.5 };
 }
 
 /**
