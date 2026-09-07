@@ -3,7 +3,7 @@ import { CLASSES, SPECIALS } from './classes.js';
 import { Weapon } from './weapons.js';
 import { buildCharacter } from './characters.js';
 import { CharacterAnimator } from './animation.js';
-import { resolveCollisions } from './world.js';
+import { resolveCollisions, groundHeightAt, STEP_UP } from './world.js';
 
 const NAMES = ['Brösel', 'Knacki', 'Zündel', 'Rumpel', 'Fiete', 'Gustl', 'Wuschel', 'Pumpf'];
 let nameIdx = 0;
@@ -24,9 +24,10 @@ export class Bot {
     this.ray = new THREE.Raycaster();
     // Ausweichrolle (nur Klassen mit Dash-Spezial), Werte aus classes.js
     this.dodge = 0; this.dodgeCool = 0; this.dodgeDir = new THREE.Vector3(); this.dodgeSpeed = 0;
+    this.vy = 0;   // Fallgeschwindigkeit, damit Bots von Plattformen fallen
   }
   spawn(at) {
-    this.pos.copy(at); this.hp = this.cls.hp; this.dead = false; this.mesh.visible = true;
+    this.pos.copy(at); this.vy = 0; this.hp = this.cls.hp; this.dead = false; this.mesh.visible = true;
     this.weapon = new Weapon(this.cls.weapon); this.retarget = 0; this.reaction = 0;
     this.dodge = 0; this.dodgeCool = 0;
     this.anim.reset();
@@ -42,6 +43,14 @@ export class Bot {
     }
   }
   get eye() { return this.pos.clone().setY(this.pos.y + this.cls.body.height * 0.9); }
+
+  /** Schwerkraft und Bodenhöhe – Bots stehen auf Rampen und Dächern wie der Spieler. */
+  applyGravity(dt) {
+    this.vy -= 22 * dt;
+    this.pos.y += this.vy * dt;
+    const support = groundHeightAt(this.pos, 0.35, this.world, this.pos.y + STEP_UP);
+    if (this.pos.y <= support) { this.pos.y = support; this.vy = 0; }
+  }
 
   /** Seitlich wegrollen, wenn die Klasse Dash hat, die Abklingzeit um ist und der Zufall will. */
   tryDodge() {
@@ -86,7 +95,8 @@ export class Bot {
     if (this.dodge > 0) {
       this.dodge -= dt;
       this.pos.addScaledVector(this.dodgeDir, this.dodgeSpeed * dt);
-      resolveCollisions(this.pos, 0.5, this.world);
+      resolveCollisions(this.pos, 0.5, this.world, { height: this.cls.body.height });
+      this.applyGravity(dt);
       this.anim.update(dt, { moving: false, speed: 0 });
       return;
     }
@@ -112,9 +122,10 @@ export class Bot {
     const speed = this.cls.speed * 0.8;
     const walking = mv.lengthSq() > 0;
     if (walking) this.pos.addScaledVector(mv.normalize(), speed * dt);
-    resolveCollisions(this.pos, 0.5, this.world);
+    resolveCollisions(this.pos, 0.5, this.world, { height: this.cls.body.height });
+    this.applyGravity(dt);
     // Bots untereinander leicht auseinanderdrücken
-    for (const o of others) if (o !== this && !o.dead) {
+    for (const o of others) if (o !== this && !o.dead && Math.abs(o.pos.y - this.pos.y) < 1.2) {
       const d = this.pos.clone().sub(o.pos).setY(0); const l = d.length();
       if (l < 1.4 && l > 0) this.pos.addScaledVector(d.normalize(), (1.4 - l) * 0.5);
     }

@@ -12,7 +12,7 @@ Class-based Cartoon-Arena-Shooter im Browser. Inspiriert von Team-Fortress-artig
 ```
 src/
   main.js      Bootstrap, Game-Loop, Zustand (Menü → Match → Ende)
-  world.js     Arena-Aufbau aus Props (Zaun, Deckung, Kulisse), Kollisionsquader, Flaggenpunkte, Licht
+  world.js     Arena aus Props: zwei Ebenen (Boden + begehbare Dächer), Rampen, Kollisionsquader, Licht
   player.js    FPS-Controller (PointerLock, WASD, Sprung, Kollision grob)
   classes.js   Klassendefinitionen (HP, Speed, Waffe, Farbe, Spezial)
   weapons.js   Waffenlogik (Raycast-Hitscan, Cooldown, Spread, Schaden)
@@ -32,6 +32,7 @@ src/
 - Neue Klasse = Eintrag in `classes.js` (inkl. `model`) + ggf. Modell-Eintrag in `assets.js`. Sonst nichts anfassen.
 - Die Toon-Kit-Figuren sind CC0 und dürfen bleiben. Eigene Modelle: siehe public/assets/README.md.
 - Performance-Ziel: 60 fps auf Mittelklasse-Laptop, spielbar auf Handy (Touch-Controls sind Roadmap, nicht Prototyp).
+- Bewegung ist dreidimensional: `groundHeightAt()` liefert die Bodenhöhe, `resolveCollisions()` übergeht Quader unterhalb der Schrittweite (STEP_UP) und über Kopfhöhe. Rampen sind unsichtbare Stufen unter einer geneigten Platte.
 - Nach Änderungen `npm run build` laufen lassen; muss ohne Fehler durchgehen.
 
 ## Roadmap

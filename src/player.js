@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { resolveCollisions } from './world.js';
+import { resolveCollisions, groundHeightAt, STEP_UP } from './world.js';
 import { Weapon } from './weapons.js';
 import { SPECIALS } from './classes.js';
 import { buildViewmodel } from './characters.js';
@@ -80,8 +80,11 @@ export class Player {
     if (this.keys.Space && this.grounded) { this.vel.y = JUMP; this.grounded = false; }
     this.vel.y -= GRAVITY * dt;
     this.pos.addScaledVector(this.vel, dt);
-    if (this.pos.y <= 0) { this.pos.y = 0; this.vel.y = 0; this.grounded = true; }
-    resolveCollisions(this.pos, 0.45, this.world);
+    resolveCollisions(this.pos, 0.45, this.world, { height: this.cls.body.height });
+    // Boden unter den Füßen: Rampenstufen und Plattformdächer zählen mit
+    const support = groundHeightAt(this.pos, 0.32, this.world, this.pos.y + STEP_UP);
+    if (this.pos.y <= support) { this.pos.y = support; this.vel.y = 0; this.grounded = true; }
+    else this.grounded = false;
     this.mesh.position.set(this.pos.x, this.pos.y + this.cls.body.height / 2, this.pos.z);
 
     // Kamera
