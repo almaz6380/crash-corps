@@ -109,6 +109,12 @@ function start(clsId) {
   }
 }
 hud.onPick = start;
+hud.onCustomize = () => {
+  // Menü ausblenden, Bedienung über dem eingefrorenen Bild anordnen
+  hud.showMenu(false);
+  input.touch.onDone = () => { input.touch.edit(false); hud.showMenu(true); };
+  input.touch.edit(true);
+};
 hud.onPause = () => { if (running) { running = false; input.showTouch(false); hud.showMenu(true); hud.hint(false); } };
 
 // Figuren und Arena-Props laden, dann Arena bauen, dann Menü freigeben

@@ -15,6 +15,14 @@ Das Spiel erkennt Touch-Geräte selbst und blendet dann die Bildschirm-Bedienung
 ein: links ziehen zum Laufen, rechts wischen zum Umsehen, dazu FEUER, Springen,
 Nachladen und Spezial. Am Rechner lässt sich das mit `?touch=1` testen.
 
+Die Schaltflächen lassen sich verschieben und in der Größe ändern: im Menü auf
+**Bedienung anpassen**, dann Knopf ziehen oder antippen und den Regler nutzen.
+Die Anordnung bleibt im Browser gespeichert.
+
+**Zielhilfe:** Auf Touch-Geräten bremst das Wischen ab, sobald ein Gegner nah am
+Fadenkreuz ist, und das Fadenkreuz wird sanft nachgeführt – aber nur, solange
+man selbst wischt oder läuft. Wer stillhält, bekommt keine Korrektur.
+
 **Ohne Veröffentlichung, über das eigene WLAN:**
 
 ```
@@ -36,6 +44,7 @@ der Workflow bei jedem Push auf `main`.
 | `?stil=real` | Physikalische Materialien, Himmelslicht, Umgebungsverdeckung statt Cel-Shading |
 | `?touch=1` | Touch-Bedienung erzwingen (zum Testen am Rechner) |
 | `?leistung=niedrig` | Kleinere Auflösung und Schattenkarte, keine Umgebungsverdeckung |
+| `?zielhilfe=an` / `=aus` | Zielhilfe erzwingen (Standard: an auf Touch, aus am Rechner) |
 
 ## Steuerung am Rechner
 

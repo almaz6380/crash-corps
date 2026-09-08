@@ -11,6 +11,7 @@ export class Hud {
         <h1>Crash Corps</h1>
         <p class="sub">Wähl deine Klasse. Dann rein.</p>
         <div id="classes"></div>
+        ${TOUCH ? '<button id="anpassen" type="button">Bedienung anpassen</button>' : ''}
         <p class="help">${TOUCH
           ? 'Links ziehen zum Laufen · rechts wischen zum Umsehen · FEUER halten · ⤒ springen · R nachladen · Q Spezial'
           : 'WASD laufen · Shift sprinten · Leertaste springen · Klick schießen · R nachladen · Q Spezial · Esc Menü'}</p>
@@ -38,6 +39,8 @@ export class Hud {
       list.append(el);
     }
     root.querySelector('#pause').onclick = () => this.onPause?.();
+    const anp = root.querySelector('#anpassen');
+    if (anp) anp.onclick = () => this.onCustomize?.();
     this.feed = root.querySelector('#feed');
     this.feedItems = [];
   }

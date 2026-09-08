@@ -27,7 +27,9 @@ src/
                Umgebungsverdeckung). Tone-Mapping liegt im Composite-Shader.
   style.js     Stilumschalter (?stil=real)
   device.js    Touch-Erkennung und Leistungsstufe (Auflösung, Schatten, Verdeckung)
-  input.js     Eingabe-Schicht: Tastatur, Maus und Touch zu einem Zustand gebündelt
+  input.js     Eingabe-Schicht: Tastatur, Maus und Touch gebündelt; Anordnung der
+               Bildschirm-Knöpfe (verschiebbar, skalierbar, in localStorage)
+  aimassist.js Zielhilfe für Touch: Reibung im Zielkegel und träges Nachführen
   surface.js   Oberflächen für den realistischen Stil: PBR-Texturen, bei Props ohne UVs
                über Weltraum-Projektion (triplanar)
   animation.js Skelett-Clips (Stehen/Gehen/Rennen, Anschlag-Varianten, Tod) + Knochen-Overlays als Ersatz
@@ -51,7 +53,7 @@ src/
 3. [x] Cel-Shading + Outline-Pass
 4. [x] Charakter-Animation prozedural (Laufen, Anschlag/Rückstoß, Umfallen) – Mixamo später
 5. [ ] Sounds
-6. [x] Touch-Controls (Mobile) – Bildschirm-Stick, Wischen zum Umsehen, Schaltflächen
+6. [x] Touch-Controls (Mobile) – Bildschirm-Stick, Wischen zum Umsehen, anpassbare Schaltflächen, Zielhilfe
 7. [x] Asset-Pipeline: Modelle in `public/assets/`, Loader in `assets.js` (Quaternius Ultimate Modular Men, CC0)
 8. [ ] Multiplayer-Server (eigenes Repo)
 

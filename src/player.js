@@ -4,6 +4,8 @@ import { Weapon } from './weapons.js';
 import { SPECIALS } from './classes.js';
 import { buildViewmodel } from './characters.js';
 import { ViewmodelAnimator } from './animation.js';
+import { AIM_ASSIST } from './device.js';
+import { bestTarget, pullToward, ASSIST } from './aimassist.js';
 
 const EYE = 1.6, GRAVITY = 22, JUMP = 8;
 
@@ -45,10 +47,19 @@ export class Player {
   update(dt, targets, fx) {
     const inp = this.input;
     // Umsehen: Maus liefert Pixel pro Bewegung, Touch die Zugstrecke
-    const [lx, ly] = inp.takeLook();
+    let [lx, ly] = inp.takeLook();
     const sens = inp.touch ? 0.0042 : 0.0022;
+    // Zielhilfe: bremst das Wischen nahe am Gegner und führt danach nach
+    const aimed = AIM_ASSIST && !this.dead ? bestTarget(this, targets, this.world) : null;
+    if (aimed) { const s = 1 - ASSIST.friction * aimed.weight; lx *= s; ly *= s; }
     this.yaw -= lx * sens; this.pitch -= ly * sens;
     this.pitch = Math.max(-1.45, Math.min(1.45, this.pitch));
+    if (aimed) {
+      // Nur nachführen, solange der Spieler selbst wischt oder läuft
+      const activity = Math.min(1, (Math.hypot(lx, ly) / 6) + Math.hypot(inp.moveX, inp.moveY));
+      pullToward(this, aimed, dt, activity);
+      this.pitch = Math.max(-1.45, Math.min(1.45, this.pitch));
+    }
     if (inp.takeReload()) this.weapon.reload();
     if (inp.takeSpecial()) this.useSpecial();
 
