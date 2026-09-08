@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { clone as skinClone } from 'three/addons/utils/SkeletonUtils.js';
+import { REAL } from './style.js';
+import { realisticMaterial } from './surface.js';
 
 /**
  * Asset-Pipeline für Figuren. Modelle liegen in public/assets/, werden einmal
@@ -241,6 +243,7 @@ export function instantiate(id, { height, tint, weapon } = {}) {
     const mats = Array.isArray(o.material) ? o.material : [o.material];
     const cloned = mats.map(m => {
       const c = m.clone();
+      if (REAL) realisticMaterial(c, { detail: 0 });   // Figuren ohne Weltraum-Struktur, die würde beim Animieren wandern
       if (tint && (!def.tintMaterials || def.tintMaterials.includes(m.name))) {
         // Modelle mit Textur werden überblendet, flache Toon-Modelle bekommen die Farbe direkt
         if (c.map) c.color.lerp(new THREE.Color(tint), 0.8); else c.color.set(tint);
@@ -329,6 +332,19 @@ export function spawnProp(name, { ramp } = {}) {
   const src = propCache.get(name);
   if (!src) throw new Error(`Prop "${name}" ist nicht geladen`);
   const m = src.clone(true);
+  if (REAL) {
+    // Physikalische Materialien behalten, nur Rauheit/Metall setzen und
+    // prozedurale Struktur einhängen. Pro Ausgangsmaterial einmal.
+    m.traverse(o => {
+      if (!o.isMesh) return;
+      const conv = (mat) => {
+        if (!realCache.has(mat.uuid)) realCache.set(mat.uuid, realisticMaterial(mat.clone()));
+        return realCache.get(mat.uuid);
+      };
+      o.material = Array.isArray(o.material) ? o.material.map(conv) : conv(o.material);
+    });
+    return m;
+  }
   if (ramp) {
     m.traverse(o => {
       if (!o.isMesh) return;
@@ -346,3 +362,4 @@ export function spawnProp(name, { ramp } = {}) {
   return m;
 }
 const toonCache = new Map();
+const realCache = new Map();

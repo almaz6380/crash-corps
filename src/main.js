@@ -101,7 +101,7 @@ Promise.all([
   preloadCharacters((p) => hud.loading(`Figuren … ${Math.round(p * 100)}%`), Object.values(CLASSES).map(c => c.model)),
   preloadProps(WORLD_PROPS, (p) => hud.loading(`Arena … ${Math.round(p * 100)}%`)),
 ])
-  .then(() => { world = buildWorld(scene); hud.loading(null); hud.showMenu(true); })
+  .then(() => { world = buildWorld(scene, renderer); hud.loading(null); hud.showMenu(true); })
   .catch((err) => {
     console.error(err);
     hud.loading('Assets konnten nicht geladen werden. Liegen die Modelle in public/assets/?');

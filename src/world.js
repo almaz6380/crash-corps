@@ -1,11 +1,18 @@
 import * as THREE from 'three';
-import { celRamp, buildSky } from './render.js';
+import { celRamp, buildSky, buildRealSky } from './render.js';
+import { REAL } from './style.js';
+import { realisticMaterial } from './surface.js';
 import { spawnProp } from './assets.js';
 
 const RAMP = celRamp(4);
 const SIZE = 60;                 // Kantenlänge der Arena
 export const STEP_UP = 0.55;     // maximale Stufenhöhe, die Figuren erklimmen
 const PLATFORM_H = 2.3;          // Höhe der begehbaren Ebene (Containerdach)
+
+/** Baumaterial im jeweiligen Stil: Toon-Rampe oder physikalisch mit Struktur. */
+const build = (color, name) => REAL
+  ? realisticMaterial(new THREE.MeshStandardMaterial({ color, name }))
+  : new THREE.MeshToonMaterial({ color, gradientMap: RAMP });
 
 /** Props, die die Arena braucht – main.js lädt sie vor dem Aufbau. */
 export const WORLD_PROPS = [
@@ -76,7 +83,7 @@ function arenaFloorTexture() {
  * über Rampen. Gibt {group, colliders, spawns, bounds} zurück.
  * colliders sind achsenparallele Quader; die Props selbst sind reine Optik.
  */
-export function buildWorld(scene) {
+export function buildWorld(scene, renderer) {
   const group = new THREE.Group();
   const colliders = [];
   const ramps = [];   // Wegpunkte für die Bot-Navigation zwischen den Ebenen
@@ -92,13 +99,18 @@ export function buildWorld(scene) {
   const otex = new THREE.CanvasTexture(outer);
   otex.wrapS = otex.wrapT = THREE.RepeatWrapping; otex.repeat.set(30, 30);
   otex.colorSpace = THREE.SRGBColorSpace; otex.anisotropy = 8;
-  const ground = new THREE.Mesh(new THREE.PlaneGeometry(320, 320), new THREE.MeshToonMaterial({ map: otex, gradientMap: RAMP }));
+  const groundMat = REAL
+    ? realisticMaterial(new THREE.MeshStandardMaterial({ map: otex, name: 'Dirt', roughness: 1 }), { scale: 0.12 })
+    : new THREE.MeshToonMaterial({ map: otex, gradientMap: RAMP });
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(320, 320), groundMat);
   ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; group.add(ground);
 
   // Bemalter Arenaboden darüber
-  const floor = new THREE.Mesh(new THREE.PlaneGeometry(SIZE, SIZE), new THREE.MeshToonMaterial({
-    map: arenaFloorTexture(), gradientMap: RAMP, polygonOffset: true, polygonOffsetFactor: -1,
-  }));
+  const floorMat = REAL
+    ? realisticMaterial(new THREE.MeshStandardMaterial({
+        map: arenaFloorTexture(), name: 'Concrete', roughness: 1, polygonOffset: true, polygonOffsetFactor: -1 }), { scale: 0.3 })
+    : new THREE.MeshToonMaterial({ map: arenaFloorTexture(), gradientMap: RAMP, polygonOffset: true, polygonOffsetFactor: -1 });
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(SIZE, SIZE), floorMat);
   floor.rotation.x = -Math.PI / 2; floor.position.y = 0.012; floor.receiveShadow = true; group.add(floor);
 
   // ---- Kollisionsquader ----
@@ -128,8 +140,8 @@ export function buildWorld(scene) {
     return p;
   };
 
-  const metal = new THREE.MeshToonMaterial({ color: 0x8b8f96, gradientMap: RAMP });
-  const metalDark = new THREE.MeshToonMaterial({ color: 0x6f747b, gradientMap: RAMP });
+  const metal = build(0x8b8f96, 'Metal');
+  const metalDark = build(0x6f747b, 'Metal2');
 
   /**
    * Begehbare Platte. Der Kollisionsquader sitzt nur unter der Oberkante,
@@ -308,16 +320,24 @@ export function buildWorld(scene) {
   }
 
   // Licht: Sonne + Himmel
-  const sun = new THREE.DirectionalLight(0xfff2d6, 2.6);
-  sun.position.set(25, 40, 15); sun.castShadow = true;
-  sun.shadow.mapSize.set(2048, 2048);
+  const sunDir = new THREE.Vector3(25, 40, 15);
+  const sun = new THREE.DirectionalLight(0xfff2d6, REAL ? 3.0 : 2.6);
+  sun.position.copy(sunDir); sun.castShadow = true;
+  sun.shadow.mapSize.set(REAL ? 4096 : 2048, REAL ? 4096 : 2048);
   Object.assign(sun.shadow.camera, { left: -40, right: 40, top: 40, bottom: -40, far: 120 });
-  sun.shadow.bias = -0.0006; sun.shadow.normalBias = 0.02; sun.shadow.radius = 3;
+  sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.02; sun.shadow.radius = REAL ? 2 : 3;
   sun.shadow.camera.updateProjectionMatrix();
-  const rim = new THREE.DirectionalLight(0xbcd8ff, 0.8); rim.position.set(-20, 14, -25);
-  group.add(sun, rim, new THREE.HemisphereLight(0xbfe6ff, 0x6b8f3a, 1.1));
-  group.add(buildSky());
-  scene.fog = new THREE.Fog(0xa9d3ea, 55, 170);
+  group.add(sun);
+  if (REAL) {
+    // Umgebungslicht kommt aus dem Himmel selbst, kein künstliches Fülllicht
+    buildRealSky(scene, renderer, sunDir.clone().normalize());
+    scene.fog = new THREE.FogExp2(0x9fbdd4, 0.0012);
+  } else {
+    const rim = new THREE.DirectionalLight(0xbcd8ff, 0.8); rim.position.set(-20, 14, -25);
+    group.add(rim, new THREE.HemisphereLight(0xbfe6ff, 0x6b8f3a, 1.1));
+    group.add(buildSky());
+    scene.fog = new THREE.Fog(0xa9d3ea, 55, 170);
+  }
 
   scene.add(group);
   const spawns = [

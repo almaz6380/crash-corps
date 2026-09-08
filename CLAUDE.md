@@ -5,7 +5,10 @@ Class-based Cartoon-Arena-Shooter im Browser. Inspiriert von Team-Fortress-artig
 ## Stack
 - Vite + Three.js (ES-Module, kein Framework)
 - Figuren als glTF-Modelle aus `public/assets/characters/` (Quaternius Ultimate Modular Men, CC0), geladen über `assets.js`. Waffen prozedural aus `gear.js` am Handknochen. Arena aus Toon-Kit-Props (`public/assets/props/`), Effekte per Code.
-- Look: Cel-Shading mit Lichtstufen-Rampe, Outline aus Tiefe/Normalen, ACES-Tone-Mapping (`render.js`).
+- Look: zwei Stile in `render.js`, umschaltbar über `?stil=real`. Standard ist Cel-Shading mit
+  Lichtstufen-Rampe und Outline; `real` nutzt physikalische Materialien, Himmelslicht und
+  Umgebungsverdeckung. ACES-Tone-Mapping passiert im Composite-Shader, nicht im Renderer –
+  three wendet es beim Rendern in ein Render-Target nicht an.
 - Kein TypeScript im Prototyp, JSDoc wo sinnvoll.
 
 ## Struktur
@@ -20,7 +23,10 @@ src/
   characters.js Prozedurale Low-Poly-Figur pro Klasse
   assets.js    Modell-Manifest, Laden, Klonen pro Figur (Knochen, Clips, Materialien)
   gear.js      Ego-Waffe (Klon aus dem Modell) + prozedurale Ersatzwaffen für Modelle ohne eigene
-  render.js    Cel-Shading, Outline-Pass, Himmel, Tone-Mapping
+  render.js    Zwei Stile: Cel-Shading mit Outline oder physikalisch (Himmel, Umgebungslicht,
+               Umgebungsverdeckung). Tone-Mapping liegt im Composite-Shader.
+  style.js     Stilumschalter (?stil=real)
+  surface.js   Prozedurale Oberflächenstruktur für den realistischen Stil
   animation.js Skelett-Clips (Stehen/Gehen/Rennen, Anschlag-Varianten, Tod) + Knochen-Overlays als Ersatz
   hud.js       DOM-HUD (HP, Munition, Fadenkreuz, Killfeed, Score, Klassenwahl)
   style.css
