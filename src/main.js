@@ -8,10 +8,12 @@ import { Pipeline } from './render.js';
 import { preloadCharacters, preloadProps } from './assets.js';
 import { REAL } from './style.js';
 import { preloadTextures } from './surface.js';
+import { Input } from './input.js';
+import { TOUCH, QUALITY } from './device.js';
 
 const canvas = document.getElementById('game');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setPixelRatio(Math.min(devicePixelRatio, QUALITY.pixelRatio));
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(80, 1, 0.05, 300);
 camera.userData.canvas = canvas;
@@ -19,6 +21,8 @@ scene.add(camera);
 const pipeline = new Pipeline(renderer, camera);
 
 let world = null;                      // wird nach dem Laden der Props gebaut
+const input = new Input(canvas);
+if (TOUCH) document.body.classList.add('touch');
 const hud = new Hud(document.getElementById('hud'));
 
 // Effekte: kurze Leuchtspuren + Treffer-Funken
@@ -82,7 +86,7 @@ function pickSpawn(avoid) {
 function start(clsId) {
   if (player) player.dispose();
   for (const b of bots) b.dispose();
-  player = new Player(camera, CLASSES[clsId], world, scene);
+  player = new Player(camera, CLASSES[clsId], world, scene, input);
   player.spawn(world.spawns[0]);
   const ids = Object.keys(CLASSES);
   bots = Array.from({ length: 5 }, (_, i) => {
@@ -92,10 +96,20 @@ function start(clsId) {
     return b;
   });
   time = 0; running = true;
-  hud.showMenu(false); hud.hint(true);
-  canvas.requestPointerLock();
+  hud.showMenu(false);
+  if (TOUCH) {
+    hud.hint(false);
+    input.showTouch(true);
+    // Vollbild und Querformat brauchen eine Nutzergeste – der Klassen-Knopf ist eine
+    document.documentElement.requestFullscreen?.().catch(() => {});
+    screen.orientation?.lock?.('landscape').catch(() => {});
+  } else {
+    hud.hint(true);
+    canvas.requestPointerLock();
+  }
 }
 hud.onPick = start;
+hud.onPause = () => { if (running) { running = false; input.showTouch(false); hud.showMenu(true); hud.hint(false); } };
 
 // Figuren und Arena-Props laden, dann Arena bauen, dann Menü freigeben
 hud.showMenu(false); hud.loading('Wird geladen …');
@@ -110,14 +124,16 @@ Promise.all([
     hud.loading('Assets konnten nicht geladen werden. Liegen die Modelle in public/assets/?');
   });
 
-canvas.addEventListener('click', () => { if (running && document.pointerLockElement !== canvas) canvas.requestPointerLock(); });
-document.addEventListener('pointerlockchange', () => hud.hint(running && document.pointerLockElement !== canvas));
-addEventListener('keydown', e => { if (e.code === 'Escape' && running) { running = false; hud.showMenu(true); } });
+if (!TOUCH) {
+  canvas.addEventListener('click', () => { if (running && document.pointerLockElement !== canvas) canvas.requestPointerLock(); });
+  document.addEventListener('pointerlockchange', () => hud.hint(running && document.pointerLockElement !== canvas));
+}
 
 let last = performance.now();
 function loop(now) {
   requestAnimationFrame(loop);
   const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  if (input.takeMenu() && running) { running = false; input.showTouch(false); hud.showMenu(true); hud.hint(false); }
   if (!running) { pipeline.render(scene, camera); return; }
   time += dt;
   const wasDead = player.dead;

@@ -38,3 +38,59 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #9fd7f7; fon
   background: #10141a; color: #f6f0e8; font: 600 18px/1.4 system-ui, sans-serif;
   letter-spacing: 0.02em; text-align: center; padding: 24px; z-index: 20;
 }
+
+/* ---------------------------------------------------------------------------
+   Touch-Bedienung. Nur sichtbar, wenn das Gerät Touch meldet (siehe device.js).
+   Die Zonen liegen über dem Bild, fangen aber nur ihre eigenen Gesten ab.
+--------------------------------------------------------------------------- */
+html, body { overscroll-behavior: none; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
+
+#touch { position: fixed; inset: 0; z-index: 5; pointer-events: none; touch-action: none; }
+#t-move { position: absolute; left: 0; bottom: 0; width: 45%; height: 72%; pointer-events: auto; touch-action: none; }
+#t-look { position: absolute; right: 0; top: 0; width: 55%; height: 100%; pointer-events: auto; touch-action: none; }
+
+#t-stick { position: fixed; width: 148px; height: 148px; margin: -74px 0 0 -74px;
+  border: 4px solid rgba(255,247,230,.5); border-radius: 50%; background: rgba(43,33,24,.28); pointer-events: none; }
+#t-knob { position: absolute; left: 50%; top: 50%; width: 62px; height: 62px; margin: -31px 0 0 -31px;
+  border: 4px solid var(--ink); border-radius: 50%; background: var(--paper); }
+
+#t-buttons { position: absolute; right: max(18px, env(safe-area-inset-right)); bottom: max(18px, env(safe-area-inset-bottom));
+  display: grid; grid-template-columns: repeat(2, auto); gap: 12px; align-items: end; justify-items: end; pointer-events: none; }
+#t-buttons button { pointer-events: auto; touch-action: none; font-family: inherit; font-weight: bold; color: var(--ink);
+  background: var(--paper); border: 4px solid var(--ink); border-radius: 50%; box-shadow: 4px 4px 0 var(--ink); }
+#t-special, #t-reload, #t-jump { width: 68px; height: 68px; font-size: 22px; }
+#t-fire { width: 108px; height: 108px; font-size: 17px; background: var(--red); color: var(--paper); grid-row: span 2; }
+#t-buttons button.on { transform: translate(3px, 3px); box-shadow: 1px 1px 0 var(--ink); }
+
+/* Menü-Knopf oben rechts, damit man ohne Tastatur zurückkommt */
+#pause { position: absolute; top: max(18px, env(safe-area-inset-top)); right: max(18px, env(safe-area-inset-right));
+  width: 44px; height: 44px; border: 3px solid var(--ink); border-radius: 12px; background: var(--paper);
+  box-shadow: 3px 3px 0 var(--ink); font: bold 16px/1 inherit; color: var(--ink); letter-spacing: 2px; z-index: 6; }
+#feed { top: max(70px, calc(env(safe-area-inset-top) + 52px)); }
+
+/* Auf kleinen Bildschirmen HUD kompakter, damit die Daumen nichts verdecken */
+@media (max-height: 520px) {
+  #hp { width: 180px; height: 24px; }
+  #ammo { font-size: 26px; }
+  #bottom { left: 12px; right: 12px; bottom: 12px; }
+  #menu h1 { font-size: clamp(32px, 7vw, 56px); }
+  .cls { width: 160px; padding: 12px; }
+}
+
+/* Auf Touch-Geräten liegen HP und Munition zwischen Stick und Schaltflächen,
+   sonst verdecken die Daumen sie. */
+body.touch #bottom { left: 200px; right: 230px; bottom: max(12px, env(safe-area-inset-bottom)); }
+body.touch #hp { width: 150px; height: 24px; }
+body.touch #ammo { font-size: 24px; }
+body.touch #special { font-size: 13px; }
+body.touch #score { top: max(12px, env(safe-area-inset-top)); left: max(12px, env(safe-area-inset-left)); font-size: 13px; }
+body.touch #score b { font-size: 16px; }
+body.touch #feed { right: 74px; font-size: 13px; }
+
+/* Hochformat ist für einen Shooter unbrauchbar – Hinweis statt kaputter Ansicht */
+#hochkant { display: none; }
+@media (orientation: portrait) {
+  body.touch #hochkant { position: fixed; inset: 0; z-index: 20; display: grid; place-content: center;
+    padding: 32px; text-align: center; background: var(--ink); color: var(--paper);
+    font-size: 22px; font-weight: bold; line-height: 1.5; }
+}

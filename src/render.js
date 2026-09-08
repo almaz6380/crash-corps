@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { Sky } from 'three/addons/objects/Sky.js';
 import { REAL } from './style.js';
+import { QUALITY } from './device.js';
 
 /**
  * Render-Stufe: Cel-Shading, Outline-Pass, Tone-Mapping.
@@ -140,7 +141,7 @@ export class Pipeline {
   /** @param {{outline?:boolean, ao?:number}} opts */
   constructor(renderer, camera, opts = {}) {
     const useOutline = opts.outline ?? !REAL;
-    const useAo = opts.ao ?? (REAL ? 1.0 : 0);
+    const useAo = opts.ao ?? (REAL && QUALITY.ao ? 1.0 : 0);
     this.renderer = renderer; this.camera = camera;
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;

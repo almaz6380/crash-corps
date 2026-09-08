@@ -1,15 +1,19 @@
 import { CLASSES } from './classes.js';
+import { TOUCH } from './device.js';
 
 export class Hud {
   constructor(root) {
     this.root = root;
     root.innerHTML = `
       <div id="loading" hidden></div>
+      <div id="hochkant">Bitte das Gerät quer halten</div>
       <div id="menu">
         <h1>Crash Corps</h1>
         <p class="sub">Wähl deine Klasse. Dann rein.</p>
         <div id="classes"></div>
-        <p class="help">WASD laufen · Shift sprinten · Leertaste springen · Klick schießen · R nachladen · Q Spezial · Esc Menü</p>
+        <p class="help">${TOUCH
+          ? 'Links ziehen zum Laufen · rechts wischen zum Umsehen · FEUER halten · ⤒ springen · R nachladen · Q Spezial'
+          : 'WASD laufen · Shift sprinten · Leertaste springen · Klick schießen · R nachladen · Q Spezial · Esc Menü'}</p>
       </div>
       <div id="play" hidden>
         <div id="cross"></div>
@@ -22,7 +26,8 @@ export class Hud {
           <div id="special"></div>
         </div>
         <div id="dead" hidden></div>
-        <div id="hint">Klick ins Bild, um die Maus zu fangen</div>
+        <div id="hint" hidden>Klick ins Bild, um die Maus zu fangen</div>
+        <button id="pause" type="button" title="Menü">II</button>
       </div>`;
     const list = root.querySelector('#classes');
     for (const c of Object.values(CLASSES)) {
@@ -32,6 +37,7 @@ export class Hud {
       el.onclick = () => this.onPick?.(c.id);
       list.append(el);
     }
+    root.querySelector('#pause').onclick = () => this.onPause?.();
     this.feed = root.querySelector('#feed');
     this.feedItems = [];
   }

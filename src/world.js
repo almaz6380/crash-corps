@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { celRamp, buildSky, buildRealSky } from './render.js';
 import { REAL } from './style.js';
+import { QUALITY } from './device.js';
 import { realisticMaterial, uvSurface, setImage } from './surface.js';
 import { spawnProp } from './assets.js';
 
@@ -340,9 +341,10 @@ export function buildWorld(scene, renderer) {
   const sunDir = new THREE.Vector3(25, 40, 15);
   const sun = new THREE.DirectionalLight(0xfff2d6, REAL ? 3.0 : 2.6);
   sun.position.copy(sunDir); sun.castShadow = true;
-  sun.shadow.mapSize.set(REAL ? 4096 : 2048, REAL ? 4096 : 2048);
+  const sm = REAL ? QUALITY.shadowSize * 2 : QUALITY.shadowSize;
+  sun.shadow.mapSize.set(sm, sm);
   Object.assign(sun.shadow.camera, { left: -40, right: 40, top: 40, bottom: -40, far: 120 });
-  sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.02; sun.shadow.radius = REAL ? 2 : 3;
+  sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.02; sun.shadow.radius = REAL ? Math.max(1, QUALITY.shadowRadius - 1) : QUALITY.shadowRadius;
   sun.shadow.camera.updateProjectionMatrix();
   group.add(sun);
   if (REAL) {
