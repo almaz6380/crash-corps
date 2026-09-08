@@ -3,6 +3,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { clone as skinClone } from 'three/addons/utils/SkeletonUtils.js';
 import { REAL } from './style.js';
 import { realisticMaterial, SURFACE_FOR_PROP } from './surface.js';
+import { embeddedBytes } from './embed.js';
 
 /**
  * Asset-Pipeline für Figuren. Modelle liegen in public/assets/, werden einmal
@@ -151,6 +152,13 @@ export const CHARACTER_MODELS = {
 
 const cache = new Map();
 
+/** glTF laden – aus dem Netz oder, im Einzeldatei-Build, aus den Rohdaten. */
+function loadGltf(loader, url) {
+  const bytes = embeddedBytes(url);
+  if (!bytes) return loader.loadAsync(url);
+  return new Promise((res, rej) => loader.parse(bytes.buffer, '', res, rej));
+}
+
 /**
  * Baut aus Vollkörper-Clips Oberkörper-Clips: es bleiben nur die Tracks der in
  * def.upperBones genannten Knochen. So kann der Anschlag über jede Gangart
@@ -182,7 +190,7 @@ export async function preloadCharacters(onProgress, ids = Object.keys(CHARACTER_
   let done = 0;
   for (const id of ids) {
     const def = CHARACTER_MODELS[id];
-    const gltf = await loader.loadAsync(def.url);
+    const gltf = await loadGltf(loader, def.url);
     // Grundhöhe messen, damit sich Figuren später auf die Klassengröße skalieren lassen
     const box = new THREE.Box3().setFromObject(gltf.scene);
     const layers = buildLayerClips(def, gltf.animations);
@@ -316,7 +324,7 @@ export async function preloadProps(names, onProgress) {
   const list = [...new Set(names)].filter(n => !propCache.has(n));
   let done = 0;
   await Promise.all(list.map(async (name) => {
-    const gltf = await loader.loadAsync(`assets/props/${name}.glb`);
+    const gltf = await loadGltf(loader, `assets/props/${name}.glb`);
     const root = gltf.scene;
     root.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
     propCache.set(name, root);

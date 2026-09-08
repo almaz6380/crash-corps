@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { embeddedBytes } from './embed.js';
 
 /**
  * Oberflächen für den realistischen Stil.
@@ -52,7 +53,14 @@ export async function preloadTextures(onProgress) {
   let done = 0;
   await Promise.all(TEXTURE_SETS.map(async (name) => {
     const load = async (short, srgb) => {
-      const t = await loader.loadAsync(`assets/textures/${name}/${short}.jpg`);
+      const url = `assets/textures/${name}/${short}.jpg`;
+      const bytes = embeddedBytes(url);
+      let t;
+      if (bytes) {
+        // Einzeldatei-Build: Bild aus den Rohdaten, ohne Netzzugriff
+        t = new THREE.Texture(await createImageBitmap(new Blob([bytes], { type: 'image/jpeg' })));
+        t.needsUpdate = true;
+      } else t = await loader.loadAsync(url);
       t.wrapS = t.wrapT = THREE.RepeatWrapping;
       if (srgb) t.colorSpace = THREE.SRGBColorSpace;
       t.anisotropy = 4;
