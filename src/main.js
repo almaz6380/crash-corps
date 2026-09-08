@@ -23,6 +23,16 @@ const pipeline = new Pipeline(renderer, camera);
 let world = null;                      // wird nach dem Laden der Props gebaut
 const input = new Input(canvas);
 if (TOUCH) document.body.classList.add('touch');
+
+// Als Webapp installierbar und offline spielbar. Nur im eigenen Fenster und
+// nur über HTTPS – in einem eingebetteten Rahmen (z. B. Artefakt) hätte der
+// Service Worker keinen eigenen Geltungsbereich.
+if ('serviceWorker' in navigator && isSecureContext && window.top === window) {
+  addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(() => {}));
+  navigator.serviceWorker.addEventListener('message', (e) => {
+    if (e.data?.typ === 'offline-fortschritt') hud.offline(e.data.anteil);
+  });
+}
 const hud = new Hud(document.getElementById('hud'));
 
 // Effekte: kurze Leuchtspuren + Treffer-Funken

@@ -122,3 +122,7 @@ body.touch #feed { right: 74px; font-size: 13px; }
 
 #anpassen { font: bold 15px/1 inherit; color: var(--ink); background: var(--sun); border: 4px solid var(--ink);
   border-radius: 14px; padding: 12px 18px; box-shadow: 5px 5px 0 var(--ink); justify-self: center; }
+
+/* Offline-Bereitschaft im Menü */
+#offline { margin: 0; font-size: 13px; font-weight: bold; color: var(--paper); opacity: .75; }
+#offline.fertig { color: var(--sun); opacity: 1; }

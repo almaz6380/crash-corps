@@ -12,6 +12,7 @@ export class Hud {
         <p class="sub">Wähl deine Klasse. Dann rein.</p>
         <div id="classes"></div>
         ${TOUCH ? '<button id="anpassen" type="button">Bedienung anpassen</button>' : ''}
+        <p id="offline" hidden></p>
         <p class="help">${TOUCH
           ? 'Links ziehen zum Laufen · rechts wischen zum Umsehen · FEUER halten · ⤒ springen · R nachladen · Q Spezial'
           : 'WASD laufen · Shift sprinten · Leertaste springen · Klick schießen · R nachladen · Q Spezial · Esc Menü'}</p>
@@ -44,6 +45,15 @@ export class Hud {
     this.feed = root.querySelector('#feed');
     this.feedItems = [];
   }
+  /** Fortschritt der Offline-Bereitschaft (0..1) im Menü. */
+  offline(anteil) {
+    const el = this.root.querySelector('#offline');
+    el.hidden = false;
+    const fertig = anteil >= 0.999;
+    el.textContent = fertig ? 'Offline spielbar' : `Wird für offline vorbereitet … ${Math.round(anteil * 100)}%`;
+    el.classList.toggle('fertig', fertig);
+  }
+
   /** Ladeanzeige: Text zeigen, null blendet sie aus. */
   loading(text) {
     const el = this.root.querySelector('#loading');

@@ -57,6 +57,16 @@ src/
 7. [x] Asset-Pipeline: Modelle in `public/assets/`, Loader in `assets.js` (Quaternius Ultimate Modular Men, CC0)
 8. [ ] Multiplayer-Server (eigenes Repo)
 
+## Auslieferung
+- `npm run build` erzeugt `dist/` und trägt über `tools/sw-liste.mjs` die Vorlade-Liste
+  und eine Version in den Service Worker ein. Ohne diesen Schritt kennt er die Modelle
+  nicht und das Spiel ist offline nur zufällig verfügbar.
+- Als App installierbar (Manifest, Icons, Service Worker). Service Worker brauchen HTTPS;
+  über eine LAN-Adresse lässt es sich spielen, aber nicht installieren.
+- `tools/einzeldatei.mjs` packt alles in eine HTML-Datei ohne Server.
+- Was eingebettet bzw. vorgehalten wird, bestimmt `tools/assets-liste.mjs` – die Auswahl
+  folgt `classes.js` (Modelle) und `world.js` (Props), ungenutzte Alternativen bleiben draußen.
+
 ## Start
 ```
 npm install

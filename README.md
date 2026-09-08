@@ -9,6 +9,24 @@ npm install
 npm run dev
 ```
 
+## Als App installieren
+
+Das Spiel ist eine Progressive Web App: Manifest, Icons und ein Service Worker,
+der alle Modelle und Texturen vorhält. Nach dem ersten Laden meldet das Menü
+**Offline spielbar** – danach läuft es ohne Netz.
+
+Installieren:
+- **Android/Chrome:** Menü → *App installieren* (oder *Zum Startbildschirm*)
+- **iOS/Safari:** Teilen → *Zum Home-Bildschirm*
+
+**Wichtig:** Service Worker brauchen HTTPS. Über `http://192.168.…` aus dem
+lokalen Netz lässt sich das Spiel spielen, aber **nicht installieren** –
+dafür muss es über HTTPS ausgeliefert werden (GitHub Pages, Netlify,
+Cloudflare Pages). `localhost` gilt als sicher und funktioniert auch.
+
+Der Build liegt danach vollständig in `dist/` und ist auf jeden statischen
+Hoster kopierbar; alle Pfade sind relativ.
+
 ## Auf dem Handy spielen
 
 Das Spiel erkennt Touch-Geräte selbst und blendet dann die Bildschirm-Bedienung
@@ -50,5 +68,14 @@ der Workflow bei jedem Push auf `main`.
 
 WASD laufen · Shift sprinten · Leertaste springen · Klick schießen ·
 R nachladen · Q Spezial · Esc Menü
+
+## Ohne Server: eine einzige Datei
+
+```
+npm run build && node tools/einzeldatei.mjs
+```
+
+Packt Skript, Stile, Modelle und Texturen in eine HTML-Datei (rund 10 MB), die
+ohne Server und ohne Nachladen läuft – zum Verschicken oder für einen USB-Stick.
 
 Details zum Aufbau: siehe `CLAUDE.md`.
