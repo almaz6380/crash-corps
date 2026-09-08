@@ -1,8 +1,9 @@
 import * as THREE from 'three';
-import { CLASSES } from './classes.js';
+import { CLASSES, SPECIALS } from './classes.js';
 import { Weapon } from './weapons.js';
 import { buildCharacter } from './characters.js';
-import { resolveCollisions } from './world.js';
+import { CharacterAnimator } from './animation.js';
+import { resolveCollisions, groundHeightAt, STEP_UP } from './world.js';
 
 const NAMES = ['Brösel', 'Knacki', 'Zündel', 'Rumpel', 'Fiete', 'Gustl', 'Wuschel', 'Pumpf'];
 let nameIdx = 0;
@@ -13,6 +14,7 @@ export class Bot {
     this.cls = CLASSES[clsId]; this.world = world; this.scene = scene;
     this.name = NAMES[nameIdx++ % NAMES.length];
     this.mesh = buildCharacter(this.cls); this.mesh.userData.target = this;
+    this.anim = new CharacterAnimator(this.mesh);
     scene.add(this.mesh);
     this.pos = this.mesh.position;
     this.hp = this.cls.hp; this.dead = false; this.respawnIn = 0;
@@ -20,10 +22,89 @@ export class Bot {
     this.target = null; this.wander = new THREE.Vector3();
     this.retarget = 0; this.reaction = 0; this.kills = 0;
     this.ray = new THREE.Raycaster();
+    // Ausweichrolle (nur Klassen mit Dash-Spezial), Werte aus classes.js
+    this.dodge = 0; this.dodgeCool = 0; this.dodgeDir = new THREE.Vector3(); this.dodgeSpeed = 0;
+    this.vy = 0;   // Fallgeschwindigkeit, damit Bots von Plattformen fallen
+    this.navPoint = null; this.navRefresh = 0;   // Zwischenziel beim Ebenenwechsel
   }
-  spawn(at) { this.pos.copy(at); this.hp = this.cls.hp; this.dead = false; this.mesh.visible = true; this.weapon = new Weapon(this.cls.weapon); this.retarget = 0; }
-  onHit(dmg) { if (this.dead) return; this.hp -= dmg; this.hurt = 0.15; if (this.hp <= 0) { this.hp = 0; this.dead = true; this.mesh.visible = false; this.respawnIn = 4; this.onDeath?.(); } }
+  spawn(at) {
+    this.pos.copy(at); this.vy = 0; this.hp = this.cls.hp; this.dead = false; this.mesh.visible = true;
+    this.weapon = new Weapon(this.cls.weapon); this.retarget = 0; this.reaction = 0;
+    this.dodge = 0; this.dodgeCool = 0; this.navPoint = null; this.navRefresh = 0;
+    this.anim.reset();
+  }
+  onHit(dmg) {
+    if (this.dead) return;
+    this.hp -= dmg; this.anim.hit();
+    if (this.hp > 0) this.tryDodge();
+    if (this.hp <= 0) {
+      this.hp = 0; this.dead = true; this.respawnIn = 4;
+      this.anim.die(); // Leiche bleibt sichtbar, bis sie umgefallen ist
+      this.onDeath?.();
+    }
+  }
   get eye() { return this.pos.clone().setY(this.pos.y + this.cls.body.height * 0.9); }
+
+  /**
+   * Zwischenziel, wenn das eigentliche Ziel auf einer anderen Ebene liegt:
+   * erst zum Fuß der günstigsten Rampe, dann hinauf. Rampen, deren Fuß selbst
+   * höher liegt als der Bot steht, kommen nicht in Frage – so klettert er
+   * mehrstufige Aufgänge Stück für Stück.
+   */
+  routeTo(dst, dt) {
+    this.navRefresh -= dt;
+    // Ein gewähltes Zwischenziel wird gehalten, bis es erreicht ist. Ohne das
+    // verwirft der Bot es auf halber Rampe, weil der Höhenunterschied schrumpft.
+    if (this.navPoint) {
+      if (this.pos.distanceTo(this.navPoint) > 1.4 && this.navRefresh > -6) return this.navPoint;
+      this.navPoint = null;
+    }
+    if (dst.y - this.pos.y < 0.9) return dst;                   // gleiche Ebene oder Ziel tiefer
+
+    let best = null, bestCost = Infinity;
+    for (const r of this.world.ramps || []) {
+      if (r.top.y <= this.pos.y + 0.6) continue;                // führt nicht höher
+      if (r.bottom.y > this.pos.y + 0.9) continue;              // Fuß liegt über meiner Ebene
+      const cost = this.pos.distanceTo(r.bottom) + r.top.distanceTo(dst);
+      if (cost < bestCost) { bestCost = cost; best = r; }
+    }
+    if (!best) return dst;
+    this.navRefresh = 0.7;
+    // Am Fuß angekommen: Ziel ist die Rampenoberkante
+    this.navPoint = this.pos.distanceTo(best.bottom) > 2.2 ? best.bottom : best.top;
+    return this.navPoint;
+  }
+
+  /** Schwerkraft und Bodenhöhe – Bots stehen auf Rampen und Dächern wie der Spieler. */
+  applyGravity(dt) {
+    this.vy -= 22 * dt;
+    this.pos.y += this.vy * dt;
+    const support = groundHeightAt(this.pos, 0.35, this.world, this.pos.y + STEP_UP);
+    if (this.pos.y <= support) { this.pos.y = support; this.vy = 0; }
+  }
+
+  /** Seitlich wegrollen, wenn die Klasse Dash hat, die Abklingzeit um ist und der Zufall will. */
+  tryDodge() {
+    const sp = SPECIALS[this.cls.special];
+    if (!sp?.speedMul || this.dodge > 0 || this.dodgeCool > 0 || Math.random() > 0.6) return;
+    const dur = this.anim.roll();
+    if (!dur) return;
+    // Gleiche Strecke wie der Spieler-Dash, gestreckt auf die Dauer des Roll-Clips
+    const dist = this.cls.speed * sp.speedMul * sp.duration;
+    const yaw = this.mesh.rotation.y;
+    this.dodgeDir.set(Math.cos(yaw), 0, -Math.sin(yaw)).multiplyScalar(Math.random() < 0.5 ? 1 : -1);
+    this.dodgeSpeed = dist / dur;
+    this.dodge = dur; this.dodgeCool = sp.cooldown;
+    // Der Clip ist eine Vorwärtsrolle: für die Dauer in die Ausweichrichtung drehen,
+    // danach dreht die weiche Blickführung wieder zum Ziel zurück
+    this.mesh.rotation.y = Math.atan2(this.dodgeDir.x, this.dodgeDir.z);
+  }
+
+  /** Figur aus der Szene nehmen und ihre geklonten Materialien freigeben. */
+  dispose() {
+    this.scene.remove(this.mesh);
+    for (const m of this.mesh.userData.rig.inst.materials) m.dispose();
+  }
 
   canSee(p) {
     const from = this.eye, to = p.eye, dir = to.clone().sub(from), dist = dir.length();
@@ -34,9 +115,22 @@ export class Bot {
 
   update(dt, player, others, fx) {
     this.weapon.update(dt);
-    this.hurt = Math.max(0, (this.hurt || 0) - dt);
-    this.mesh.userData.parts.torso.material.emissive?.setScalar?.(0);
-    if (this.dead) { this.respawnIn -= dt; return; }
+    if (this.dead) {
+      // Leiche bleibt bis zum Respawn liegen
+      this.respawnIn -= dt;
+      this.anim.update(dt);
+      return;
+    }
+
+    this.dodgeCool = Math.max(0, this.dodgeCool - dt);
+    if (this.dodge > 0) {
+      this.dodge -= dt;
+      this.pos.addScaledVector(this.dodgeDir, this.dodgeSpeed * dt);
+      resolveCollisions(this.pos, 0.5, this.world, { height: this.cls.body.height });
+      this.applyGravity(dt);
+      this.anim.update(dt, { moving: false, speed: 0 });
+      return;
+    }
 
     const sees = !player.dead && this.canSee(player);
     this.retarget -= dt;
@@ -45,38 +139,60 @@ export class Bot {
     } else { this.reaction = Math.max(0, this.reaction - dt); if (this.retarget <= 0) { this.wander.set((Math.random() - 0.5) * 50, 0, (Math.random() - 0.5) * 50); this.retarget = 3 + Math.random() * 3; } }
 
     // Bewegung
-    const dst = sees ? player.pos : this.wander;
+    const goal = sees ? player.pos : this.wander;
+    const dst = this.routeTo(goal, dt);
+    const climbing = dst !== goal;                 // unterwegs zu einer Rampe
     const dir = dst.clone().sub(this.pos).setY(0);
     const dist = dir.length();
     const ideal = { shotgun: 4, smg: 9, rifle: 22 }[this.cls.weapon];
     let mv = new THREE.Vector3();
-    if (sees) {
+    if (climbing) {
+      mv.copy(dir).normalize();                    // direkt hin, kein Abstandsspiel
+    } else if (sees) {
       if (dist > ideal + 2) mv.copy(dir).normalize();
       else if (dist < ideal - 2) mv.copy(dir).normalize().negate();
       // seitliches Ausweichen
       mv.addScaledVector(new THREE.Vector3(-dir.z, 0, dir.x).normalize(), Math.sin(performance.now() / 700 + this.pos.x) * 0.6);
     } else if (dist > 1.5) mv.copy(dir).normalize();
-    if (mv.lengthSq() > 0) this.pos.addScaledVector(mv.normalize(), this.cls.speed * 0.8 * dt);
-    resolveCollisions(this.pos, 0.5, this.world);
+    const speed = this.cls.speed * 0.8;
+    const walking = mv.lengthSq() > 0;
+    if (walking) this.pos.addScaledVector(mv.normalize(), speed * dt);
+    resolveCollisions(this.pos, 0.5, this.world, { height: this.cls.body.height });
+    this.applyGravity(dt);
     // Bots untereinander leicht auseinanderdrücken
-    for (const o of others) if (o !== this && !o.dead) {
+    if (!climbing) for (const o of others) if (o !== this && !o.dead && Math.abs(o.pos.y - this.pos.y) < 1.2) {
       const d = this.pos.clone().sub(o.pos).setY(0); const l = d.length();
       if (l < 1.4 && l > 0) this.pos.addScaledVector(d.normalize(), (1.4 - l) * 0.5);
     }
-    // Blickrichtung
-    const look = sees ? player.pos : this.pos.clone().add(mv);
-    this.mesh.rotation.y = Math.atan2(look.x - this.pos.x, look.z - this.pos.z);
-    // Lauf-Wackeln
-    const walking = mv.lengthSq() > 0;
-    this.mesh.userData.parts.torso.rotation.z = walking ? Math.sin(performance.now() / 120) * 0.06 : 0;
-    this.mesh.position.y = walking ? Math.abs(Math.sin(performance.now() / 120)) * 0.08 : 0;
+    // Blickrichtung: weich drehen statt umschnappen
+    const look = sees && !climbing ? player.pos : this.pos.clone().add(mv);
+    if (walking || sees) {
+      const want = Math.atan2(look.x - this.pos.x, look.z - this.pos.z);
+      let d = want - this.mesh.rotation.y;
+      d = Math.atan2(Math.sin(d), Math.cos(d));                 // kürzester Weg
+      this.mesh.rotation.y += d * Math.min(1, dt * (sees ? 12 : 7));
+    }
+    // Bewegungsrichtung relativ zur Blickrichtung (für Seitwärts-/Rückwärtslaufen)
+    const yaw = this.mesh.rotation.y;
+    const fwd = new THREE.Vector3(Math.sin(yaw), 0, Math.cos(yaw));
+    const right = new THREE.Vector3(fwd.z, 0, -fwd.x);
+    const advance = walking ? mv.dot(fwd) : 0;
+    const strafe = walking ? mv.dot(right) : 0;
 
     // Schießen mit Reaktionszeit + Streuung
+    const aiming = sees && this.reaction > 0.35;
     if (sees && this.reaction > 0.6 && this.weapon.canFire()) {
       const aim = player.eye.clone().sub(this.eye);
       aim.x += (Math.random() - 0.5) * 0.6; aim.y += (Math.random() - 0.5) * 0.4; aim.z += (Math.random() - 0.5) * 0.6;
       const hits = this.weapon.fire(this.eye, aim.normalize(), [player], this.world);
-      if (hits) fx.tracers(this.eye, hits, this.cls.accent);
+      if (hits) {
+        this.anim.fire();
+        fx.tracers(this.eye, hits, this.cls.accent);
+        const rig = this.mesh.userData.rig;
+        if (rig.muzzle) fx.flash(rig.muzzle.getWorldPosition(new THREE.Vector3()));
+      }
     } else if (!sees && this.weapon.ammo < this.weapon.def.mag) this.weapon.reload();
+
+    this.anim.update(dt, { moving: walking, speed, aiming, advance, strafe, lookAt: sees ? player.eye : null });
   }
 }

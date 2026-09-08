@@ -1,50 +1,63 @@
 import * as THREE from 'three';
+import { instantiate, CHARACTER_MODELS } from './assets.js';
+import { buildWeapon } from './gear.js';
 
-const mat = (c) => new THREE.MeshToonMaterial({ color: c });
+export { buildViewmodel } from './gear.js';
 
-/** Baut eine Low-Poly-Figur aus Grundkörpern. Root steht mit Füßen auf y=0. */
+/**
+ * Baut eine Spielfigur aus dem geladenen Modell der Klasse.
+ * Root steht mit den Füßen auf y=0 und schaut nach +z.
+ *
+ * Aufbau: root (Position/Blickrichtung) → frame (Umfallen/Hüpfen) → Modell.
+ * Bringt das Modell eigene Waffen mit, wird die passende eingeblendet; sonst
+ * hängt eine prozedurale Waffe in einem Halter am Hand-Knochen.
+ */
 export function buildCharacter(cls) {
   const g = new THREE.Group();
-  const { width: w, height: h, head } = cls.body;
-  const legH = h * 0.42, torsoH = h * 0.38;
-  const body = mat(cls.color), skin = mat(0xf2c9a0), dark = mat(0x3a2e2a), acc = mat(cls.accent);
+  const frame = new THREE.Group(); g.add(frame);
 
-  const legs = new THREE.Mesh(new THREE.BoxGeometry(w * 0.8, legH, w * 0.45), dark);
-  legs.position.y = legH / 2; g.add(legs);
+  const def = CHARACTER_MODELS[cls.model];
+  const inst = instantiate(cls.model, { height: cls.body.height, tint: cls.color, weapon: cls.weapon });
+  inst.root.rotation.y = def.yaw || 0;
+  frame.add(inst.root);
 
-  const torso = new THREE.Mesh(new THREE.BoxGeometry(w, torsoH, w * 0.55), body);
-  torso.position.y = legH + torsoH / 2; g.add(torso);
-
-  const belt = new THREE.Mesh(new THREE.BoxGeometry(w * 1.02, 0.12, w * 0.57), acc);
-  belt.position.y = legH + 0.06; g.add(belt);
-
-  const hd = new THREE.Mesh(new THREE.BoxGeometry(head, head, head), skin);
-  hd.position.y = legH + torsoH + head / 2 + 0.05; g.add(hd);
-
-  const helmet = new THREE.Mesh(new THREE.BoxGeometry(head * 1.15, head * 0.45, head * 1.15), body);
-  helmet.position.y = hd.position.y + head * 0.4; g.add(helmet);
-
-  for (const s of [-1, 1]) {
-    const arm = new THREE.Mesh(new THREE.BoxGeometry(w * 0.22, torsoH * 0.9, w * 0.22), body);
-    arm.position.set(s * (w / 2 + w * 0.13), legH + torsoH * 0.5, 0); g.add(arm);
-    const hand = new THREE.Mesh(new THREE.BoxGeometry(w * 0.22, 0.18, w * 0.22), skin);
-    hand.position.set(arm.position.x, legH + 0.1, 0); g.add(hand);
+  let weapon, holder = null, holderRest = null, weaponRest = null;
+  if (inst.builtinWeapon) {
+    weapon = inst.builtinWeapon;
+  } else {
+    weapon = buildWeapon(cls.weapon, cls.accent);
+    holder = new THREE.Object3D();
+    if (inst.hand && def.grip) {
+      g.updateWorldMatrix(true, true);
+      // Knochen-Skalierung herausrechnen, damit die Waffe in Metern stimmt
+      const s = new THREE.Vector3();
+      inst.hand.matrixWorld.decompose(new THREE.Vector3(), new THREE.Quaternion(), s);
+      holder.scale.setScalar(1 / (s.x || 1));
+      holder.rotation.fromArray(def.grip.rot);
+      weapon.position.fromArray(def.grip.pos);
+      weapon.scale.setScalar(def.grip.scale);
+      holder.add(weapon);
+      inst.hand.add(holder);
+    } else {
+      frame.add(weapon);
+    }
+    holderRest = holder.quaternion.clone();
+    weaponRest = weapon.position.clone();
   }
-  const gun = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.15, 0.9), dark);
-  gun.position.set(w / 2 + w * 0.13, legH + 0.2, -0.45); g.add(gun);
 
-  g.traverse(o => { if (o.isMesh) { o.castShadow = true; } });
-  g.userData.parts = { torso, hd, legs };
-  return g;
-}
+  // Mündungspunkt: bei mitgelieferten Waffen das in Blickrichtung vorderste Ende
+  let muzzle = weapon.userData.muzzle;
+  if (!muzzle) {
+    g.updateWorldMatrix(true, true);
+    const box = new THREE.Box3().setFromObject(weapon);
+    if (!box.isEmpty()) {
+      const tip = new THREE.Vector3(box.getCenter(new THREE.Vector3()).x, box.getCenter(new THREE.Vector3()).y, box.max.z);
+      muzzle = new THREE.Object3D();
+      weapon.add(muzzle);
+      muzzle.position.copy(weapon.worldToLocal(tip));
+    }
+  }
 
-/** Ego-Waffe (nur sichtbarer Lauf unten rechts im Bild). */
-export function buildViewmodel(cls) {
-  const g = new THREE.Group();
-  const barrel = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.14, 0.9), mat(0x3a2e2a));
-  const grip = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.3, 0.14), mat(cls.accent));
-  grip.position.set(0, -0.18, 0.25);
-  g.add(barrel, grip);
-  g.position.set(0.32, -0.32, -0.7);
+  g.userData.rig = { frame, inst, weapon, holder, muzzle, holderRest, weaponRest };
   return g;
 }

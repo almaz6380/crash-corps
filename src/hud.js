@@ -1,14 +1,21 @@
 import { CLASSES } from './classes.js';
+import { TOUCH } from './device.js';
 
 export class Hud {
   constructor(root) {
     this.root = root;
     root.innerHTML = `
+      <div id="loading" hidden></div>
+      <div id="hochkant">Bitte das Gerät quer halten</div>
       <div id="menu">
         <h1>Crash Corps</h1>
         <p class="sub">Wähl deine Klasse. Dann rein.</p>
         <div id="classes"></div>
-        <p class="help">WASD laufen · Shift sprinten · Leertaste springen · Klick schießen · R nachladen · Q Spezial · Esc Menü</p>
+        ${TOUCH ? '<button id="anpassen" type="button">Bedienung anpassen</button>' : ''}
+        <p id="offline" hidden></p>
+        <p class="help">${TOUCH
+          ? 'Links ziehen zum Laufen · rechts wischen zum Umsehen · FEUER halten · ⤒ springen · R nachladen · Q Spezial'
+          : 'WASD laufen · Shift sprinten · Leertaste springen · Klick schießen · R nachladen · Q Spezial · Esc Menü'}</p>
       </div>
       <div id="play" hidden>
         <div id="cross"></div>
@@ -21,7 +28,8 @@ export class Hud {
           <div id="special"></div>
         </div>
         <div id="dead" hidden></div>
-        <div id="hint">Klick ins Bild, um die Maus zu fangen</div>
+        <div id="hint" hidden>Klick ins Bild, um die Maus zu fangen</div>
+        <button id="pause" type="button" title="Menü">II</button>
       </div>`;
     const list = root.querySelector('#classes');
     for (const c of Object.values(CLASSES)) {
@@ -31,8 +39,26 @@ export class Hud {
       el.onclick = () => this.onPick?.(c.id);
       list.append(el);
     }
+    root.querySelector('#pause').onclick = () => this.onPause?.();
+    const anp = root.querySelector('#anpassen');
+    if (anp) anp.onclick = () => this.onCustomize?.();
     this.feed = root.querySelector('#feed');
     this.feedItems = [];
+  }
+  /** Fortschritt der Offline-Bereitschaft (0..1) im Menü. */
+  offline(anteil) {
+    const el = this.root.querySelector('#offline');
+    el.hidden = false;
+    const fertig = anteil >= 0.999;
+    el.textContent = fertig ? 'Offline spielbar' : `Wird für offline vorbereitet … ${Math.round(anteil * 100)}%`;
+    el.classList.toggle('fertig', fertig);
+  }
+
+  /** Ladeanzeige: Text zeigen, null blendet sie aus. */
+  loading(text) {
+    const el = this.root.querySelector('#loading');
+    el.hidden = text == null;
+    if (text != null) el.textContent = text;
   }
   showMenu(on) { this.root.querySelector('#menu').hidden = !on; this.root.querySelector('#play').hidden = on; }
   hint(on) { this.root.querySelector('#hint').hidden = !on; }
