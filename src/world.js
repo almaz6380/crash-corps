@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { celRamp, buildSky, buildRealSky } from './render.js';
 import { REAL } from './style.js';
-import { realisticMaterial } from './surface.js';
+import { realisticMaterial, uvSurface, setImage } from './surface.js';
 import { spawnProp } from './assets.js';
 
 const RAMP = celRamp(4);
@@ -10,8 +10,8 @@ export const STEP_UP = 0.55;     // maximale Stufenhöhe, die Figuren erklimmen
 const PLATFORM_H = 2.3;          // Höhe der begehbaren Ebene (Containerdach)
 
 /** Baumaterial im jeweiligen Stil: Toon-Rampe oder physikalisch mit Struktur. */
-const build = (color, name) => REAL
-  ? realisticMaterial(new THREE.MeshStandardMaterial({ color, name }))
+const build = (color, name, set = 'rust_coarse_01') => REAL
+  ? realisticMaterial(new THREE.MeshStandardMaterial({ color, name }), { set, scale: 0.35 })
   : new THREE.MeshToonMaterial({ color, gradientMap: RAMP });
 
 /** Props, die die Arena braucht – main.js lädt sie vor dem Aufbau. */
@@ -30,24 +30,40 @@ function arenaFloorTexture() {
   const px = (v) => ((v + SIZE / 2) / SIZE) * S;      // Weltkoordinate → Pixel
   const m = (v) => (v / SIZE) * S;                    // Länge → Pixel
 
-  x.fillStyle = '#82a95a'; x.fillRect(0, 0, S, S);
-  for (let i = 0; i < 9000; i++) {
-    x.fillStyle = ['#7ba054', '#8fb264', '#6e9149', '#97b972'][i % 4];
-    x.fillRect(Math.random() * S, Math.random() * S, 4 + Math.random() * 12, 3 + Math.random() * 5);
+  // Im realistischen Stil wird der Boden mit den echten Texturen gemalt, sonst
+  // prozedural. So passt die Arenafläche zu den texturierten Props.
+  const pattern = (img, meters) => {
+    if (!img) return null;
+    const pat = x.createPattern(img, 'repeat');
+    const f = (meters / SIZE) * S / img.width;
+    pat.setTransform(new DOMMatrix([f, 0, 0, f, 0, 0]));
+    return pat;
+  };
+  const grassPat = pattern(setImage('leafy_grass'), 3.2);
+  const asphaltPat = pattern(setImage('asphalt_03'), 3.6);
+  const concretePat = pattern(setImage('concrete_floor_02'), 3.0);
+
+  if (grassPat) { x.fillStyle = grassPat; x.fillRect(0, 0, S, S); }
+  else {
+    x.fillStyle = '#82a95a'; x.fillRect(0, 0, S, S);
+    for (let i = 0; i < 9000; i++) {
+      x.fillStyle = ['#7ba054', '#8fb264', '#6e9149', '#97b972'][i % 4];
+      x.fillRect(Math.random() * S, Math.random() * S, 4 + Math.random() * 12, 3 + Math.random() * 5);
+    }
   }
 
   // Schotterwege zwischen den drei Punkten und in die Ecken
-  x.lineCap = 'round'; x.strokeStyle = '#9c8b6d'; x.lineWidth = m(5.5);
+  x.lineCap = 'round'; x.strokeStyle = concretePat || '#9c8b6d'; x.lineWidth = m(5.5);
   const path = (pts) => { x.beginPath(); x.moveTo(px(pts[0][0]), px(pts[0][1])); for (const p of pts.slice(1)) x.lineTo(px(p[0]), px(p[1])); x.stroke(); };
   path([[-20, 20], [-8, 8], [8, -8], [20, -20]]);
   path([[-24, -24], [-10, -6], [10, 6], [24, 24]]);
   path([[0, -26], [0, -10]]); path([[0, 26], [0, 10]]);
-  x.globalAlpha = 0.5; x.strokeStyle = '#8d7d61'; x.lineWidth = m(3.2);
+  x.globalAlpha = 0.5; x.strokeStyle = concretePat || '#8d7d61'; x.lineWidth = m(3.2);
   path([[-20, 20], [-8, 8], [8, -8], [20, -20]]);
   x.globalAlpha = 1;
 
   // Asphaltplatte in der Mitte
-  x.fillStyle = '#5f5f63';
+  x.fillStyle = asphaltPat || '#5f5f63';
   x.beginPath(); x.roundRect(px(-11), px(-11), m(22), m(22), m(1.6)); x.fill();
   x.strokeStyle = '#6b6b70'; x.lineWidth = m(0.5); x.stroke();
   x.strokeStyle = '#c8b45e'; x.lineWidth = m(0.28);       // Markierung
@@ -58,7 +74,7 @@ function arenaFloorTexture() {
   x.beginPath(); x.rect(px(-9.6), px(-9.6), m(19.2), m(19.2)); x.stroke();
 
   // Beton unter den beiden Seitenplattformen
-  x.fillStyle = '#6c6c70';
+  x.fillStyle = concretePat || '#6c6c70';
   for (const [cx, cz] of [[20, -20], [-20, 20]]) {
     x.beginPath(); x.roundRect(px(cx - 6), px(cz - 6), m(12), m(12), m(0.8)); x.fill();
   }
@@ -100,15 +116,16 @@ export function buildWorld(scene, renderer) {
   otex.wrapS = otex.wrapT = THREE.RepeatWrapping; otex.repeat.set(30, 30);
   otex.colorSpace = THREE.SRGBColorSpace; otex.anisotropy = 8;
   const groundMat = REAL
-    ? realisticMaterial(new THREE.MeshStandardMaterial({ map: otex, name: 'Dirt', roughness: 1 }), { scale: 0.12 })
+    ? uvSurface(new THREE.MeshStandardMaterial({ name: 'Dirt', roughness: 1 }), 'leafy_grass', { repeat: 60 })
     : new THREE.MeshToonMaterial({ map: otex, gradientMap: RAMP });
   const ground = new THREE.Mesh(new THREE.PlaneGeometry(320, 320), groundMat);
   ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; group.add(ground);
 
   // Bemalter Arenaboden darüber
   const floorMat = REAL
-    ? realisticMaterial(new THREE.MeshStandardMaterial({
-        map: arenaFloorTexture(), name: 'Concrete', roughness: 1, polygonOffset: true, polygonOffsetFactor: -1 }), { scale: 0.3 })
+    ? uvSurface(new THREE.MeshStandardMaterial({
+        map: arenaFloorTexture(), name: 'Concrete', roughness: 1, polygonOffset: true, polygonOffsetFactor: -1 }),
+        'asphalt_03', { repeat: 26, keepMap: true })
     : new THREE.MeshToonMaterial({ map: arenaFloorTexture(), gradientMap: RAMP, polygonOffset: true, polygonOffsetFactor: -1 });
   const floor = new THREE.Mesh(new THREE.PlaneGeometry(SIZE, SIZE), floorMat);
   floor.rotation.x = -Math.PI / 2; floor.position.y = 0.012; floor.receiveShadow = true; group.add(floor);

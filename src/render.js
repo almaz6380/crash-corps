@@ -27,9 +27,9 @@ export function buildRealSky(scene, renderer, sunDir) {
   const sky = new Sky();
   sky.scale.setScalar(8000);
   const u = sky.material.uniforms;
-  u.turbidity.value = 3.0;
-  u.rayleigh.value = 2.6;
-  u.mieCoefficient.value = 0.006;
+  u.turbidity.value = 1.8;
+  u.rayleigh.value = 3.4;
+  u.mieCoefficient.value = 0.003;
   u.mieDirectionalG.value = 0.8;
   u.sunPosition.value.copy(sunDir);
   scene.add(sky);

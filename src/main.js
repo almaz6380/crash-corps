@@ -6,6 +6,8 @@ import { Bot } from './bots.js';
 import { Hud } from './hud.js';
 import { Pipeline } from './render.js';
 import { preloadCharacters, preloadProps } from './assets.js';
+import { REAL } from './style.js';
+import { preloadTextures } from './surface.js';
 
 const canvas = document.getElementById('game');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
@@ -100,6 +102,7 @@ hud.showMenu(false); hud.loading('Wird geladen …');
 Promise.all([
   preloadCharacters((p) => hud.loading(`Figuren … ${Math.round(p * 100)}%`), Object.values(CLASSES).map(c => c.model)),
   preloadProps(WORLD_PROPS, (p) => hud.loading(`Arena … ${Math.round(p * 100)}%`)),
+  REAL ? preloadTextures((p) => hud.loading(`Oberflächen … ${Math.round(p * 100)}%`)) : null,
 ])
   .then(() => { world = buildWorld(scene, renderer); hud.loading(null); hud.showMenu(true); })
   .catch((err) => {

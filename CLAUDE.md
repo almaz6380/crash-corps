@@ -26,7 +26,8 @@ src/
   render.js    Zwei Stile: Cel-Shading mit Outline oder physikalisch (Himmel, Umgebungslicht,
                Umgebungsverdeckung). Tone-Mapping liegt im Composite-Shader.
   style.js     Stilumschalter (?stil=real)
-  surface.js   Prozedurale Oberflächenstruktur für den realistischen Stil
+  surface.js   Oberflächen für den realistischen Stil: PBR-Texturen, bei Props ohne UVs
+               über Weltraum-Projektion (triplanar)
   animation.js Skelett-Clips (Stehen/Gehen/Rennen, Anschlag-Varianten, Tod) + Knochen-Overlays als Ersatz
   hud.js       DOM-HUD (HP, Munition, Fadenkreuz, Killfeed, Score, Klassenwahl)
   style.css
