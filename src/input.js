@@ -131,12 +131,12 @@ class TouchControls {
           <input id="t-edit-size" type="range" min="44" max="180" step="2" disabled />
           <button id="t-edit-reset" type="button">Zurücksetzen</button>
           <button id="t-edit-done" type="button">Fertig</button>
-        </div>
-        <div id="t-gyro">
-          <b>Gyroskop</b>
-          <label>Stärke <input id="gyro-staerke" type="range" min="0.2" max="3" step="0.1"></label>
-          <label><input id="gyro-x" type="checkbox"> X umkehren</label>
-          <label><input id="gyro-y" type="checkbox"> Y umkehren</label>
+          <div id="t-gyro">
+            <b>Gyroskop</b>
+            <label>Stärke <input id="gyro-staerke" type="range" min="0.2" max="3" step="0.1"></label>
+            <label><input id="gyro-x" type="checkbox"> X</label>
+            <label><input id="gyro-y" type="checkbox"> Y</label>
+          </div>
         </div>
         <p id="t-edit-hint">Knopf ziehen zum Verschieben · antippen und Regler für die Größe</p>
       </div>`;
