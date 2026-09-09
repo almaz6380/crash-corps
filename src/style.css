@@ -209,9 +209,10 @@ body.touch #ende > div { font-size: 24px; padding: 18px 28px; }
 /* Gyro-Einstellungen sitzen im Anpassen-Bildschirm, und zwar in der Werkzeug-
    leiste: das Menü ist im Querformat eines Handys randvoll, und frei im Bild
    stünde der Kasten dort, wo man gerade Knöpfe hinzieht. */
-#t-edit-bar { flex-wrap: wrap; max-width: min(96vw, 780px); }
-#t-gyro { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center;
-  padding-left: 12px; border-left: 3px solid rgba(43,33,24,.25);
+#t-edit-bar { flex-wrap: wrap; max-width: min(96vw, 900px); }
+/* Eigene Zeile erzwingen, sonst rutscht ein Knopf der ersten Zeile mit nach unten */
+#t-gyro { flex-basis: 100%; display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center;
+  padding-top: 7px; border-top: 3px solid rgba(43,33,24,.2);
   font-size: 13px; font-weight: bold; color: var(--ink); }
 #t-gyro label { display: flex; align-items: center; gap: 6px; font-weight: normal; }
 #t-gyro input[type="range"] { width: 96px; }
