@@ -314,6 +314,29 @@ export class Sound {
     }
   }
 
+  /** Kontrollpunkt eingenommen. `eigen` = von der eigenen Mannschaft. */
+  punktGenommen(eigen) {
+    if (!this._bereit()) return;
+    const z = this.at(null, 0.55);
+    // Eigener Punkt steigt auf, gegnerischer fällt ab
+    const [a, b2, c] = eigen ? [520, 700, 880] : [700, 560, 420];
+    this._ton(z, { dauer: 0.1, f0: a, form: 'triangle', laut: 0.5 });
+    this._ton(z, { dauer: 0.1, f0: b2, form: 'triangle', laut: 0.5, start: 0.1 });
+    this._ton(z, { dauer: 0.24, f0: c, form: 'triangle', laut: 0.45, start: 0.2 });
+    this._rausch(z, { dauer: 0.3, f0: 2200, f1: 500, typ: 'bandpass', q: 1.2, laut: 0.3 });
+  }
+
+  /** Ende des Matches. */
+  matchEnde(gewonnen) {
+    if (!this._bereit()) return;
+    const z = this.at(null, 0.75);
+    const noten = gewonnen ? [523, 659, 784, 1047] : [523, 440, 349, 262];
+    noten.forEach((f, i) => this._ton(z, {
+      dauer: i === noten.length - 1 ? 0.6 : 0.16,
+      f0: f, form: 'triangle', laut: 0.45, start: i * 0.15,
+    }));
+  }
+
   /** Knopfdruck im Menü. */
   klick() {
     if (!this._bereit()) return;

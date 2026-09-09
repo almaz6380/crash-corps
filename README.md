@@ -64,6 +64,17 @@ der Workflow bei jedem Push auf `main`.
 | `?leistung=niedrig` | Kleinere Auflösung und Schattenkarte, keine Umgebungsverdeckung |
 | `?zielhilfe=an` / `=aus` | Zielhilfe erzwingen (Standard: an auf Touch, aus am Rechner) |
 
+## Modi
+
+**Deathmatch** – jeder gegen jeden, du allein gegen fünf Bots.
+
+**Domination** – drei gegen drei um die Kontrollpunkte **A**, **B** und **C**. Sie liegen
+auf den Plattformdächern, man muss also über eine Rampe hoch. Wer allein im Ring steht,
+zieht ihn zu seiner Mannschaft; stehen beide Mannschaften drauf, bewegt sich nichts.
+Ein gegnerischer Punkt muss erst neutralisiert und dann erobert werden – das dauert
+doppelt so lange wie ein freier. Jeder gehaltene Punkt bringt zwei Zähler pro Sekunde,
+bei 250 ist Schluss. Der Wimpel über jeder Figur zeigt die Mannschaft.
+
 ## Steuerung am Rechner
 
 WASD laufen · Shift sprinten · Leertaste springen · Klick schießen ·

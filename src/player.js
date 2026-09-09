@@ -13,6 +13,7 @@ export class Player {
   constructor(camera, cls, world, scene, input, sound) {
     this.camera = camera; this.cls = cls; this.world = world; this.scene = scene;
     this.input = input; this.sound = sound;
+    this.team = 0;                     // der Spieler steht immer in Mannschaft 0
     this.pos = new THREE.Vector3(); this.vel = new THREE.Vector3();
     this.yaw = 0; this.pitch = 0; this.grounded = true;
     this.hp = cls.hp; this.dead = false; this.respawnIn = 0;
