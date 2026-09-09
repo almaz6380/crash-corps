@@ -92,13 +92,22 @@ export class Hud {
       }
     };
     this.gyroKnopf = knopf;
+    this.hilfeZeile = root.querySelector('#menu .help');
+    this.hilfeText = this.hilfeZeile.textContent;
   }
 
-  /** Zustand des Gyro-Knopfs nachziehen. Stärke und Umkehr stehen unter "Bedienung anpassen". */
+  /**
+   * Zustand des Gyro-Knopfs nachziehen. Stärke und Umkehr stehen unter
+   * "Bedienung anpassen" – im Menü ist im Querformat kein Platz dafür. Damit das
+   * niemand suchen muss, sagt es die Hilfezeile, solange der Gyro an ist.
+   */
   gyroStand(an) {
     if (!this.gyroKnopf) return;
     this.gyroKnopf.classList.toggle('an', !!an);
     this.gyroKnopf.textContent = an ? '🧭 an' : '🧭 aus';
+    this.hilfeZeile.innerHTML = an
+      ? 'Gyroskop an · <b>Stärke und Achsen umkehren: „Bedienung anpassen“</b>'
+      : this.hilfeText;
   }
 
   setModus(m) {
