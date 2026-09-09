@@ -166,6 +166,16 @@ hud.onCustomize = () => {
 };
 hud.onPause = () => { if (running) { sound.klick(); running = false; input.showTouch(false); hud.showMenu(true); hud.hint(false); } };
 hud.onModus = () => sound.klick();
+// Gyroskop: der Knopf ist die Nutzergeste, die iOS für die Erlaubnis verlangt
+hud.onGyro = async () => {
+  sound.klick();
+  const an = await input.gyro.schalten();
+  hud.gyroAbgelehnt = !an && input.gyro.einst.an === false;
+  return an;
+};
+hud.onGyroStaerke = (v) => input.gyro.staerke(v);
+hud.onGyroUmkehr = (achse, an) => input.gyro.umkehren(achse, an);
+hud.gyroStand(input.gyro.einst.an && input.gyro.laeuft, input.gyro.einst);
 hud.onWeiter = () => { sound.klick(); hud.ende(null); hud.showMenu(true); };
 
 // Figuren und Arena-Props laden, dann Arena bauen, dann Menü freigeben
@@ -192,7 +202,7 @@ function loop(now) {
   const dt = Math.min(0.05, (now - last) / 1000); last = now;
   if (input.takeMute()) hud.tonStand(sound.schalten());
   if (input.takeMenu() && running) { running = false; input.showTouch(false); hud.showMenu(true); hud.hint(false); }
-  if (!running) { pipeline.render(scene, camera); return; }
+  if (!running) { input.gyro.leeren(); pipeline.render(scene, camera); return; }
   time += dt;
   const alle = [player, ...bots];
   const wasDead = player.dead;

@@ -32,6 +32,8 @@ src/
   input.js     Eingabe-Schicht: Tastatur, Maus und Touch gebündelt; Anordnung der
                Bildschirm-Knöpfe (verschiebbar, skalierbar, in localStorage)
   aimassist.js Zielhilfe für Touch: Reibung im Zielkegel und träges Nachführen
+  gyro.js      Zielen mit dem Gyroskop: Drehrate statt Lage, Hochachse aus der
+               Schwerkraft, Bildachse aus screen.orientation.angle
   domination.js Modus mit drei Kontrollpunkten: Mannschaften, Eroberung, Punktestand,
                Marker in der Arena und Marschziele für die Bots
   sound.js     Klang, vollständig zur Laufzeit erzeugt (WebAudio) – keine Audiodateien.
@@ -56,6 +58,13 @@ src/
 - Die Toon-Kit-Figuren sind CC0 und dürfen bleiben. Eigene Modelle: siehe public/assets/README.md.
 - Performance-Ziel: 60 fps auf Mittelklasse-Laptop, spielbar auf Handy. Auf Touch-Geräten greift automatisch die niedrigere Leistungsstufe aus `device.js`.
 - Eingaben laufen nur über `input.js`. `player.js` kennt keine Tasten und keine Berührungen, sondern fragt `moveX/moveY`, `fire`, `jump` und die Flanken ab.
+- Blick kommt aus zwei Quellen: `takeLook()` in Pixeln (Maus, Wischen) und
+  `takeGyro()` im Bogenmaß. Getrennt halten – das eine wird noch mit der
+  Empfindlichkeit multipliziert, das andere ist schon ein Winkel.
+- Das Gyroskop misst die Drehrate, nicht die Lage: so wirkt es wie eine Maus und
+  driftet nicht. Die Hochachse kommt aus der Schwerkraft, damit schräges Halten
+  nichts verzieht. Die Vorzeichen lassen sich nur auf echter Hardware prüfen –
+  deshalb sind beide Achsen im Menü umkehrbar.
 - Klangfarben stehen nur in `sound.js` (Tabelle `SCHUSS`). Spieler und Bots rufen
   Methoden auf (`schuss`, `treffer`, `schritt` …) und kennen keine Frequenzen.
   Klänge in der Welt bekommen eine Position mit, eigene nicht – daraus ergibt sich

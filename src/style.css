@@ -70,7 +70,10 @@ html, body { overscroll-behavior: none; -webkit-user-select: none; user-select: 
 
 /* Auf kleinen Bildschirmen HUD kompakter, damit die Daumen nichts verdecken */
 @media (max-height: 520px) {
-  #menu { gap: 12px; }
+  #menu { gap: 10px; }
+  #t-gyro { padding: 5px 10px; gap: 4px 10px; font-size: 12px; }
+  #t-gyro input[type="range"] { width: 84px; }
+  #modi button { padding: 6px 12px; font-size: 14px; }
   #hp { width: 180px; height: 24px; }
   #ammo { font-size: 26px; }
   #bottom { left: 12px; right: 12px; bottom: 12px; }
@@ -193,3 +196,28 @@ body.touch .teamstand span { font-size: 9px; }
 body.touch .kp { width: 34px; }
 body.touch .kp b { font-size: 13px; }
 body.touch #ende > div { font-size: 24px; padding: 18px 28px; }
+
+/* ---------------------------------------------------------------------------
+   Gyroskop: Schalter neben den anderen Menüknöpfen, Einstellungen darunter.
+--------------------------------------------------------------------------- */
+#gyro { font: bold 14px/1 inherit; color: var(--ink); background: var(--paper);
+  border: 3px solid var(--ink); border-radius: 12px; padding: 0 12px; height: 44px;
+  box-shadow: 3px 3px 0 var(--ink); cursor: pointer; white-space: nowrap; }
+#gyro.an { background: var(--sun); }
+#gyro:disabled { opacity: .5; cursor: default; }
+
+/* Gyro-Einstellungen sitzen im Anpassen-Bildschirm, und zwar in der Werkzeug-
+   leiste: das Menü ist im Querformat eines Handys randvoll, und frei im Bild
+   stünde der Kasten dort, wo man gerade Knöpfe hinzieht. */
+/* Raster statt Flex: die Leiste ist absolut positioniert und bekommt ihre Breite
+   aus dem Inhalt. Ein Flex-Kind mit `flex-basis: 100%` verdirbt diese Rechnung,
+   dann rutscht ein Knopf der ersten Zeile mit nach unten. Im Raster bekommt die
+   Gyro-Zeile einfach die ganze Breite. */
+#t-edit-bar { display: grid; grid-template-columns: auto auto auto auto;
+  justify-items: center; max-width: min(96vw, 900px); }
+#t-gyro { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center;
+  padding-top: 7px; border-top: 3px solid rgba(43,33,24,.2);
+  font-size: 13px; font-weight: bold; color: var(--ink); }
+#t-gyro label { display: flex; align-items: center; gap: 6px; font-weight: normal; }
+#t-gyro input[type="range"] { width: 96px; }
+#t-gyro input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--red); }

@@ -1,8 +1,13 @@
 import { TOUCH } from './device.js';
+import { Gyro } from './gyro.js';
 
 /**
  * Eingabe-Schicht. Bündelt Tastatur, Maus und Touch zu einem Zustand, den der
  * Spieler jeden Frame abfragt – dadurch kennt player.js keine Eingabegeräte.
+ *
+ * Blick kommt aus zwei Quellen: Maus/Wischen in Pixeln (`takeLook`) und
+ * Gyroskop im Bogenmaß (`takeGyro`). Getrennt, weil das eine noch mit der
+ * Empfindlichkeit multipliziert wird und das andere schon ein Winkel ist.
  *
  * Dauerzustände: moveX/moveY, fire, sprint, jump.
  * Flanken (einmal je Druck): reload, special, menu, mute – über take…() abzuholen.
@@ -15,7 +20,13 @@ export class Input {
     this.lookX = 0; this.lookY = 0;        // aufgelaufene Blickänderung
     this.fireHeld = false; this.jumpHeld = false; this.sprintHeld = false;
     this._reload = false; this._special = false; this._menu = false; this._mute = false;
+    // Gyro vor der Touch-Bedienung: deren Anpassen-Bildschirm greift beim Aufbau
+    // schon auf die Gyro-Einstellungen zu.
+    this.gyro = new Gyro();
     this.touch = TOUCH ? new TouchControls(this) : null;
+    // War es zuletzt an, gleich wieder anschalten. Auf iOS scheitert das ohne
+    // Nutzergeste stillschweigend – dort hilft der Knopf im Menü.
+    if (this.gyro.einst.an) this.gyro.einschalten().catch(() => {});
     this._bind();
   }
 
@@ -41,6 +52,7 @@ export class Input {
   }
 
   dispose() {
+    this.gyro.ausschalten();
     removeEventListener('keydown', this._onKeyDown);
     removeEventListener('keyup', this._onKeyUp);
     removeEventListener('mousemove', this._onMouseMove);
@@ -59,6 +71,8 @@ export class Input {
 
   /** Blickänderung seit dem letzten Abruf, in Pixeln. */
   takeLook() { const v = [this.lookX, this.lookY]; this.lookX = 0; this.lookY = 0; return v; }
+  /** Blickänderung aus dem Gyroskop, in Bogenmaß. */
+  takeGyro() { return this.gyro.take(); }
   takeReload() { const v = this._reload; this._reload = false; return v; }
   takeSpecial() { const v = this._special; this._special = false; return v; }
   takeMenu() { const v = this._menu; this._menu = false; return v; }
@@ -117,6 +131,12 @@ class TouchControls {
           <input id="t-edit-size" type="range" min="44" max="180" step="2" disabled />
           <button id="t-edit-reset" type="button">Zurücksetzen</button>
           <button id="t-edit-done" type="button">Fertig</button>
+          <div id="t-gyro">
+            <b>Gyroskop</b>
+            <label>Stärke <input id="gyro-staerke" type="range" min="0.2" max="3" step="0.1"></label>
+            <label><input id="gyro-x" type="checkbox"> X</label>
+            <label><input id="gyro-y" type="checkbox"> Y</label>
+          </div>
         </div>
         <p id="t-edit-hint">Knopf ziehen zum Verschieben · antippen und Regler für die Größe</p>
       </div>`;
@@ -281,6 +301,13 @@ class TouchControls {
       this.applyLayout(); this.saveLayout(); this.select(this.selected);
     });
     el.querySelector('#t-edit-done').addEventListener('click', () => this.onDone?.());
+    // Gyro-Einstellungen sitzen hier, weil das Menü im Querformat randvoll ist
+    const g = this.input.gyro;
+    const st = el.querySelector('#gyro-staerke'), ix = el.querySelector('#gyro-x'), iy = el.querySelector('#gyro-y');
+    st.value = g.einst.staerke; ix.checked = g.einst.invertX; iy.checked = g.einst.invertY;
+    st.addEventListener('input', (e) => g.staerke(+e.target.value));
+    ix.addEventListener('change', (e) => g.umkehren('x', e.target.checked));
+    iy.addEventListener('change', (e) => g.umkehren('y', e.target.checked));
   }
 
   show(on) { this.el.hidden = !on; if (!on) { this.input.stickX = this.input.stickY = 0; this.stick.hidden = true; } }

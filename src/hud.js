@@ -20,6 +20,7 @@ export class Hud {
         <div id="classes"></div>
         <div id="menuknoepfe">
           ${TOUCH ? '<button id="anpassen" type="button">Bedienung anpassen</button>' : ''}
+          ${TOUCH ? '<button id="gyro" type="button" title="Gyroskop">🧭</button>' : ''}
           <button id="ton" type="button" title="Ton an/aus (M)"></button>
         </div>
         <p id="offline" hidden></p>
@@ -66,6 +67,7 @@ export class Hud {
       list.append(el);
     }
     root.querySelector('#pause').onclick = () => this.onPause?.();
+    this._gyroAufbauen(root);
     // Zwei Knöpfe, ein Schalter: einer im Menü, einer während des Matches
     this.tonKnoepfe = [root.querySelector('#ton'), root.querySelector('#ton2')];
     for (const b of this.tonKnoepfe) b.onclick = () => this.tonStand(this.onSound?.());
@@ -74,6 +76,31 @@ export class Hud {
     this.feed = root.querySelector('#feed');
     this.feedItems = [];
   }
+  /**
+   * Gyro-Bedienung. Der Knopf fordert beim ersten Antippen die Erlaubnis an –
+   * iOS gibt sie nur aus einer Nutzergeste heraus.
+   */
+  _gyroAufbauen(root) {
+    const knopf = root.querySelector('#gyro');
+    if (!knopf) return;
+    knopf.onclick = async () => {
+      const an = await this.onGyro?.();
+      this.gyroStand(an);
+      if (an === false && this.gyroAbgelehnt) {
+        knopf.textContent = '🧭 geht nicht';
+        knopf.disabled = true;
+      }
+    };
+    this.gyroKnopf = knopf;
+  }
+
+  /** Zustand des Gyro-Knopfs nachziehen. Stärke und Umkehr stehen unter "Bedienung anpassen". */
+  gyroStand(an) {
+    if (!this.gyroKnopf) return;
+    this.gyroKnopf.classList.toggle('an', !!an);
+    this.gyroKnopf.textContent = an ? '🧭 an' : '🧭 aus';
+  }
+
   setModus(m) {
     this.modus = m;
     try { localStorage.setItem(MODUS_KEY, m); } catch { /* privater Modus */ }
