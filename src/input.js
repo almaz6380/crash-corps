@@ -130,6 +130,12 @@ class TouchControls {
           <button id="t-edit-reset" type="button">Zurücksetzen</button>
           <button id="t-edit-done" type="button">Fertig</button>
         </div>
+        <div id="t-gyro">
+          <b>Gyroskop</b>
+          <label>Stärke <input id="gyro-staerke" type="range" min="0.2" max="3" step="0.1"></label>
+          <label><input id="gyro-x" type="checkbox"> X umkehren</label>
+          <label><input id="gyro-y" type="checkbox"> Y umkehren</label>
+        </div>
         <p id="t-edit-hint">Knopf ziehen zum Verschieben · antippen und Regler für die Größe</p>
       </div>`;
     document.body.append(el);
@@ -293,6 +299,13 @@ class TouchControls {
       this.applyLayout(); this.saveLayout(); this.select(this.selected);
     });
     el.querySelector('#t-edit-done').addEventListener('click', () => this.onDone?.());
+    // Gyro-Einstellungen sitzen hier, weil das Menü im Querformat randvoll ist
+    const g = this.input.gyro;
+    const st = el.querySelector('#gyro-staerke'), ix = el.querySelector('#gyro-x'), iy = el.querySelector('#gyro-y');
+    st.value = g.einst.staerke; ix.checked = g.einst.invertX; iy.checked = g.einst.invertY;
+    st.addEventListener('input', (e) => g.staerke(+e.target.value));
+    ix.addEventListener('change', (e) => g.umkehren('x', e.target.checked));
+    iy.addEventListener('change', (e) => g.umkehren('y', e.target.checked));
   }
 
   show(on) { this.el.hidden = !on; if (!on) { this.input.stickX = this.input.stickY = 0; this.stick.hidden = true; } }

@@ -23,11 +23,6 @@ export class Hud {
           ${TOUCH ? '<button id="gyro" type="button" title="Gyroskop">🧭</button>' : ''}
           <button id="ton" type="button" title="Ton an/aus (M)"></button>
         </div>
-        <div id="gyroeinst" hidden>
-          <label>Stärke <input id="gyro-staerke" type="range" min="0.2" max="3" step="0.1"></label>
-          <label><input id="gyro-x" type="checkbox"> X umkehren</label>
-          <label><input id="gyro-y" type="checkbox"> Y umkehren</label>
-        </div>
         <p id="offline" hidden></p>
         <p class="help">${TOUCH
           ? 'Links ziehen zum Laufen · rechts wischen zum Umsehen · FEUER halten · ⤒ springen · R nachladen · Q Spezial'
@@ -88,7 +83,6 @@ export class Hud {
   _gyroAufbauen(root) {
     const knopf = root.querySelector('#gyro');
     if (!knopf) return;
-    const feld = root.querySelector('#gyroeinst');
     knopf.onclick = async () => {
       const an = await this.onGyro?.();
       this.gyroStand(an);
@@ -97,23 +91,14 @@ export class Hud {
         knopf.disabled = true;
       }
     };
-    root.querySelector('#gyro-staerke').oninput = (e) => this.onGyroStaerke?.(+e.target.value);
-    root.querySelector('#gyro-x').onchange = (e) => this.onGyroUmkehr?.('x', e.target.checked);
-    root.querySelector('#gyro-y').onchange = (e) => this.onGyroUmkehr?.('y', e.target.checked);
-    this.gyroFeld = feld; this.gyroKnopf = knopf;
+    this.gyroKnopf = knopf;
   }
 
-  /** Zustand der Gyro-Bedienung nachziehen. */
-  gyroStand(an, einst) {
+  /** Zustand des Gyro-Knopfs nachziehen. Stärke und Umkehr stehen unter "Bedienung anpassen". */
+  gyroStand(an) {
     if (!this.gyroKnopf) return;
     this.gyroKnopf.classList.toggle('an', !!an);
     this.gyroKnopf.textContent = an ? '🧭 an' : '🧭 aus';
-    this.gyroFeld.hidden = !an;
-    if (einst) {
-      this.root.querySelector('#gyro-staerke').value = einst.staerke;
-      this.root.querySelector('#gyro-x').checked = einst.invertX;
-      this.root.querySelector('#gyro-y').checked = einst.invertY;
-    }
   }
 
   setModus(m) {
