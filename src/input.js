@@ -20,8 +20,10 @@ export class Input {
     this.lookX = 0; this.lookY = 0;        // aufgelaufene Blickänderung
     this.fireHeld = false; this.jumpHeld = false; this.sprintHeld = false;
     this._reload = false; this._special = false; this._menu = false; this._mute = false;
-    this.touch = TOUCH ? new TouchControls(this) : null;
+    // Gyro vor der Touch-Bedienung: deren Anpassen-Bildschirm greift beim Aufbau
+    // schon auf die Gyro-Einstellungen zu.
     this.gyro = new Gyro();
+    this.touch = TOUCH ? new TouchControls(this) : null;
     // War es zuletzt an, gleich wieder anschalten. Auf iOS scheitert das ohne
     // Nutzergeste stillschweigend – dort hilft der Knopf im Menü.
     if (this.gyro.einst.an) this.gyro.einschalten().catch(() => {});
