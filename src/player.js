@@ -68,11 +68,16 @@ export class Player {
     // Zielhilfe: bremst das Wischen nahe am Gegner und führt danach nach
     const aimed = AIM_ASSIST && !this.dead ? bestTarget(this, targets, this.world) : null;
     if (aimed) { const s = 1 - ASSIST.friction * aimed.weight; lx *= s; ly *= s; }
+    // Gyroskop kommt schon als Winkel und wird von der Zielhilfe genauso gebremst
+    let [gx, gy] = inp.takeGyro();
+    if (aimed) { const s = 1 - ASSIST.friction * aimed.weight; gx *= s; gy *= s; }
     this.yaw -= lx * sens; this.pitch -= ly * sens;
+    this.yaw += gx; this.pitch += gy;
     this.pitch = Math.max(-1.45, Math.min(1.45, this.pitch));
     if (aimed) {
-      // Nur nachführen, solange der Spieler selbst wischt oder läuft
-      const activity = Math.min(1, (Math.hypot(lx, ly) / 6) + Math.hypot(inp.moveX, inp.moveY));
+      // Nur nachführen, solange der Spieler selbst wischt, dreht oder läuft
+      const activity = Math.min(1,
+        (Math.hypot(lx, ly) / 6) + (Math.hypot(gx, gy) * 12) + Math.hypot(inp.moveX, inp.moveY));
       pullToward(this, aimed, dt, activity);
       this.pitch = Math.max(-1.45, Math.min(1.45, this.pitch));
     }

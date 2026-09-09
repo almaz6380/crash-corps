@@ -1,8 +1,13 @@
 import { TOUCH } from './device.js';
+import { Gyro } from './gyro.js';
 
 /**
  * Eingabe-Schicht. Bündelt Tastatur, Maus und Touch zu einem Zustand, den der
  * Spieler jeden Frame abfragt – dadurch kennt player.js keine Eingabegeräte.
+ *
+ * Blick kommt aus zwei Quellen: Maus/Wischen in Pixeln (`takeLook`) und
+ * Gyroskop im Bogenmaß (`takeGyro`). Getrennt, weil das eine noch mit der
+ * Empfindlichkeit multipliziert wird und das andere schon ein Winkel ist.
  *
  * Dauerzustände: moveX/moveY, fire, sprint, jump.
  * Flanken (einmal je Druck): reload, special, menu, mute – über take…() abzuholen.
@@ -16,6 +21,10 @@ export class Input {
     this.fireHeld = false; this.jumpHeld = false; this.sprintHeld = false;
     this._reload = false; this._special = false; this._menu = false; this._mute = false;
     this.touch = TOUCH ? new TouchControls(this) : null;
+    this.gyro = new Gyro();
+    // War es zuletzt an, gleich wieder anschalten. Auf iOS scheitert das ohne
+    // Nutzergeste stillschweigend – dort hilft der Knopf im Menü.
+    if (this.gyro.einst.an) this.gyro.einschalten().catch(() => {});
     this._bind();
   }
 
@@ -41,6 +50,7 @@ export class Input {
   }
 
   dispose() {
+    this.gyro.ausschalten();
     removeEventListener('keydown', this._onKeyDown);
     removeEventListener('keyup', this._onKeyUp);
     removeEventListener('mousemove', this._onMouseMove);
@@ -59,6 +69,8 @@ export class Input {
 
   /** Blickänderung seit dem letzten Abruf, in Pixeln. */
   takeLook() { const v = [this.lookX, this.lookY]; this.lookX = 0; this.lookY = 0; return v; }
+  /** Blickänderung aus dem Gyroskop, in Bogenmaß. */
+  takeGyro() { return this.gyro.take(); }
   takeReload() { const v = this._reload; this._reload = false; return v; }
   takeSpecial() { const v = this._special; this._special = false; return v; }
   takeMenu() { const v = this._menu; this._menu = false; return v; }

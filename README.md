@@ -80,6 +80,16 @@ bei 250 ist Schluss. Der Wimpel über jeder Figur zeigt die Mannschaft.
 WASD laufen · Shift sprinten · Leertaste springen · Klick schießen ·
 R nachladen · Q Spezial · M Ton an/aus · Esc Menü
 
+## Gyroskop
+
+Auf dem Handy lässt sich über **🧭** im Menü das Gyroskop zuschalten. Es zielt
+zusätzlich zum Wischen: die grobe Drehung macht der Daumen, das Feinzielen die
+Hand. Gemessen wird die Drehrate, nicht die Lage – es gibt also keinen festen
+Bezugspunkt, der wegdriften kann, und schräges Halten verzieht nichts.
+
+Stärke, sowie Umkehrschalter für beide Achsen, stehen im Menü unter dem Knopf.
+Auf iOS fragt der erste Tipp nach der Erlaubnis für Bewegungsdaten.
+
 ## Ton
 
 Alle Geräusche werden im Browser erzeugt (WebAudio), es gibt keine Audiodateien –

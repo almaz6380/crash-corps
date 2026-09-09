@@ -20,7 +20,13 @@ export class Hud {
         <div id="classes"></div>
         <div id="menuknoepfe">
           ${TOUCH ? '<button id="anpassen" type="button">Bedienung anpassen</button>' : ''}
+          ${TOUCH ? '<button id="gyro" type="button" title="Gyroskop">🧭</button>' : ''}
           <button id="ton" type="button" title="Ton an/aus (M)"></button>
+        </div>
+        <div id="gyroeinst" hidden>
+          <label>Stärke <input id="gyro-staerke" type="range" min="0.2" max="3" step="0.1"></label>
+          <label><input id="gyro-x" type="checkbox"> X umkehren</label>
+          <label><input id="gyro-y" type="checkbox"> Y umkehren</label>
         </div>
         <p id="offline" hidden></p>
         <p class="help">${TOUCH
@@ -66,6 +72,7 @@ export class Hud {
       list.append(el);
     }
     root.querySelector('#pause').onclick = () => this.onPause?.();
+    this._gyroAufbauen(root);
     // Zwei Knöpfe, ein Schalter: einer im Menü, einer während des Matches
     this.tonKnoepfe = [root.querySelector('#ton'), root.querySelector('#ton2')];
     for (const b of this.tonKnoepfe) b.onclick = () => this.tonStand(this.onSound?.());
@@ -74,6 +81,41 @@ export class Hud {
     this.feed = root.querySelector('#feed');
     this.feedItems = [];
   }
+  /**
+   * Gyro-Bedienung. Der Knopf fordert beim ersten Antippen die Erlaubnis an –
+   * iOS gibt sie nur aus einer Nutzergeste heraus.
+   */
+  _gyroAufbauen(root) {
+    const knopf = root.querySelector('#gyro');
+    if (!knopf) return;
+    const feld = root.querySelector('#gyroeinst');
+    knopf.onclick = async () => {
+      const an = await this.onGyro?.();
+      this.gyroStand(an);
+      if (an === false && this.gyroAbgelehnt) {
+        knopf.textContent = '🧭 geht nicht';
+        knopf.disabled = true;
+      }
+    };
+    root.querySelector('#gyro-staerke').oninput = (e) => this.onGyroStaerke?.(+e.target.value);
+    root.querySelector('#gyro-x').onchange = (e) => this.onGyroUmkehr?.('x', e.target.checked);
+    root.querySelector('#gyro-y').onchange = (e) => this.onGyroUmkehr?.('y', e.target.checked);
+    this.gyroFeld = feld; this.gyroKnopf = knopf;
+  }
+
+  /** Zustand der Gyro-Bedienung nachziehen. */
+  gyroStand(an, einst) {
+    if (!this.gyroKnopf) return;
+    this.gyroKnopf.classList.toggle('an', !!an);
+    this.gyroKnopf.textContent = an ? '🧭 an' : '🧭 aus';
+    this.gyroFeld.hidden = !an;
+    if (einst) {
+      this.root.querySelector('#gyro-staerke').value = einst.staerke;
+      this.root.querySelector('#gyro-x').checked = einst.invertX;
+      this.root.querySelector('#gyro-y').checked = einst.invertY;
+    }
+  }
+
   setModus(m) {
     this.modus = m;
     try { localStorage.setItem(MODUS_KEY, m); } catch { /* privater Modus */ }
