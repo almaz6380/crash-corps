@@ -11,11 +11,14 @@ export class Hud {
         <h1>Crash Corps</h1>
         <p class="sub">Wähl deine Klasse. Dann rein.</p>
         <div id="classes"></div>
-        ${TOUCH ? '<button id="anpassen" type="button">Bedienung anpassen</button>' : ''}
+        <div id="menuknoepfe">
+          ${TOUCH ? '<button id="anpassen" type="button">Bedienung anpassen</button>' : ''}
+          <button id="ton" type="button" title="Ton an/aus (M)"></button>
+        </div>
         <p id="offline" hidden></p>
         <p class="help">${TOUCH
           ? 'Links ziehen zum Laufen · rechts wischen zum Umsehen · FEUER halten · ⤒ springen · R nachladen · Q Spezial'
-          : 'WASD laufen · Shift sprinten · Leertaste springen · Klick schießen · R nachladen · Q Spezial · Esc Menü'}</p>
+          : 'WASD laufen · Shift sprinten · Leertaste springen · Klick schießen · R nachladen · Q Spezial · M Ton · Esc Menü'}</p>
       </div>
       <div id="play" hidden>
         <div id="cross"></div>
@@ -29,6 +32,7 @@ export class Hud {
         </div>
         <div id="dead" hidden></div>
         <div id="hint" hidden>Klick ins Bild, um die Maus zu fangen</div>
+        <button id="ton2" type="button" title="Ton an/aus (M)"></button>
         <button id="pause" type="button" title="Menü">II</button>
       </div>`;
     const list = root.querySelector('#classes');
@@ -40,11 +44,22 @@ export class Hud {
       list.append(el);
     }
     root.querySelector('#pause').onclick = () => this.onPause?.();
+    // Zwei Knöpfe, ein Schalter: einer im Menü, einer während des Matches
+    this.tonKnoepfe = [root.querySelector('#ton'), root.querySelector('#ton2')];
+    for (const b of this.tonKnoepfe) b.onclick = () => this.tonStand(this.onSound?.());
     const anp = root.querySelector('#anpassen');
     if (anp) anp.onclick = () => this.onCustomize?.();
     this.feed = root.querySelector('#feed');
     this.feedItems = [];
   }
+  /** Beschriftung der Ton-Knöpfe nachziehen. */
+  tonStand(an) {
+    for (const b of this.tonKnoepfe) {
+      b.textContent = an ? '🔊' : '🔇';
+      b.classList.toggle('aus', !an);
+    }
+  }
+
   /** Fortschritt der Offline-Bereitschaft (0..1) im Menü. */
   offline(anteil) {
     const el = this.root.querySelector('#offline');

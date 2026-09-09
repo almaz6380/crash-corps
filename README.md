@@ -67,7 +67,18 @@ der Workflow bei jedem Push auf `main`.
 ## Steuerung am Rechner
 
 WASD laufen · Shift sprinten · Leertaste springen · Klick schießen ·
-R nachladen · Q Spezial · Esc Menü
+R nachladen · Q Spezial · M Ton an/aus · Esc Menü
+
+## Ton
+
+Alle Geräusche werden im Browser erzeugt (WebAudio), es gibt keine Audiodateien –
+das Spiel wird dadurch keinen Kilobyte größer und klingt auch offline. Schüsse und
+Schritte anderer Figuren sind ortbar: Lautstärke fällt mit der Entfernung, die Seite
+ergibt sich aus der eigenen Blickrichtung, Entferntes klingt dumpfer.
+
+Der Ton startet erst nach dem ersten Tippen oder Klicken – so schreiben es die
+Browser vor. Umschalten mit **M** oder dem Lautsprecher-Knopf; die Einstellung wird
+gemerkt.
 
 ## Ohne Server: eine einzige Datei
 

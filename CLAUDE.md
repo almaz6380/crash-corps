@@ -9,6 +9,8 @@ Class-based Cartoon-Arena-Shooter im Browser. Inspiriert von Team-Fortress-artig
   Lichtstufen-Rampe und Outline; `real` nutzt physikalische Materialien, Himmelslicht und
   Umgebungsverdeckung. ACES-Tone-Mapping passiert im Composite-Shader, nicht im Renderer –
   three wendet es beim Rendern in ein Render-Target nicht an.
+- Klang wird synthetisiert, nicht geladen (`sound.js`): gefiltertes Rauschen plus
+  Oszillatoren, dazu ein kurzer Faltungshall. Das kostet keine Bytes im Offline-Speicher.
 - Kein TypeScript im Prototyp, JSDoc wo sinnvoll.
 
 ## Struktur
@@ -30,6 +32,9 @@ src/
   input.js     Eingabe-Schicht: Tastatur, Maus und Touch gebündelt; Anordnung der
                Bildschirm-Knöpfe (verschiebbar, skalierbar, in localStorage)
   aimassist.js Zielhilfe für Touch: Reibung im Zielkegel und träges Nachführen
+  sound.js     Klang, vollständig zur Laufzeit erzeugt (WebAudio) – keine Audiodateien.
+               Schüsse, Treffer, Schritte, Nachladen, Spezial, Menü. Weltklänge mit
+               Entfernungsdämpfung und Panorama relativ zur Blickrichtung.
   surface.js   Oberflächen für den realistischen Stil: PBR-Texturen, bei Props ohne UVs
                über Weltraum-Projektion (triplanar)
   animation.js Skelett-Clips (Stehen/Gehen/Rennen, Anschlag-Varianten, Tod) + Knochen-Overlays als Ersatz
@@ -44,6 +49,10 @@ src/
 - Die Toon-Kit-Figuren sind CC0 und dürfen bleiben. Eigene Modelle: siehe public/assets/README.md.
 - Performance-Ziel: 60 fps auf Mittelklasse-Laptop, spielbar auf Handy. Auf Touch-Geräten greift automatisch die niedrigere Leistungsstufe aus `device.js`.
 - Eingaben laufen nur über `input.js`. `player.js` kennt keine Tasten und keine Berührungen, sondern fragt `moveX/moveY`, `fire`, `jump` und die Flanken ab.
+- Klangfarben stehen nur in `sound.js` (Tabelle `SCHUSS`). Spieler und Bots rufen
+  Methoden auf (`schuss`, `treffer`, `schritt` …) und kennen keine Frequenzen.
+  Klänge in der Welt bekommen eine Position mit, eigene nicht – daraus ergibt sich
+  Lautstärke und Seite. Die Schleife meldet dafür jeden Frame `sound.listener()`.
 - Bewegung ist dreidimensional: `groundHeightAt()` liefert die Bodenhöhe, `resolveCollisions()` übergeht Quader unterhalb der Schrittweite (STEP_UP) und über Kopfhöhe. Rampen sind unsichtbare Stufen unter einer geneigten Platte.
 - Nach Änderungen `npm run build` laufen lassen; muss ohne Fehler durchgehen.
 
@@ -52,7 +61,7 @@ src/
 2. [ ] Domination-Modus (3 Kontrollpunkte, Team-Score)
 3. [x] Cel-Shading + Outline-Pass
 4. [x] Charakter-Animation prozedural (Laufen, Anschlag/Rückstoß, Umfallen) – Mixamo später
-5. [ ] Sounds
+5. [x] Sounds – prozedural erzeugt, mit Richtungshören und Ton-Schalter (M)
 6. [x] Touch-Controls (Mobile) – Bildschirm-Stick, Wischen zum Umsehen, anpassbare Schaltflächen, Zielhilfe
 7. [x] Asset-Pipeline: Modelle in `public/assets/`, Loader in `assets.js` (Quaternius Ultimate Modular Men, CC0)
 8. [ ] Multiplayer-Server (eigenes Repo)
