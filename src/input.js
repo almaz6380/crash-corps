@@ -5,7 +5,7 @@ import { TOUCH } from './device.js';
  * Spieler jeden Frame abfragt – dadurch kennt player.js keine Eingabegeräte.
  *
  * Dauerzustände: moveX/moveY, fire, sprint, jump.
- * Flanken (einmal je Druck): reload, special, menu – über take…() abzuholen.
+ * Flanken (einmal je Druck): reload, special, menu, mute – über take…() abzuholen.
  */
 export class Input {
   constructor(canvas) {
@@ -14,7 +14,7 @@ export class Input {
     this.stickX = 0; this.stickY = 0;      // Touch-Stick
     this.lookX = 0; this.lookY = 0;        // aufgelaufene Blickänderung
     this.fireHeld = false; this.jumpHeld = false; this.sprintHeld = false;
-    this._reload = false; this._special = false; this._menu = false;
+    this._reload = false; this._special = false; this._menu = false; this._mute = false;
     this.touch = TOUCH ? new TouchControls(this) : null;
     this._bind();
   }
@@ -25,6 +25,7 @@ export class Input {
       if (e.code === 'KeyR') this._reload = true;
       if (e.code === 'KeyQ') this._special = true;
       if (e.code === 'Escape') this._menu = true;
+      if (e.code === 'KeyM') this._mute = true;
     };
     this._onKeyUp = (e) => { this.keys[e.code] = false; };
     this._onMouseMove = (e) => {
@@ -61,6 +62,7 @@ export class Input {
   takeReload() { const v = this._reload; this._reload = false; return v; }
   takeSpecial() { const v = this._special; this._special = false; return v; }
   takeMenu() { const v = this._menu; this._menu = false; return v; }
+  takeMute() { const v = this._mute; this._mute = false; return v; }
 
   /** Touch-Bedienung ein-/ausblenden (nur während des Matches sichtbar). */
   showTouch(on) { this.touch?.show(on); }

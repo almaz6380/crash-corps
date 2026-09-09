@@ -10,9 +10,9 @@ import { bestTarget, pullToward, ASSIST } from './aimassist.js';
 const EYE = 1.6, GRAVITY = 22, JUMP = 8;
 
 export class Player {
-  constructor(camera, cls, world, scene, input) {
+  constructor(camera, cls, world, scene, input, sound) {
     this.camera = camera; this.cls = cls; this.world = world; this.scene = scene;
-    this.input = input;
+    this.input = input; this.sound = sound;
     this.pos = new THREE.Vector3(); this.vel = new THREE.Vector3();
     this.yaw = 0; this.pitch = 0; this.grounded = true;
     this.hp = cls.hp; this.dead = false; this.respawnIn = 0;
@@ -29,6 +29,8 @@ export class Player {
     this.mesh.userData.target = this;
     scene.add(this.mesh);
     this.kills = 0; this.deaths = 0;
+    this.schrittWeg = 0;      // gelaufene Strecke seit dem letzten Schritt
+    this.warLaden = false;    // für die Flanke am Ende des Nachladens
   }
   /** Abräumen beim Klassenwechsel: Viewmodel und Trefferkörper lösen. */
   dispose() {
@@ -36,9 +38,22 @@ export class Player {
     this.scene.remove(this.mesh);
     this.mesh.geometry.dispose(); this.mesh.material.dispose();
   }
-  spawn(at) { this.pos.copy(at); this.pos.y = 0; this.vel.set(0, 0, 0); this.hp = this.cls.hp; this.dead = false; this.weapon = new Weapon(this.cls.weapon); }
-  useSpecial() { if (this.special.cool > 0 || this.dead) return; this.special.active = this.special.def.duration; this.special.cool = this.special.def.cooldown; }
-  onHit(dmg) { if (this.dead) return; this.hp -= dmg; this.flash = 0.25; if (this.hp <= 0) { this.hp = 0; this.dead = true; this.deaths++; this.respawnIn = 3; } }
+  spawn(at) {
+    this.pos.copy(at); this.pos.y = 0; this.vel.set(0, 0, 0);
+    this.hp = this.cls.hp; this.dead = false; this.weapon = new Weapon(this.cls.weapon);
+    this.warLaden = false; this.schrittWeg = 0;
+  }
+  useSpecial() {
+    if (this.special.cool > 0 || this.dead) return;
+    this.special.active = this.special.def.duration; this.special.cool = this.special.def.cooldown;
+    this.sound?.spezial(this.cls.special);
+  }
+  onHit(dmg) {
+    if (this.dead) return;
+    this.hp -= dmg; this.flash = 0.25;
+    if (this.hp <= 0) { this.hp = 0; this.dead = true; this.deaths++; this.respawnIn = 3; this.sound?.tod(); }
+    else this.sound?.schmerz();
+  }
 
   get forward() { return new THREE.Vector3(-Math.sin(this.yaw), 0, -Math.cos(this.yaw)); }
   get aim() { return new THREE.Vector3(-Math.sin(this.yaw) * Math.cos(this.pitch), Math.sin(this.pitch), -Math.cos(this.yaw) * Math.cos(this.pitch)); }
@@ -64,6 +79,11 @@ export class Player {
     if (inp.takeSpecial()) this.useSpecial();
 
     this.weapon.update(dt);
+    // Flanke: Magazin sitzt. Gilt auch fürs selbsttätige Nachladen bei 0 Schuss.
+    const laedt = this.weapon.reloading > 0;
+    if (this.warLaden && !laedt) this.sound?.nachladen(true);
+    else if (!this.warLaden && laedt) this.sound?.nachladen();
+    this.warLaden = laedt;
     this.special.cool = Math.max(0, this.special.cool - dt);
     this.special.active = Math.max(0, this.special.active - dt);
     this.flash = Math.max(0, (this.flash || 0) - dt);
@@ -87,8 +107,17 @@ export class Player {
     resolveCollisions(this.pos, 0.45, this.world, { height: this.cls.body.height });
     // Boden unter den Füßen: Rampenstufen und Plattformdächer zählen mit
     const support = groundHeightAt(this.pos, 0.32, this.world, this.pos.y + STEP_UP);
-    if (this.pos.y <= support) { this.pos.y = support; this.vel.y = 0; this.grounded = true; }
-    else this.grounded = false;
+    const fallTempo = this.vel.y;
+    if (this.pos.y <= support) {
+      this.pos.y = support; this.vel.y = 0;
+      if (!this.grounded && fallTempo < -5) this.sound?.landung(Math.min(1, -fallTempo / 16));
+      this.grounded = true;
+    } else this.grounded = false;
+    // Schritte: nach je gut zwei Metern einer, schneller beim Sprinten
+    if (this.grounded && moving) {
+      this.schrittWeg += Math.hypot(this.vel.x, this.vel.z) * dt;
+      if (this.schrittWeg > 2.1) { this.schrittWeg = 0; this.sound?.schritt(null, inp.sprint); }
+    } else this.schrittWeg = 1.6;   // beim Loslaufen kommt der erste Schritt früh
     this.mesh.position.set(this.pos.x, this.pos.y + this.cls.body.height / 2, this.pos.z);
 
     // Kamera
@@ -104,7 +133,11 @@ export class Player {
     if (inp.fire) {
       const dmgMul = sp.active > 0 && sp.def.damageMul ? sp.def.damageMul : 1;
       const hits = this.weapon.fire(this.eye, this.aim, targets, this.world, dmgMul);
-      if (hits) { this.vmAnim.fire(); fx.tracers(this.eye, hits, this.cls.accent); }
+      if (hits) {
+        this.vmAnim.fire(); fx.tracers(this.eye, hits, this.cls.accent);
+        this.sound?.schuss(this.cls.weapon);
+        if (this.weapon.hitCount > 0) this.sound?.treffer();
+      }
       if (!this.weapon.def.auto) inp.fireHeld = false;   // Einzelschuss: Taste muss neu gedrückt werden
     }
 

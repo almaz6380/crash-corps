@@ -70,6 +70,7 @@ html, body { overscroll-behavior: none; -webkit-user-select: none; user-select: 
 
 /* Auf kleinen Bildschirmen HUD kompakter, damit die Daumen nichts verdecken */
 @media (max-height: 520px) {
+  #menu { gap: 12px; }
   #hp { width: 180px; height: 24px; }
   #ammo { font-size: 26px; }
   #bottom { left: 12px; right: 12px; bottom: 12px; }
@@ -121,8 +122,24 @@ body.touch #feed { right: 74px; font-size: 13px; }
   margin: 0; text-align: center; color: var(--paper); font-size: 13px; text-shadow: 2px 2px 0 var(--ink); }
 
 #anpassen { font: bold 15px/1 inherit; color: var(--ink); background: var(--sun); border: 4px solid var(--ink);
-  border-radius: 14px; padding: 12px 18px; box-shadow: 5px 5px 0 var(--ink); justify-self: center; }
+  border-radius: 14px; padding: 12px 18px; box-shadow: 5px 5px 0 var(--ink); }
+/* Anpassen und Ton teilen sich eine Zeile – auf niedrigen Bildschirmen ist
+   jede zusätzliche Zeile eine, die die Hilfezeile aus dem Bild schiebt. */
+#menuknoepfe { display: flex; gap: 12px; justify-content: center; align-items: center; }
 
 /* Offline-Bereitschaft im Menü */
 #offline { margin: 0; font-size: 13px; font-weight: bold; color: var(--paper); opacity: .75; }
 #offline.fertig { color: var(--sun); opacity: 1; }
+
+/* ---------------------------------------------------------------------------
+   Ton-Schalter. Einer im Menü unter der Klassenwahl, einer während des Matches
+   links neben dem Pausenknopf. Beide zeigen denselben Zustand.
+--------------------------------------------------------------------------- */
+#ton, #ton2 { font: 20px/1 inherit; color: var(--ink); background: var(--paper);
+  border: 3px solid var(--ink); box-shadow: 3px 3px 0 var(--ink); cursor: pointer; }
+#ton { width: 52px; height: 44px; border-radius: 12px; }
+#ton2 { position: absolute; width: 44px; height: 44px; border-radius: 12px; z-index: 6;
+  top: max(18px, env(safe-area-inset-top));
+  right: calc(max(18px, env(safe-area-inset-right)) + 54px); }
+#ton.aus, #ton2.aus { background: #c9bfae; opacity: .8; }
+#ton:active, #ton2:active { transform: translate(3px, 3px); box-shadow: 0 0 0 var(--ink); }

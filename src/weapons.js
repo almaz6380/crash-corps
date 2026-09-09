@@ -13,6 +13,7 @@ export class Weapon {
     this.ammo = this.def.mag;
     this.cool = 0;
     this.reloading = 0;
+    this.hitCount = 0;
   }
   update(dt) {
     this.cool = Math.max(0, this.cool - dt);
@@ -27,10 +28,12 @@ export class Weapon {
   /**
    * Feuert Hitscan-Strahlen. targets = Array von {mesh, onHit(dmg)}.
    * Gibt Array von Trefferpunkten (Vector3) zurück, für Effekte.
+   * `hitCount` steht danach auf der Zahl der getroffenen Figuren – daran hängt
+   * der Trefferton, ohne dass der Aufrufer die Strahlen noch einmal prüfen muss.
    */
   fire(origin, dir, targets, world, damageMul = 1) {
     if (!this.canFire()) return null;
-    this.ammo--; this.cool = this.def.cooldown;
+    this.ammo--; this.cool = this.def.cooldown; this.hitCount = 0;
     const hits = [];
     const ray = new THREE.Raycaster();
     ray.far = this.def.range;
@@ -47,7 +50,7 @@ export class Weapon {
       if (hit && (!wall || hit.distance < wall.distance)) {
         let o = hit.object; while (o && !o.userData.target) o = o.parent;
         const falloff = Math.max(0.35, 1 - hit.distance / this.def.range);
-        if (o) o.userData.target.onHit(this.def.damage * falloff * damageMul);
+        if (o) { o.userData.target.onHit(this.def.damage * falloff * damageMul); this.hitCount++; }
         hits.push(hit.point);
       } else if (wall) hits.push(wall.point);
       else hits.push(origin.clone().addScaledVector(d, this.def.range));

@@ -10,6 +10,7 @@ import { REAL } from './style.js';
 import { preloadTextures } from './surface.js';
 import { Input } from './input.js';
 import { TOUCH, QUALITY } from './device.js';
+import { Sound } from './sound.js';
 
 const canvas = document.getElementById('game');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
@@ -22,6 +23,8 @@ const pipeline = new Pipeline(renderer, camera);
 
 let world = null;                      // wird nach dem Laden der Props gebaut
 const input = new Input(canvas);
+// Klang wird erzeugt, nicht geladen – siehe sound.js
+const sound = new Sound();
 if (TOUCH) document.body.classList.add('touch');
 
 // Als Webapp installierbar und offline spielbar. Nur im eigenen Fenster und
@@ -96,13 +99,14 @@ function pickSpawn(avoid) {
 function start(clsId) {
   if (player) player.dispose();
   for (const b of bots) b.dispose();
-  player = new Player(camera, CLASSES[clsId], world, scene, input);
+  sound.resume();                        // Browser lassen Ton erst nach einer Geste zu
+  player = new Player(camera, CLASSES[clsId], world, scene, input, sound);
   player.spawn(world.spawns[0]);
   const ids = Object.keys(CLASSES);
   bots = Array.from({ length: 5 }, (_, i) => {
-    const b = new Bot(scene, world, ids[i % ids.length]);
+    const b = new Bot(scene, world, ids[i % ids.length], sound);
     b.spawn(world.spawns[(i + 1) % world.spawns.length]);
-    b.onDeath = () => { player.kills++; hud.kill(`Du → ${b.name}`); };
+    b.onDeath = () => { player.kills++; hud.kill(`Du → ${b.name}`); sound.abschuss(); };
     return b;
   });
   time = 0; running = true;
@@ -118,14 +122,17 @@ function start(clsId) {
     canvas.requestPointerLock();
   }
 }
-hud.onPick = start;
+hud.onPick = (id) => { sound.resume(); sound.klick(); start(id); };
+hud.onSound = () => { sound.resume(); const an = sound.schalten(); if (an) sound.klick(); return an; };
+hud.tonStand(sound.an);
 hud.onCustomize = () => {
+  sound.klick();
   // Menü ausblenden, Bedienung über dem eingefrorenen Bild anordnen
   hud.showMenu(false);
   input.touch.onDone = () => { input.touch.edit(false); hud.showMenu(true); };
   input.touch.edit(true);
 };
-hud.onPause = () => { if (running) { running = false; input.showTouch(false); hud.showMenu(true); hud.hint(false); } };
+hud.onPause = () => { if (running) { sound.klick(); running = false; input.showTouch(false); hud.showMenu(true); hud.hint(false); } };
 
 // Figuren und Arena-Props laden, dann Arena bauen, dann Menü freigeben
 hud.showMenu(false); hud.loading('Wird geladen …');
@@ -149,11 +156,13 @@ let last = performance.now();
 function loop(now) {
   requestAnimationFrame(loop);
   const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  if (input.takeMute()) hud.tonStand(sound.schalten());
   if (input.takeMenu() && running) { running = false; input.showTouch(false); hud.showMenu(true); hud.hint(false); }
   if (!running) { pipeline.render(scene, camera); return; }
   time += dt;
   const wasDead = player.dead;
   player.update(dt, bots.filter(b => !b.dead), fx);
+  sound.listener(player.eye, player.yaw);   // Ohr sitzt am Auge und dreht mit
   if (player.dead && player.respawnIn <= 0) player.spawn(pickSpawn(bots));
   for (const b of bots) {
     const wasBotDead = b.dead;

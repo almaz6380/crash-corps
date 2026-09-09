@@ -10,8 +10,8 @@ let nameIdx = 0;
 
 /** Bot: patrol → chase → shoot. Sieht den Spieler nur mit Sichtlinie. */
 export class Bot {
-  constructor(scene, world, clsId) {
-    this.cls = CLASSES[clsId]; this.world = world; this.scene = scene;
+  constructor(scene, world, clsId, sound) {
+    this.cls = CLASSES[clsId]; this.world = world; this.scene = scene; this.sound = sound;
     this.name = NAMES[nameIdx++ % NAMES.length];
     this.mesh = buildCharacter(this.cls); this.mesh.userData.target = this;
     this.anim = new CharacterAnimator(this.mesh);
@@ -26,20 +26,24 @@ export class Bot {
     this.dodge = 0; this.dodgeCool = 0; this.dodgeDir = new THREE.Vector3(); this.dodgeSpeed = 0;
     this.vy = 0;   // Fallgeschwindigkeit, damit Bots von Plattformen fallen
     this.navPoint = null; this.navRefresh = 0;   // Zwischenziel beim Ebenenwechsel
+    this.schrittWeg = 0;                         // Strecke seit dem letzten Schritt
   }
   spawn(at) {
     this.pos.copy(at); this.vy = 0; this.hp = this.cls.hp; this.dead = false; this.mesh.visible = true;
     this.weapon = new Weapon(this.cls.weapon); this.retarget = 0; this.reaction = 0;
     this.dodge = 0; this.dodgeCool = 0; this.navPoint = null; this.navRefresh = 0;
+    this.schrittWeg = 0;
     this.anim.reset();
   }
   onHit(dmg) {
     if (this.dead) return;
     this.hp -= dmg; this.anim.hit();
+    this.sound?.koerpertreffer(this.pos);
     if (this.hp > 0) this.tryDodge();
     if (this.hp <= 0) {
       this.hp = 0; this.dead = true; this.respawnIn = 4;
       this.anim.die(); // Leiche bleibt sichtbar, bis sie umgefallen ist
+      this.sound?.sturz(this.pos);
       this.onDeath?.();
     }
   }
@@ -187,11 +191,18 @@ export class Bot {
       const hits = this.weapon.fire(this.eye, aim.normalize(), [player], this.world);
       if (hits) {
         this.anim.fire();
+        this.sound?.schuss(this.cls.weapon, this.eye);
         fx.tracers(this.eye, hits, this.cls.accent);
         const rig = this.mesh.userData.rig;
         if (rig.muzzle) fx.flash(rig.muzzle.getWorldPosition(new THREE.Vector3()));
       }
     } else if (!sees && this.weapon.ammo < this.weapon.def.mag) this.weapon.reload();
+
+    // Schritte hörbar machen – daran merkt man, dass sich jemand nähert
+    if (walking) {
+      this.schrittWeg += speed * dt;
+      if (this.schrittWeg > 2.1) { this.schrittWeg = 0; this.sound?.schritt(this.pos); }
+    } else this.schrittWeg = 1.6;
 
     this.anim.update(dt, { moving: walking, speed, aiming, advance, strafe, lookAt: sees ? player.eye : null });
   }
