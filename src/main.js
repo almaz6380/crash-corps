@@ -11,6 +11,7 @@ import { preloadTextures } from './surface.js';
 import { Input } from './input.js';
 import { TOUCH, QUALITY } from './device.js';
 import { Sound } from './sound.js';
+import { Domination, TEAMS } from './domination.js';
 
 const canvas = document.getElementById('game');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
@@ -78,6 +79,7 @@ const fx = {
 };
 
 let player = null, bots = [], time = 0, running = false;
+let dom = null;              // Domination-Zustand, null im Deathmatch
 
 function resize() {
   renderer.setSize(innerWidth, innerHeight, false);
@@ -86,29 +88,59 @@ function resize() {
 }
 addEventListener('resize', resize); resize();
 
-function pickSpawn(avoid) {
-  // Spawn möglichst weit weg von allen lebenden Figuren
+/**
+ * Spawn möglichst weit weg von allen lebenden Figuren. Bei Domination kommen
+ * nur die Plätze der eigenen Mannschaftshälfte in Frage, sonst landet man
+ * mitten unter Gegnern.
+ */
+function pickSpawn(avoid, team = null) {
+  const plaetze = team == null ? world.spawns : world.spawns.filter(s => seite(s) === team);
   let best = null, bd = -1;
-  for (const s of world.spawns) {
+  for (const s of (plaetze.length ? plaetze : world.spawns)) {
     const d = avoid.filter(a => a && !a.dead).reduce((m, a) => Math.min(m, a.pos.distanceTo(s)), 1e9);
     if (d > bd) { bd = d; best = s; }
   }
   return best;
 }
+/** Arenahälfte eines Punktes: Südwesten gehört Rot, Nordosten Blau. */
+const seite = (v) => (v.x + v.z < 0 ? 0 : 1);
 
 function start(clsId) {
   if (player) player.dispose();
   for (const b of bots) b.dispose();
+  dom?.dispose(); dom = null;
   sound.resume();                        // Browser lassen Ton erst nach einer Geste zu
+  const domination = hud.modus === 'domination';
+
   player = new Player(camera, CLASSES[clsId], world, scene, input, sound);
-  player.spawn(world.spawns[0]);
   const ids = Object.keys(CLASSES);
-  bots = Array.from({ length: 5 }, (_, i) => {
-    const b = new Bot(scene, world, ids[i % ids.length], sound);
-    b.spawn(world.spawns[(i + 1) % world.spawns.length]);
-    b.onDeath = () => { player.kills++; hud.kill(`Du → ${b.name}`); sound.abschuss(); };
+  // Deathmatch: der Spieler allein gegen fünf Bots. Domination: drei gegen drei.
+  const teams = domination ? [0, 0, 1, 1, 1] : [1, 1, 1, 1, 1];
+  bots = teams.map((team, i) => {
+    const b = new Bot(scene, world, ids[i % ids.length], sound, team);
+    b.onDeath = () => {
+      // Nur gegnerische Abschüsse zählen für den Spieler
+      if (b.team !== player.team) { player.kills++; hud.kill(`Du → ${b.name}`); sound.abschuss(); }
+      else hud.kill(`${b.name} gefallen`);
+    };
     return b;
   });
+  player.spawn(pickSpawn(bots, domination ? 0 : null));
+  for (const b of bots) b.spawn(pickSpawn([player, ...bots], domination ? b.team : null));
+
+  if (domination) {
+    dom = new Domination(world, sound);
+    dom.onErobert = (punkt, team) => hud.kill(`${TEAMS[team].name} nimmt ${punkt.id}`);
+    dom.onEnde = (sieger) => {
+      running = false; input.showTouch(false);
+      const gewonnen = sieger === player.team;
+      hud.ende(gewonnen ? 'Sieg!' : 'Verloren', gewonnen);
+      sound.matchEnde(gewonnen);
+      if (!TOUCH) document.exitPointerLock?.();
+    };
+  }
+  hud.domAufbauen(dom);
+  hud.ende(null);
   time = 0; running = true;
   hud.showMenu(false);
   if (TOUCH) {
@@ -133,6 +165,8 @@ hud.onCustomize = () => {
   input.touch.edit(true);
 };
 hud.onPause = () => { if (running) { sound.klick(); running = false; input.showTouch(false); hud.showMenu(true); hud.hint(false); } };
+hud.onModus = () => sound.klick();
+hud.onWeiter = () => { sound.klick(); hud.ende(null); hud.showMenu(true); };
 
 // Figuren und Arena-Props laden, dann Arena bauen, dann Menü freigeben
 hud.showMenu(false); hud.loading('Wird geladen …');
@@ -160,16 +194,18 @@ function loop(now) {
   if (input.takeMenu() && running) { running = false; input.showTouch(false); hud.showMenu(true); hud.hint(false); }
   if (!running) { pipeline.render(scene, camera); return; }
   time += dt;
+  const alle = [player, ...bots];
   const wasDead = player.dead;
-  player.update(dt, bots.filter(b => !b.dead), fx);
+  // Der Spieler schießt nur auf die andere Mannschaft
+  player.update(dt, bots.filter(b => !b.dead && b.team !== player.team), fx);
   sound.listener(player.eye, player.yaw);   // Ohr sitzt am Auge und dreht mit
-  if (player.dead && player.respawnIn <= 0) player.spawn(pickSpawn(bots));
+  if (player.dead && player.respawnIn <= 0) player.spawn(pickSpawn(bots, dom ? player.team : null));
   for (const b of bots) {
-    const wasBotDead = b.dead;
-    b.update(dt, player, bots, fx);
-    if (b.dead && b.respawnIn <= 0) b.spawn(pickSpawn([player, ...bots]));
+    b.update(dt, alle.filter(a => !a.dead && a.team !== b.team), bots, fx, dom);
+    if (b.dead && b.respawnIn <= 0) b.spawn(pickSpawn(alle, dom ? b.team : null));
   }
-  if (!wasDead && player.dead) hud.kill(`Ein Bot → Du`);
+  if (!wasDead && player.dead) hud.kill(`Ein Gegner → Du`);
+  dom?.update(dt, alle);
   fx.update(dt);
   hud.update(player, bots, time);
   pipeline.render(scene, camera);

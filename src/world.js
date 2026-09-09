@@ -330,12 +330,6 @@ export function buildWorld(scene, renderer) {
   place('CardboardBoxes_2', -1.7, -2.6, 0.3); place('CardboardBoxes_2', 1.7, 2.6, -0.3);
   place('Pallet', 0, -1.4, 0.2, { solid: false }); place('Pallet', 0, 1.4, -0.2, { solid: false });
 
-  // Kontrollpunkt-Marker (für Domination später) – jetzt nur Deko
-  const ringMat = new THREE.MeshBasicMaterial({ color: 0xffd166 });
-  for (const [x, z, y] of [[0, 0, PLATFORM_H], [20, -20, PLATFORM_H], [-20, 20, PLATFORM_H]]) {
-    const ring = new THREE.Mesh(new THREE.RingGeometry(2.2, 2.6, 24), ringMat);
-    ring.rotation.x = -Math.PI / 2; ring.position.set(x, y + 0.02, z); group.add(ring);
-  }
 
   // Licht: Sonne + Himmel
   const sunDir = new THREE.Vector3(25, 40, 15);
@@ -364,7 +358,14 @@ export function buildWorld(scene, renderer) {
     new THREE.Vector3(-26, 0, 10), new THREE.Vector3(26, 0, -10),
     new THREE.Vector3(10, 0, -26), new THREE.Vector3(-10, 0, 26),
   ];
-  return { group, colliders, ramps, spawns, bounds: SIZE / 2 - 1.5 };
+  // Kontrollpunkte für Domination. Sie liegen auf den Plattformdächern – wer sie
+  // will, muss über eine Rampe hoch. Gezeichnet werden sie in domination.js.
+  const punkte = [
+    { id: 'A', pos: new THREE.Vector3(-20, PLATFORM_H, 20) },
+    { id: 'B', pos: new THREE.Vector3(0, PLATFORM_H, 0) },
+    { id: 'C', pos: new THREE.Vector3(20, PLATFORM_H, -20) },
+  ];
+  return { group, colliders, ramps, spawns, punkte, bounds: SIZE / 2 - 1.5 };
 }
 
 /**

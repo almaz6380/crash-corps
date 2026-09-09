@@ -143,3 +143,53 @@ body.touch #feed { right: 74px; font-size: 13px; }
   right: calc(max(18px, env(safe-area-inset-right)) + 54px); }
 #ton.aus, #ton2.aus { background: #c9bfae; opacity: .8; }
 #ton:active, #ton2:active { transform: translate(3px, 3px); box-shadow: 0 0 0 var(--ink); }
+
+/* ---------------------------------------------------------------------------
+   Domination: Modusauswahl im Menü, Kontrollpunkt-Leiste und Endbildschirm.
+--------------------------------------------------------------------------- */
+#modi { display: flex; gap: 10px; justify-content: center; }
+#modi button { display: grid; gap: 2px; padding: 8px 16px; cursor: pointer;
+  font: bold 16px/1.2 inherit; color: var(--ink); background: var(--paper);
+  border: 3px solid var(--ink); border-radius: 12px; box-shadow: 4px 4px 0 var(--ink); }
+#modi button small { font-size: 11px; font-weight: normal; opacity: .7; }
+#modi button.an { background: var(--sun); transform: translate(2px, 2px); box-shadow: 2px 2px 0 var(--ink); }
+
+/* Leiste oben: Punktestand links und rechts, dazwischen die drei Punkte */
+#dom { position: absolute; top: max(14px, env(safe-area-inset-top)); left: 50%; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 12px; }
+.teamstand { position: relative; overflow: hidden; min-width: 96px; padding: 5px 10px;
+  display: grid; gap: 1px; text-align: center; background: var(--paper);
+  border: 3px solid var(--ink); border-radius: 12px; box-shadow: 3px 3px 0 var(--ink); }
+/* Der Balken im Rücken zeigt, wie nah die Mannschaft am Ziel ist */
+.teamstand::before { content: ""; position: absolute; inset: 0 auto 0 0; width: var(--f, 0%);
+  background: var(--c); opacity: .3; transition: width .3s; }
+.teamstand span, .teamstand b { position: relative; }
+.teamstand span { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; opacity: .75; }
+.teamstand b { font-size: 20px; color: var(--c); font-variant-numeric: tabular-nums; }
+
+#dom-punkte { display: flex; gap: 8px; }
+.kp { width: 46px; display: grid; gap: 3px; justify-items: center; padding: 4px 0 3px;
+  background: var(--paper); border: 3px solid var(--ink); border-radius: 10px; box-shadow: 3px 3px 0 var(--ink); }
+.kp b { font-size: 17px; line-height: 1; color: var(--c, #8a7f70); }
+.kpbar { width: 32px; height: 5px; border: 2px solid var(--ink); border-radius: 3px; overflow: hidden; background: var(--paper); }
+.kpbar i { display: block; height: 100%; width: 0; transition: width .12s linear; }
+.kp.umkaempft { animation: pochen .6s steps(2, end) infinite; }
+@keyframes pochen { 50% { background: var(--sun); } }
+
+#ende { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(43,33,24,.6); }
+#ende > div { display: grid; gap: 16px; justify-items: center; padding: 28px 44px; text-align: center;
+  font: bold 34px/1.2 inherit; color: var(--ink); background: var(--paper);
+  border: 5px solid var(--ink); border-radius: 20px; box-shadow: 8px 8px 0 var(--ink); }
+#ende .sieg { color: #2f7f4d; }
+#ende .niederlage { color: var(--red); }
+#ende button { pointer-events: auto; font: bold 17px/1 inherit; color: var(--ink); background: var(--sun);
+  border: 4px solid var(--ink); border-radius: 14px; padding: 12px 20px; box-shadow: 5px 5px 0 var(--ink); cursor: pointer; }
+
+/* Auf Touch-Geräten sitzt die Leiste kompakter, damit nichts kollidiert */
+body.touch #dom { gap: 8px; top: max(10px, env(safe-area-inset-top)); }
+body.touch .teamstand { min-width: 70px; padding: 3px 7px; }
+body.touch .teamstand b { font-size: 15px; }
+body.touch .teamstand span { font-size: 9px; }
+body.touch .kp { width: 34px; }
+body.touch .kp b { font-size: 13px; }
+body.touch #ende > div { font-size: 24px; padding: 18px 28px; }

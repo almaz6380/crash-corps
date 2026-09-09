@@ -4,17 +4,34 @@ import { Weapon } from './weapons.js';
 import { buildCharacter } from './characters.js';
 import { CharacterAnimator } from './animation.js';
 import { resolveCollisions, groundHeightAt, STEP_UP } from './world.js';
+import { TEAMS } from './domination.js';
 
 const NAMES = ['Brösel', 'Knacki', 'Zündel', 'Rumpel', 'Fiete', 'Gustl', 'Wuschel', 'Pumpf'];
 let nameIdx = 0;
 
-/** Bot: patrol → chase → shoot. Sieht den Spieler nur mit Sichtlinie. */
+/**
+ * Bot: patrol → chase → shoot. Sieht Gegner nur mit Sichtlinie.
+ *
+ * `team` bestimmt, wer Gegner ist. Im Deathmatch steht der Spieler allein in
+ * Mannschaft 0 und alle Bots in Mannschaft 1 – daraus ergibt sich dasselbe
+ * Verhalten wie vorher. Bei Domination sind beide Mannschaften gemischt.
+ */
 export class Bot {
-  constructor(scene, world, clsId, sound) {
+  constructor(scene, world, clsId, sound, team = 1) {
     this.cls = CLASSES[clsId]; this.world = world; this.scene = scene; this.sound = sound;
+    this.team = team;
     this.name = NAMES[nameIdx++ % NAMES.length];
     this.mesh = buildCharacter(this.cls); this.mesh.userData.target = this;
     this.anim = new CharacterAnimator(this.mesh);
+    // Wimpel in Mannschaftsfarbe über dem Kopf. Ohne ihn sieht man im
+    // Domination-Modus nicht, auf wen man schießen darf.
+    this.wimpel = new THREE.Mesh(
+      new THREE.ConeGeometry(0.22, 0.34, 6),
+      new THREE.MeshBasicMaterial({ color: TEAMS[team].farbe }),
+    );
+    this.wimpel.rotation.x = Math.PI;
+    this.wimpel.position.y = this.cls.body.height + 0.5;
+    this.mesh.add(this.wimpel);
     scene.add(this.mesh);
     this.pos = this.mesh.position;
     this.hp = this.cls.hp; this.dead = false; this.respawnIn = 0;
@@ -108,6 +125,18 @@ export class Bot {
   dispose() {
     this.scene.remove(this.mesh);
     for (const m of this.mesh.userData.rig.inst.materials) m.dispose();
+    this.wimpel.geometry.dispose(); this.wimpel.material.dispose();
+  }
+
+  /** Nächster sichtbarer Gegner, oder null. */
+  zielSuchen(gegner) {
+    let best = null, bd = Infinity;
+    for (const g of gegner) {
+      if (g.dead) continue;
+      const d = this.pos.distanceTo(g.pos);
+      if (d < bd && this.canSee(g)) { bd = d; best = g; }
+    }
+    return best;
   }
 
   canSee(p) {
@@ -117,7 +146,7 @@ export class Bot {
     return this.ray.intersectObjects(this.world.colliders, false).length === 0;
   }
 
-  update(dt, player, others, fx) {
+  update(dt, gegner, others, fx, dom = null) {
     this.weapon.update(dt);
     if (this.dead) {
       // Leiche bleibt bis zum Respawn liegen
@@ -136,28 +165,48 @@ export class Bot {
       return;
     }
 
-    const sees = !player.dead && this.canSee(player);
+    const feind = this.zielSuchen(gegner);
+    const sees = !!feind;
     this.retarget -= dt;
     if (sees) {
-      this.target = player; this.reaction = Math.min(1, this.reaction + dt * 2.5);
-    } else { this.reaction = Math.max(0, this.reaction - dt); if (this.retarget <= 0) { this.wander.set((Math.random() - 0.5) * 50, 0, (Math.random() - 0.5) * 50); this.retarget = 3 + Math.random() * 3; } }
+      this.target = feind; this.reaction = Math.min(1, this.reaction + dt * 2.5);
+    } else {
+      this.reaction = Math.max(0, this.reaction - dt);
+      if (this.retarget <= 0) {
+        // Bei Domination zieht es die Bots auf die Kontrollpunkte, sonst
+        // streifen sie wie bisher ziellos umher.
+        const ziel = dom?.zielFuer(this);
+        if (ziel) this.wander.copy(ziel);
+        else this.wander.set((Math.random() - 0.5) * 50, 0, (Math.random() - 0.5) * 50);
+        this.retarget = dom ? 1.5 + Math.random() * 1.5 : 3 + Math.random() * 3;
+      }
+    }
 
     // Bewegung
-    const goal = sees ? player.pos : this.wander;
+    const goal = sees ? feind.pos : this.wander;
     const dst = this.routeTo(goal, dt);
     const climbing = dst !== goal;                 // unterwegs zu einer Rampe
     const dir = dst.clone().sub(this.pos).setY(0);
     const dist = dir.length();
     const ideal = { shotgun: 4, smg: 9, rifle: 22 }[this.cls.weapon];
+    // Auf einem Punkt, der uns noch nicht gehört, wird gehalten statt auf
+    // Waffendistanz zu gehen. Ohne das laufen Bots im Gefecht vom Punkt herunter
+    // und es wird nie einer fertig erobert.
+    const halten = dom && !climbing
+      && dom.punktUnter(this)?.besitzer !== this.team
+      && dom.punktUnter(this) != null;
     let mv = new THREE.Vector3();
     if (climbing) {
       mv.copy(dir).normalize();                    // direkt hin, kein Abstandsspiel
     } else if (sees) {
-      if (dist > ideal + 2) mv.copy(dir).normalize();
-      else if (dist < ideal - 2) mv.copy(dir).normalize().negate();
-      // seitliches Ausweichen
-      mv.addScaledVector(new THREE.Vector3(-dir.z, 0, dir.x).normalize(), Math.sin(performance.now() / 700 + this.pos.x) * 0.6);
-    } else if (dist > 1.5) mv.copy(dir).normalize();
+      if (!halten) {
+        if (dist > ideal + 2) mv.copy(dir).normalize();
+        else if (dist < ideal - 2) mv.copy(dir).normalize().negate();
+      }
+      // seitliches Ausweichen – auf dem Punkt kleiner, damit man drin bleibt
+      mv.addScaledVector(new THREE.Vector3(-dir.z, 0, dir.x).normalize(),
+        Math.sin(performance.now() / 700 + this.pos.x) * (halten ? 0.25 : 0.6));
+    } else if (dist > (dom ? 1.2 : 1.5)) mv.copy(dir).normalize();
     const speed = this.cls.speed * 0.8;
     const walking = mv.lengthSq() > 0;
     if (walking) this.pos.addScaledVector(mv.normalize(), speed * dt);
@@ -169,7 +218,7 @@ export class Bot {
       if (l < 1.4 && l > 0) this.pos.addScaledVector(d.normalize(), (1.4 - l) * 0.5);
     }
     // Blickrichtung: weich drehen statt umschnappen
-    const look = sees && !climbing ? player.pos : this.pos.clone().add(mv);
+    const look = sees && !climbing ? feind.pos : this.pos.clone().add(mv);
     if (walking || sees) {
       const want = Math.atan2(look.x - this.pos.x, look.z - this.pos.z);
       let d = want - this.mesh.rotation.y;
@@ -186,9 +235,9 @@ export class Bot {
     // Schießen mit Reaktionszeit + Streuung
     const aiming = sees && this.reaction > 0.35;
     if (sees && this.reaction > 0.6 && this.weapon.canFire()) {
-      const aim = player.eye.clone().sub(this.eye);
+      const aim = feind.eye.clone().sub(this.eye);
       aim.x += (Math.random() - 0.5) * 0.6; aim.y += (Math.random() - 0.5) * 0.4; aim.z += (Math.random() - 0.5) * 0.6;
-      const hits = this.weapon.fire(this.eye, aim.normalize(), [player], this.world);
+      const hits = this.weapon.fire(this.eye, aim.normalize(), [feind], this.world);
       if (hits) {
         this.anim.fire();
         this.sound?.schuss(this.cls.weapon, this.eye);
@@ -204,6 +253,6 @@ export class Bot {
       if (this.schrittWeg > 2.1) { this.schrittWeg = 0; this.sound?.schritt(this.pos); }
     } else this.schrittWeg = 1.6;
 
-    this.anim.update(dt, { moving: walking, speed, aiming, advance, strafe, lookAt: sees ? player.eye : null });
+    this.anim.update(dt, { moving: walking, speed, aiming, advance, strafe, lookAt: sees ? feind.eye : null });
   }
 }

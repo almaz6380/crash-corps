@@ -32,6 +32,8 @@ src/
   input.js     Eingabe-Schicht: Tastatur, Maus und Touch gebündelt; Anordnung der
                Bildschirm-Knöpfe (verschiebbar, skalierbar, in localStorage)
   aimassist.js Zielhilfe für Touch: Reibung im Zielkegel und träges Nachführen
+  domination.js Modus mit drei Kontrollpunkten: Mannschaften, Eroberung, Punktestand,
+               Marker in der Arena und Marschziele für die Bots
   sound.js     Klang, vollständig zur Laufzeit erzeugt (WebAudio) – keine Audiodateien.
                Schüsse, Treffer, Schritte, Nachladen, Spezial, Menü. Weltklänge mit
                Entfernungsdämpfung und Panorama relativ zur Blickrichtung.
@@ -46,6 +48,11 @@ src/
 - Gameplay-Werte (HP, Schaden, Cooldowns) leben nur in `classes.js` / `weapons.js`, nirgends hartcodiert.
 - Kein Server-Code in diesem Repo, bis der Single-Player-Loop sauber ist. Multiplayer kommt als separater Schritt (autoritativer Server, Colyseus oder eigenes WS-Protokoll).
 - Neue Klasse = Eintrag in `classes.js` (inkl. `model`) + ggf. Modell-Eintrag in `assets.js`. Sonst nichts anfassen.
+- Mannschaften: jede Figur hat `team` (0 = Spielerseite). Wer auf wen schießen darf,
+  entscheidet allein diese Zahl – `main.js` reicht den Bots die passende Gegnerliste.
+  Deathmatch ist derselbe Code: Spieler in Mannschaft 0, alle Bots in Mannschaft 1.
+- Domination-Regelwerte stehen nur in `REGELN` in `domination.js`. Die Lage der
+  Kontrollpunkte gehört zur Karte und kommt aus `world.js` (`world.punkte`).
 - Die Toon-Kit-Figuren sind CC0 und dürfen bleiben. Eigene Modelle: siehe public/assets/README.md.
 - Performance-Ziel: 60 fps auf Mittelklasse-Laptop, spielbar auf Handy. Auf Touch-Geräten greift automatisch die niedrigere Leistungsstufe aus `device.js`.
 - Eingaben laufen nur über `input.js`. `player.js` kennt keine Tasten und keine Berührungen, sondern fragt `moveX/moveY`, `fire`, `jump` und die Flanken ab.
@@ -58,7 +65,7 @@ src/
 
 ## Roadmap
 1. [x] Prototyp: Arena, 3 Klassen, Bots, Deathmatch gegen Bots, HUD
-2. [ ] Domination-Modus (3 Kontrollpunkte, Team-Score)
+2. [x] Domination-Modus – 3 Kontrollpunkte, 3 gegen 3, Punkte je gehaltenem Punkt
 3. [x] Cel-Shading + Outline-Pass
 4. [x] Charakter-Animation prozedural (Laufen, Anschlag/Rückstoß, Umfallen) – Mixamo später
 5. [x] Sounds – prozedural erzeugt, mit Richtungshören und Ton-Schalter (M)
