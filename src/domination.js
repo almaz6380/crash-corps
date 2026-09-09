@@ -137,6 +137,11 @@ export class Domination {
     }
   }
 
+  /** Der Kontrollpunkt, auf dem die Figur steht – oder null. */
+  punktUnter(fig) {
+    return this.punkte.find(p => Domination.drauf(fig, p)) ?? null;
+  }
+
   /** Steht die Figur auf dem Punkt? Von unten zählt nicht. */
   static drauf(fig, punkt) {
     const dx = fig.pos.x - punkt.pos.x, dz = fig.pos.z - punkt.pos.z;

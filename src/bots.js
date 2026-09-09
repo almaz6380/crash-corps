@@ -189,14 +189,23 @@ export class Bot {
     const dir = dst.clone().sub(this.pos).setY(0);
     const dist = dir.length();
     const ideal = { shotgun: 4, smg: 9, rifle: 22 }[this.cls.weapon];
+    // Auf einem Punkt, der uns noch nicht gehört, wird gehalten statt auf
+    // Waffendistanz zu gehen. Ohne das laufen Bots im Gefecht vom Punkt herunter
+    // und es wird nie einer fertig erobert.
+    const halten = dom && !climbing
+      && dom.punktUnter(this)?.besitzer !== this.team
+      && dom.punktUnter(this) != null;
     let mv = new THREE.Vector3();
     if (climbing) {
       mv.copy(dir).normalize();                    // direkt hin, kein Abstandsspiel
     } else if (sees) {
-      if (dist > ideal + 2) mv.copy(dir).normalize();
-      else if (dist < ideal - 2) mv.copy(dir).normalize().negate();
-      // seitliches Ausweichen
-      mv.addScaledVector(new THREE.Vector3(-dir.z, 0, dir.x).normalize(), Math.sin(performance.now() / 700 + this.pos.x) * 0.6);
+      if (!halten) {
+        if (dist > ideal + 2) mv.copy(dir).normalize();
+        else if (dist < ideal - 2) mv.copy(dir).normalize().negate();
+      }
+      // seitliches Ausweichen – auf dem Punkt kleiner, damit man drin bleibt
+      mv.addScaledVector(new THREE.Vector3(-dir.z, 0, dir.x).normalize(),
+        Math.sin(performance.now() / 700 + this.pos.x) * (halten ? 0.25 : 0.6));
     } else if (dist > (dom ? 1.2 : 1.5)) mv.copy(dir).normalize();
     const speed = this.cls.speed * 0.8;
     const walking = mv.lengthSq() > 0;
