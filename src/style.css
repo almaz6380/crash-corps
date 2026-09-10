@@ -70,7 +70,11 @@ html, body { overscroll-behavior: none; -webkit-user-select: none; user-select: 
 
 /* Auf kleinen Bildschirmen HUD kompakter, damit die Daumen nichts verdecken */
 @media (max-height: 520px) {
-  #menu { gap: 10px; }
+  /* Im Querformat eines Handys ist die Höhe knapp. `safe center` zentriert,
+     solange es passt, und rückt sonst an den Anfang statt oben abzuschneiden;
+     zusammen mit dem Rollen bleibt jede Zeile erreichbar. */
+  #menu { gap: 6px; padding: 6px 10px; align-content: safe center; overflow-y: auto; }
+  #menu .sub { font-size: 15px; }
   #t-gyro { padding: 5px 10px; gap: 4px 10px; font-size: 12px; }
   #t-gyro input[type="range"] { width: 84px; }
   #modi button { padding: 6px 12px; font-size: 14px; }
@@ -221,3 +225,14 @@ body.touch #ende > div { font-size: 24px; padding: 18px 28px; }
 #t-gyro label { display: flex; align-items: center; gap: 6px; font-weight: normal; }
 #t-gyro input[type="range"] { width: 96px; }
 #t-gyro input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--red); }
+
+/* Gyro-Einstellungen im Menü. Nur ohne Touch – am Rechner ist Platz dafür.
+   Im Fluss, nicht darüber gelegt: ein Kasten über der Knopfzeile verdeckte den
+   Schalter, mit dem man den Gyro wieder ausschaltet. */
+#gyroeinst { display: flex; flex-wrap: wrap; gap: 6px 14px; justify-content: center; align-items: center;
+  justify-self: center; padding: 8px 14px; pointer-events: auto;
+  font-size: 13px; font-weight: bold; color: var(--ink);
+  background: var(--paper); border: 3px solid var(--ink); border-radius: 12px; box-shadow: 3px 3px 0 var(--ink); }
+#gyroeinst label { display: flex; align-items: center; gap: 6px; font-weight: normal; }
+#gyroeinst input[type="range"] { width: 120px; }
+#gyroeinst input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--red); }

@@ -1,6 +1,7 @@
 import { CLASSES } from './classes.js';
 import { TOUCH } from './device.js';
 import { TEAMS, REGELN } from './domination.js';
+import { Gyro } from './gyro.js';
 
 const MODUS_KEY = 'crashcorps.modus';
 
@@ -20,9 +21,15 @@ export class Hud {
         <div id="classes"></div>
         <div id="menuknoepfe">
           ${TOUCH ? '<button id="anpassen" type="button">Bedienung anpassen</button>' : ''}
-          ${TOUCH ? '<button id="gyro" type="button" title="Gyroskop">🧭</button>' : ''}
+          <button id="gyro" type="button" title="Gyroskop">🧭</button>
           <button id="ton" type="button" title="Ton an/aus (M)"></button>
         </div>
+        ${TOUCH ? '' : `<div id="gyroeinst" hidden>
+          <b>Gyroskop</b>
+          <label>Stärke <input id="gyro-staerke" type="range" min="0.2" max="3" step="0.1"></label>
+          <label><input id="gyro-x" type="checkbox"> X umkehren</label>
+          <label><input id="gyro-y" type="checkbox"> Y umkehren</label>
+        </div>`}
         <p id="offline" hidden></p>
         <p class="help">${TOUCH
           ? 'Links ziehen zum Laufen · rechts wischen zum Umsehen · FEUER halten · ⤒ springen · R nachladen · Q Spezial'
@@ -83,6 +90,27 @@ export class Hud {
   _gyroAufbauen(root) {
     const knopf = root.querySelector('#gyro');
     if (!knopf) return;
+    this.gyroKnopf = knopf;
+    this.hilfeZeile = root.querySelector('#menu .help');
+    this.hilfeText = this.hilfeZeile.textContent;
+    // Ohne Sensor gar nicht erst anbieten – aber sagen, warum. Ein Knopf, der
+    // beim Antippen nichts tut, ist schlimmer als einer, der den Grund nennt.
+    if (!Gyro.moeglich()) {
+      knopf.textContent = '🧭 kein Sensor';
+      knopf.disabled = true;
+      knopf.title = 'Dieses Gerät meldet kein Gyroskop (am Rechner normal)';
+      return;
+    }
+    // Einstellungen im Menü gibt es nur ohne Touch – sonst stehen sie im
+    // Anpassen-Bildschirm, weil das Menü im Querformat randvoll ist.
+    const feld = root.querySelector('#gyroeinst');
+    if (feld) {
+      this.gyroFeld = feld;
+      const st = feld.querySelector('#gyro-staerke');
+      st.oninput = (e) => this.onGyroStaerke?.(+e.target.value);
+      feld.querySelector('#gyro-x').onchange = (e) => this.onGyroUmkehr?.('x', e.target.checked);
+      feld.querySelector('#gyro-y').onchange = (e) => this.onGyroUmkehr?.('y', e.target.checked);
+    }
     knopf.onclick = async () => {
       const an = await this.onGyro?.();
       this.gyroStand(an);
@@ -101,13 +129,23 @@ export class Hud {
    * "Bedienung anpassen" – im Menü ist im Querformat kein Platz dafür. Damit das
    * niemand suchen muss, sagt es die Hilfezeile, solange der Gyro an ist.
    */
-  gyroStand(an) {
-    if (!this.gyroKnopf) return;
+  gyroStand(an, einst) {
+    if (!this.gyroKnopf || this.gyroKnopf.disabled) return;
     this.gyroKnopf.classList.toggle('an', !!an);
-    this.gyroKnopf.textContent = an ? '🧭 an' : '🧭 aus';
-    this.hilfeZeile.innerHTML = an
-      ? 'Gyroskop an · <b>Stärke und Achsen umkehren: „Bedienung anpassen“</b>'
-      : this.hilfeText;
+    this.gyroKnopf.textContent = an ? '🧭 Gyro an' : '🧭 Gyro aus';
+    if (this.gyroFeld) {
+      this.gyroFeld.hidden = !an;
+      if (einst) {
+        this.gyroFeld.querySelector('#gyro-staerke').value = einst.staerke;
+        this.gyroFeld.querySelector('#gyro-x').checked = einst.invertX;
+        this.gyroFeld.querySelector('#gyro-y').checked = einst.invertY;
+      }
+    } else {
+      // Bei Touch stehen die Regler woanders – dorthin verweisen
+      this.hilfeZeile.innerHTML = an
+        ? 'Gyroskop an · <b>Stärke und Achsen umkehren: „Bedienung anpassen“</b>'
+        : this.hilfeText;
+    }
   }
 
   setModus(m) {

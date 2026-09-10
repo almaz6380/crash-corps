@@ -170,7 +170,7 @@ hud.onModus = () => sound.klick();
 hud.onGyro = async () => {
   sound.klick();
   const an = await input.gyro.schalten();
-  hud.gyroAbgelehnt = !an && input.gyro.einst.an === false;
+  hud.gyroStand(an, input.gyro.einst);
   return an;
 };
 hud.onGyroStaerke = (v) => input.gyro.staerke(v);
