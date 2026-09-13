@@ -136,6 +136,7 @@ class TouchControls {
             <label>Stärke <input id="gyro-staerke" type="range" min="0.2" max="3" step="0.1"></label>
             <label><input id="gyro-x" type="checkbox"> X</label>
             <label><input id="gyro-y" type="checkbox"> Y</label>
+            <span id="gyro-mess" title="gemessene Drehrate in Grad/s">↔ 0 ↕ 0</span>
           </div>
         </div>
         <p id="t-edit-hint">Knopf ziehen zum Verschieben · antippen und Regler für die Größe</p>
@@ -246,6 +247,8 @@ class TouchControls {
     this.el.hidden = false;
     this.el.classList.toggle('editing', on);
     this.el.querySelector('#t-edit').hidden = !on;
+    if (on) this._messZeigen?.();
+    else if (this._messLauf) { cancelAnimationFrame(this._messLauf); this._messLauf = null; }
     if (on) this.select(null); else { this.saveLayout(); this.el.hidden = true; }
   }
 
@@ -308,6 +311,15 @@ class TouchControls {
     st.addEventListener('input', (e) => g.staerke(+e.target.value));
     ix.addEventListener('change', (e) => g.umkehren('x', e.target.checked));
     iy.addEventListener('change', (e) => g.umkehren('y', e.target.checked));
+    // Live-Anzeige der gemessenen Drehraten. Ohne sie lässt sich von außen nicht
+    // unterscheiden, ob eine Achse falsch herum läuft oder gar nichts liefert.
+    const mess = el.querySelector('#gyro-mess');
+    const zeigen = () => {
+      if (el.querySelector('#t-edit').hidden) { this._messLauf = null; return; }
+      mess.textContent = `↔ ${g.mess.gier} ↕ ${g.mess.nick}`;
+      this._messLauf = requestAnimationFrame(zeigen);
+    };
+    this._messZeigen = zeigen;
   }
 
   show(on) { this.el.hidden = !on; if (!on) { this.input.stickX = this.input.stickY = 0; this.stick.hidden = true; } }

@@ -32,8 +32,8 @@ src/
   input.js     Eingabe-Schicht: Tastatur, Maus und Touch gebündelt; Anordnung der
                Bildschirm-Knöpfe (verschiebbar, skalierbar, in localStorage)
   aimassist.js Zielhilfe für Touch: Reibung im Zielkegel und träges Nachführen
-  gyro.js      Zielen mit dem Gyroskop: Drehrate statt Lage, Hochachse aus der
-               Schwerkraft, Bildachse aus screen.orientation.angle
+  gyro.js      Zielen mit dem Gyroskop: Drehrate statt Lage, beide Blickachsen
+               aus der Schwerkraft abgeleitet (nicht aus screen.orientation)
   domination.js Modus mit drei Kontrollpunkten: Mannschaften, Eroberung, Punktestand,
                Marker in der Arena und Marschziele für die Bots
   sound.js     Klang, vollständig zur Laufzeit erzeugt (WebAudio) – keine Audiodateien.
@@ -62,9 +62,13 @@ src/
   `takeGyro()` im Bogenmaß. Getrennt halten – das eine wird noch mit der
   Empfindlichkeit multipliziert, das andere ist schon ein Winkel.
 - Das Gyroskop misst die Drehrate, nicht die Lage: so wirkt es wie eine Maus und
-  driftet nicht. Die Hochachse kommt aus der Schwerkraft, damit schräges Halten
-  nichts verzieht. Die Vorzeichen lassen sich nur auf echter Hardware prüfen –
-  deshalb sind beide Achsen im Menü umkehrbar.
+  driftet nicht. **Beide** Blickachsen kommen aus der Schwerkraft – die Hochachse
+  direkt, die waagerechte Bildachse als Kreuzprodukt aus Hochachse und Geräte-z.
+  `screen.orientation.angle` darf dafür nicht benutzt werden: das Spiel sperrt die
+  Ausrichtung auf Querformat, danach melden viele Geräte 0, und die Nickachse fiel
+  dann mit der Gierachse zusammen – links/rechts ging, oben/unten war tot.
+  Die Vorzeichen folgen dem, was auf echter Hardware herauskam; umkehrbar bleiben
+  beide Achsen trotzdem.
 - Klangfarben stehen nur in `sound.js` (Tabelle `SCHUSS`). Spieler und Bots rufen
   Methoden auf (`schuss`, `treffer`, `schritt` …) und kennen keine Frequenzen.
   Klänge in der Welt bekommen eine Position mit, eigene nicht – daraus ergibt sich
