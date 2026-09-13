@@ -26,7 +26,7 @@ export class Input {
     this.touch = TOUCH ? new TouchControls(this) : null;
     // War es zuletzt an, gleich wieder anschalten. Auf iOS scheitert das ohne
     // Nutzergeste stillschweigend – dort hilft der Knopf im Menü.
-    if (this.gyro.einst.an) this.gyro.einschalten().catch(() => {});
+    if (this.gyro.einst.an && this.gyro.kalibriert) this.gyro.einschalten().catch(() => {});
     this._bind();
   }
 
@@ -137,6 +137,7 @@ class TouchControls {
             <label><input id="gyro-x" type="checkbox"> X</label>
             <label><input id="gyro-y" type="checkbox"> Y</label>
             <span id="gyro-mess" title="gemessene Drehrate in Grad/s">↔ 0 ↕ 0</span>
+            <button id="gyro-kalib" type="button">Neu kalibrieren</button>
           </div>
         </div>
         <p id="t-edit-hint">Knopf ziehen zum Verschieben · antippen und Regler für die Größe</p>
@@ -311,6 +312,7 @@ class TouchControls {
     st.addEventListener('input', (e) => g.staerke(+e.target.value));
     ix.addEventListener('change', (e) => g.umkehren('x', e.target.checked));
     iy.addEventListener('change', (e) => g.umkehren('y', e.target.checked));
+    el.querySelector('#gyro-kalib').addEventListener('click', () => this.onKalib?.());
     // Live-Anzeige der gemessenen Drehraten. Ohne sie lässt sich von außen nicht
     // unterscheiden, ob eine Achse falsch herum läuft oder gar nichts liefert.
     const mess = el.querySelector('#gyro-mess');

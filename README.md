@@ -82,13 +82,20 @@ R nachladen · Q Spezial · M Ton an/aus · Esc Menü
 
 ## Gyroskop
 
-Auf dem Handy lässt sich über **🧭** im Menü das Gyroskop zuschalten. Es zielt
-zusätzlich zum Wischen: die grobe Drehung macht der Daumen, das Feinzielen die
-Hand. Gemessen wird die Drehrate, nicht die Lage – es gibt also keinen festen
-Bezugspunkt, der wegdriften kann, und schräges Halten verzieht nichts.
+Über **🧭** im Menü lässt sich das Gyroskop zuschalten. Es zielt zusätzlich zum
+Wischen: die grobe Drehung macht der Daumen, das Feinzielen die Hand.
 
-Stärke, sowie Umkehrschalter für beide Achsen, stehen im Menü unter dem Knopf.
-Auf iOS fragt der erste Tipp nach der Erlaubnis für Bewegungsdaten.
+Beim Einschalten kalibriert das Spiel in zwei Bewegungen: einmal das Handy nach
+links drehen, einmal nach oben kippen. Daraus misst es, welche Sensorachse sich
+wobei bewegt – deshalb ist egal, was das Gerät über seine Achsen behauptet, und
+was du bei der Kalibrierung gemacht hast, ist per Definition richtig. Läuft
+etwas verkehrt, unter **Bedienung anpassen** auf **Neu kalibrieren** tippen.
+Dort stehen auch Stärke, Umkehrschalter und eine Live-Anzeige der gemessenen
+Drehraten.
+
+Gemessen wird die Drehrate, nicht die Lage – es gibt also keinen festen
+Bezugspunkt, der wegdriften kann. Auf iOS fragt der erste Tipp nach der
+Erlaubnis für Bewegungsdaten.
 
 ## Ton
 

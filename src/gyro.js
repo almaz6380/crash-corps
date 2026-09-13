@@ -4,36 +4,30 @@
  *
  * Gemessen wird die Drehrate (`DeviceMotionEvent.rotationRate`), nicht die
  * absolute Lage. Die Drehrate wirkt wie eine Maus: sie addiert sich auf den
- * Blick und hat keinen festen Bezugspunkt, der wegdriften könnte. Die absolute
- * Lage würde dagegen am Kompass hängen und ständig nachgestellt werden müssen.
+ * Blick und hat keinen festen Bezugspunkt, der wegdriften könnte.
  *
- * Achsen: Das Gerätesystem ist x nach rechts, y zur Oberkante, z aus dem
- * Bildschirm heraus – unabhängig davon, wie das Gerät gerade gehalten wird.
- * Daraus die Blickachsen zu gewinnen, braucht zwei Bezüge:
+ * **Die Achsen werden kalibriert, nicht hergeleitet.** Drei Versuche, die
+ * Blickachsen aus Spezifikation, Schwerkraft und Bildschirmdrehung abzuleiten,
+ * sind auf echter Hardware gescheitert – die Sensoren melden je nach Gerät in
+ * anderen Achsen und mit anderen Vorzeichen, als die Spezifikation behauptet.
+ * Deshalb macht der Spieler beim Einschalten zwei Bewegungen: einmal das Gerät
+ * nach links drehen, einmal nach oben kippen. Die dabei aufsummierte Drehung
+ * ergibt je einen Vektor im Gerätesystem, und diese zwei Vektoren *sind* die
+ * Gier- und Nickachse. Was bei der Kalibrierung "links" war, ist danach links –
+ * egal, was das Gerät über x, y und z denkt.
  *
- * - **Gieren** ist die Drehung um die Hochachse der Welt. Wo die liegt, verrät
- *   die Schwerkraft aus `accelerationIncludingGravity`. Deshalb funktioniert es
- *   auch, wenn das Gerät schräg gehalten wird – und genau so hält man es.
- * - **Nicken** ist die Drehung um die waagerechte Bildschirmachse. Die ergibt
- *   sich ebenfalls aus der Schwerkraft: senkrecht zur Hochachse und senkrecht
- *   zur Bildschirmnormalen, also das Kreuzprodukt aus beiden.
- *
- * `screen.orientation.angle` wird bewusst **nicht** benutzt. Das Spiel sperrt die
- * Ausrichtung beim Start auf Querformat, und danach melden viele Geräte 0 – die
- * Nickachse fiel dann mit der Gierachse zusammen: links/rechts ging, oben/unten
- * war tot. Aus der Schwerkraft abgeleitet stimmt es unabhängig davon, was das
- * Betriebssystem über die Drehung behauptet.
- *
- * Die Vorzeichen folgen dem, was auf echter Hardware herauskam, nicht der reinen
- * Rechte-Hand-Regel – die Sensoren melden je nach Hersteller anders herum.
- * Umkehrbar bleiben beide Achsen trotzdem (`invertX`, `invertY`).
+ * Die Nickachse wird auf die Gierachse orthogonalisiert, damit eine unsaubere
+ * Kalibrierbewegung nicht dauerhaft in die andere Achse leckt.
  */
 
 const KEY = 'crashcorps.gyro';
 const RAD = Math.PI / 180;
 
 /** Voreinstellung. `staerke` 1 heißt: eine Handdrehung dreht den Blick genauso weit. */
-const WERKS = { an: false, staerke: 1.0, invertX: false, invertY: false };
+const WERKS = { an: false, staerke: 1.0, invertX: false, invertY: false, achsen: null };
+
+/** So viel Drehung muss eine Kalibrierbewegung mindestens haben, in Bogenmaß. */
+const MINDEST = 15 * Math.PI / 180;
 
 /** Sehr kleine Raten sind Sensorrauschen und würden den Blick zittern lassen. */
 const RUHE = 0.015;    // Bogenmaß je Sekunde
@@ -45,10 +39,8 @@ export class Gyro {
     this.dyaw = 0; this.dpitch = 0;   // aufgelaufene Blickänderung im Bogenmaß
     this.letzte = 0;                  // Zeitstempel des letzten Ereignisses
     this.ereignisse = 0;              // für die Prüfung: kommen überhaupt Daten?
-    // Zuletzt gültige waagerechte Bildschirmachse. Liegt das Gerät flach, ist sie
-    // nicht bestimmbar – dann wird die letzte behalten statt zu springen.
-    this.rx = 0; this.ry = -1;
     this.mess = { gier: 0, nick: 0 };  // letzte Raten in Grad/s, für die Anzeige
+    this.kalib = null;                 // laufende Kalibrierung: aufsummierte Drehung
     this._onMotion = (e) => this._motion(e);
   }
 
@@ -58,6 +50,51 @@ export class Gyro {
   }
   _speichern() {
     try { localStorage.setItem(KEY, JSON.stringify(this.einst)); } catch { /* privater Modus */ }
+  }
+
+  /** Sind Achsen bekannt? Ohne Kalibrierung zielt der Gyro nicht. */
+  get kalibriert() { return !!this.einst.achsen; }
+
+  /**
+   * Kalibrierschritt beginnen: ab jetzt wird die Drehung aufsummiert.
+   * Der Sensor muss dafür laufen – `einschalten()` vorher aufrufen.
+   */
+  kalibStart() { this.kalib = [0, 0, 0]; }
+
+  /**
+   * Kalibrierschritt abschließen. Gibt die normierte Drehachse zurück, oder null,
+   * wenn die Bewegung zu klein war, um daraus eine Richtung zu lesen.
+   */
+  kalibEnde() {
+    const k = this.kalib; this.kalib = null;
+    if (!k) return null;
+    const l = Math.hypot(k[0], k[1], k[2]);
+    if (l < MINDEST) return null;
+    return [k[0] / l, k[1] / l, k[2] / l];
+  }
+
+  /**
+   * Achsen aus den beiden Kalibrierbewegungen setzen.
+   * `links` ist die Drehachse der Bewegung "nach links drehen", `oben` die von
+   * "nach oben kippen". Beide im Gerätesystem, normiert.
+   * @returns {boolean} false, wenn die beiden Bewegungen zu ähnlich waren
+   */
+  kalibSetzen(links, oben) {
+    if (!links || !oben) return false;
+    // Nickachse auf die Gierachse orthogonalisieren
+    const d = links[0] * oben[0] + links[1] * oben[1] + links[2] * oben[2];
+    if (Math.abs(d) > 0.8) return false;     // fast dieselbe Bewegung – so nicht
+    const n = [oben[0] - d * links[0], oben[1] - d * links[1], oben[2] - d * links[2]];
+    const l = Math.hypot(n[0], n[1], n[2]) || 1;
+    this.einst.achsen = { gier: links, nick: [n[0] / l, n[1] / l, n[2] / l] };
+    this._speichern();
+    return true;
+  }
+
+  /** Kalibrierung verwerfen – der Gyro ist dann aus, bis neu kalibriert wird. */
+  kalibLoeschen() {
+    this.einst.achsen = null;
+    this.ausschalten();
   }
 
   /** Gibt es die Schnittstelle überhaupt? Am Rechner meist nicht. */
@@ -134,35 +171,26 @@ export class Gyro {
     this.letzte = jetzt;
     if (!dt) return;
 
-    // Drehrate im Gerätesystem: beta um x, gamma um y, alpha um z
-    const wx = (r.beta || 0) * RAD, wy = (r.gamma || 0) * RAD, wz = (r.alpha || 0) * RAD;
+    // Drehrate im Gerätesystem, in Bogenmaß je Sekunde. Welche Achse was ist,
+    // spielt keine Rolle mehr – die Kalibrierung hat es gemessen.
+    const w = [(r.beta || 0) * RAD, (r.gamma || 0) * RAD, (r.alpha || 0) * RAD];
 
-    // Hochachse aus der Schwerkraft. Der Sensor meldet die Gegenkraft, der
-    // Vektor zeigt also nach oben. Fehlt er, wird das Gerät als flach angenommen.
-    const g = e.accelerationIncludingGravity;
-    let ux = 0, uy = 0, uz = 1;
-    if (g && (g.x || g.y || g.z)) {
-      const l = Math.hypot(g.x || 0, g.y || 0, g.z || 0) || 1;
-      ux = (g.x || 0) / l; uy = (g.y || 0) / l; uz = (g.z || 0) / l;
+    if (this.kalib) {
+      this.kalib[0] += w[0] * dt; this.kalib[1] += w[1] * dt; this.kalib[2] += w[2] * dt;
+      return;
     }
-    const gier = wx * ux + wy * uy + wz * uz;
+    const a = this.einst.achsen;
+    if (!a) return;
 
-    // Waagerechte Bildschirmachse = Hochachse × Bildschirmnormale (Geräte-z).
-    // Das Kreuzprodukt ergibt (uy, -ux, 0): senkrecht zu beiden, also die
-    // Waagerechte in der Bildschirmebene – egal wie das Gerät gedreht ist.
-    const rl = Math.hypot(uy, ux);
-    if (rl > 0.2) { this.rx = uy / rl; this.ry = -ux / rl; }
-    const nick = wx * this.rx + wy * this.ry;
-
+    const gier = w[0] * a.gier[0] + w[1] * a.gier[1] + w[2] * a.gier[2];
+    const nick = w[0] * a.nick[0] + w[1] * a.nick[1] + w[2] * a.nick[2];
     this.mess.gier = +(gier / RAD).toFixed(1);
     this.mess.nick = +(nick / RAD).toFixed(1);
 
+    // Positiv heißt per Kalibrierung: nach links gedreht bzw. nach oben gekippt.
+    // yaw steigt = Blick nach links, pitch steigt = Blick nach oben.
     const s = this.einst.staerke;
-    if (Math.abs(gier) > RUHE) {
-      this.dyaw -= gier * dt * s * (this.einst.invertX ? -1 : 1);
-    }
-    if (Math.abs(nick) > RUHE) {
-      this.dpitch += nick * dt * s * (this.einst.invertY ? -1 : 1);
-    }
+    if (Math.abs(gier) > RUHE) this.dyaw += gier * dt * s * (this.einst.invertX ? -1 : 1);
+    if (Math.abs(nick) > RUHE) this.dpitch += nick * dt * s * (this.einst.invertY ? -1 : 1);
   }
 }

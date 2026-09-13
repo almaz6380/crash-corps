@@ -29,6 +29,7 @@ export class Hud {
           <label>Stärke <input id="gyro-staerke" type="range" min="0.2" max="3" step="0.1"></label>
           <label><input id="gyro-x" type="checkbox"> X umkehren</label>
           <label><input id="gyro-y" type="checkbox"> Y umkehren</label>
+          <button id="gyro-kalib" type="button">Neu kalibrieren</button>
         </div>`}
         <p id="offline" hidden></p>
         <p class="help">${TOUCH
@@ -46,6 +47,18 @@ export class Hud {
           <div class="teamstand" id="dom-1"></div>
         </div>
         <div id="ende" hidden></div>
+      </div>
+      <div id="kalib" hidden>
+        <div>
+          <small id="kalib-schritt"></small>
+          <h2 id="kalib-titel"></h2>
+          <p id="kalib-text"></p>
+          <p id="kalib-fehler" hidden></p>
+          <div class="reihe">
+            <button id="kalib-abbruch" type="button">Abbrechen</button>
+            <button id="kalib-weiter" type="button">Weiter</button>
+          </div>
+        </div>
         <div id="bottom">
           <div id="hp"><div id="hpbar"></div><span id="hptxt"></span></div>
           <div id="ammo"></div>
@@ -110,7 +123,12 @@ export class Hud {
       st.oninput = (e) => this.onGyroStaerke?.(+e.target.value);
       feld.querySelector('#gyro-x').onchange = (e) => this.onGyroUmkehr?.('x', e.target.checked);
       feld.querySelector('#gyro-y').onchange = (e) => this.onGyroUmkehr?.('y', e.target.checked);
+      feld.querySelector('#gyro-kalib').onclick = () => this.onGyroKalib?.();
     }
+    // Kalibrier-Overlay: Weiter/Abbrechen lösen ein wartendes Versprechen auf
+    this.kalibEl = root.querySelector('#kalib');
+    root.querySelector('#kalib-weiter').onclick = () => this._kalibAntwort?.(true);
+    root.querySelector('#kalib-abbruch').onclick = () => this._kalibAntwort?.(false);
     knopf.onclick = async () => {
       const an = await this.onGyro?.();
       this.gyroStand(an);
@@ -123,6 +141,22 @@ export class Hud {
     this.hilfeZeile = root.querySelector('#menu .help');
     this.hilfeText = this.hilfeZeile.textContent;
   }
+
+  /**
+   * Einen Kalibrierschritt zeigen und auf Weiter (true) oder Abbrechen (false)
+   * warten. `fehler` erscheint rot über den Knöpfen, etwa nach zu wenig Bewegung.
+   */
+  kalibSchritt(nummer, titel, text, fehler = null) {
+    const q = (s) => this.kalibEl.querySelector(s);
+    q('#kalib-schritt').textContent = `Gyroskop kalibrieren · Schritt ${nummer} von 2`;
+    q('#kalib-titel').textContent = titel;
+    q('#kalib-text').textContent = text;
+    q('#kalib-fehler').hidden = !fehler;
+    q('#kalib-fehler').textContent = fehler || '';
+    this.kalibEl.hidden = false;
+    return new Promise((res) => { this._kalibAntwort = res; });
+  }
+  kalibAus() { this.kalibEl.hidden = true; this._kalibAntwort = null; }
 
   /**
    * Zustand des Gyro-Knopfs nachziehen. Stärke und Umkehr stehen unter
@@ -143,7 +177,7 @@ export class Hud {
     } else {
       // Bei Touch stehen die Regler woanders – dorthin verweisen
       this.hilfeZeile.innerHTML = an
-        ? 'Gyroskop an · <b>Stärke und Achsen umkehren: „Bedienung anpassen“</b>'
+        ? 'Gyroskop an · <b>Stärke, Umkehren, neu kalibrieren: „Bedienung anpassen“</b>'
         : this.hilfeText;
     }
   }
