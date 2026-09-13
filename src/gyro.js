@@ -14,11 +14,19 @@
  * - **Gieren** ist die Drehung um die Hochachse der Welt. Wo die liegt, verrät
  *   die Schwerkraft aus `accelerationIncludingGravity`. Deshalb funktioniert es
  *   auch, wenn das Gerät schräg gehalten wird – und genau so hält man es.
- * - **Nicken** ist die Drehung um die waagerechte Bildschirmachse. Wo die im
- *   Gerätesystem liegt, hängt an `screen.orientation.angle`.
+ * - **Nicken** ist die Drehung um die waagerechte Bildschirmachse. Die ergibt
+ *   sich ebenfalls aus der Schwerkraft: senkrecht zur Hochachse und senkrecht
+ *   zur Bildschirmnormalen, also das Kreuzprodukt aus beiden.
  *
- * Die Vorzeichen sind der wacklige Teil: sie lassen sich nur auf echter Hardware
- * abschließend prüfen. Deshalb sind beide Achsen umkehrbar (`invertX`, `invertY`).
+ * `screen.orientation.angle` wird bewusst **nicht** benutzt. Das Spiel sperrt die
+ * Ausrichtung beim Start auf Querformat, und danach melden viele Geräte 0 – die
+ * Nickachse fiel dann mit der Gierachse zusammen: links/rechts ging, oben/unten
+ * war tot. Aus der Schwerkraft abgeleitet stimmt es unabhängig davon, was das
+ * Betriebssystem über die Drehung behauptet.
+ *
+ * Die Vorzeichen folgen dem, was auf echter Hardware herauskam, nicht der reinen
+ * Rechte-Hand-Regel – die Sensoren melden je nach Hersteller anders herum.
+ * Umkehrbar bleiben beide Achsen trotzdem (`invertX`, `invertY`).
  */
 
 const KEY = 'crashcorps.gyro';
@@ -37,6 +45,10 @@ export class Gyro {
     this.dyaw = 0; this.dpitch = 0;   // aufgelaufene Blickänderung im Bogenmaß
     this.letzte = 0;                  // Zeitstempel des letzten Ereignisses
     this.ereignisse = 0;              // für die Prüfung: kommen überhaupt Daten?
+    // Zuletzt gültige waagerechte Bildschirmachse. Liegt das Gerät flach, ist sie
+    // nicht bestimmbar – dann wird die letzte behalten statt zu springen.
+    this.rx = 0; this.ry = -1;
+    this.mess = { gier: 0, nick: 0 };  // letzte Raten in Grad/s, für die Anzeige
     this._onMotion = (e) => this._motion(e);
   }
 
@@ -135,16 +147,22 @@ export class Gyro {
     }
     const gier = wx * ux + wy * uy + wz * uz;
 
-    // Waagerechte Bildschirmachse im Gerätesystem, abhängig von der Bildschirmdrehung
-    const a = (screen.orientation?.angle ?? window.orientation ?? 0) * RAD;
-    const nick = wx * Math.cos(a) - wy * Math.sin(a);
+    // Waagerechte Bildschirmachse = Hochachse × Bildschirmnormale (Geräte-z).
+    // Das Kreuzprodukt ergibt (uy, -ux, 0): senkrecht zu beiden, also die
+    // Waagerechte in der Bildschirmebene – egal wie das Gerät gedreht ist.
+    const rl = Math.hypot(uy, ux);
+    if (rl > 0.2) { this.rx = uy / rl; this.ry = -ux / rl; }
+    const nick = wx * this.rx + wy * this.ry;
+
+    this.mess.gier = +(gier / RAD).toFixed(1);
+    this.mess.nick = +(nick / RAD).toFixed(1);
 
     const s = this.einst.staerke;
     if (Math.abs(gier) > RUHE) {
-      this.dyaw += gier * dt * s * (this.einst.invertX ? -1 : 1);
+      this.dyaw -= gier * dt * s * (this.einst.invertX ? -1 : 1);
     }
     if (Math.abs(nick) > RUHE) {
-      this.dpitch -= nick * dt * s * (this.einst.invertY ? -1 : 1);
+      this.dpitch += nick * dt * s * (this.einst.invertY ? -1 : 1);
     }
   }
 }

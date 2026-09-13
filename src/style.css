@@ -236,3 +236,8 @@ body.touch #ende > div { font-size: 24px; padding: 18px 28px; }
 #gyroeinst label { display: flex; align-items: center; gap: 6px; font-weight: normal; }
 #gyroeinst input[type="range"] { width: 120px; }
 #gyroeinst input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--red); }
+
+/* Live-Anzeige der Drehraten neben den Gyro-Reglern. Tabellenziffern, damit die
+   Zahlen beim Zappeln nicht springen. */
+#gyro-mess { font-variant-numeric: tabular-nums; font-weight: bold; opacity: .75;
+  min-width: 92px; text-align: right; }
