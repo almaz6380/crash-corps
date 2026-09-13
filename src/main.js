@@ -166,13 +166,52 @@ hud.onCustomize = () => {
 };
 hud.onPause = () => { if (running) { sound.klick(); running = false; input.showTouch(false); hud.showMenu(true); hud.hint(false); } };
 hud.onModus = () => sound.klick();
-// Gyroskop: der Knopf ist die Nutzergeste, die iOS für die Erlaubnis verlangt
+// Gyroskop. Der Knopf ist die Nutzergeste, die iOS für die Erlaubnis verlangt.
+// Einschalten heißt immer kalibrieren: zwei Bewegungen, aus denen die Achsen
+// gemessen werden. Ohne gültige Achsen bleibt der Gyro aus.
+async function gyroKalibrieren() {
+  const g = input.gyro;
+  let fehler = null;
+  for (let versuch = 0; versuch < 3; versuch++) {
+    g.kalibStart();
+    let weiter = await hud.kalibSchritt(1, 'Nach links drehen',
+      'Halte das Handy so, wie du spielst. Dreh es jetzt deutlich nach links – so, als würdest du dich im Spiel nach links umsehen. Dann tipp auf Weiter.', fehler);
+    if (!weiter) { hud.kalibAus(); return false; }
+    const links = g.kalibEnde();
+    if (!links) { fehler = 'Zu wenig Bewegung gemessen. Dreh das Handy deutlicher.'; continue; }
+
+    g.kalibStart();
+    weiter = await hud.kalibSchritt(2, 'Nach oben kippen',
+      'Jetzt kipp das Handy nach oben – die Oberkante von dir weg, als würdest du im Spiel nach oben schauen. Dann Weiter.', null);
+    if (!weiter) { hud.kalibAus(); return false; }
+    const oben = g.kalibEnde();
+    if (!oben) { fehler = 'Zu wenig Bewegung beim Kippen. Beide Bewegungen bitte nochmal.'; continue; }
+
+    if (g.kalibSetzen(links, oben)) { hud.kalibAus(); return true; }
+    fehler = 'Die beiden Bewegungen waren fast gleich. Erst drehen, dann kippen – deutlich verschieden.';
+  }
+  hud.kalibAus();
+  return false;
+}
 hud.onGyro = async () => {
   sound.klick();
-  const an = await input.gyro.schalten();
-  hud.gyroStand(an, input.gyro.einst);
-  return an;
+  const g = input.gyro;
+  if (g.einst.an && g.laeuft) { g.ausschalten(); hud.gyroStand(false); return false; }
+  if (!(await g.einschalten())) { hud.gyroStand(false); return false; }     // keine Erlaubnis
+  const ok = await gyroKalibrieren();
+  if (!ok) g.ausschalten();
+  hud.gyroStand(ok, g.einst);
+  return ok;
 };
+hud.onGyroKalib = async () => {
+  sound.klick();
+  const g = input.gyro;
+  if (!(await g.einschalten())) return;
+  const ok = await gyroKalibrieren();
+  if (!ok && !g.kalibriert) g.ausschalten();
+  hud.gyroStand(g.einst.an && g.laeuft, g.einst);
+};
+if (input.touch) input.touch.onKalib = () => hud.onGyroKalib();
 hud.onGyroStaerke = (v) => input.gyro.staerke(v);
 hud.onGyroUmkehr = (achse, an) => input.gyro.umkehren(achse, an);
 hud.gyroStand(input.gyro.einst.an && input.gyro.laeuft, input.gyro.einst);
