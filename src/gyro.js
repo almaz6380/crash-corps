@@ -59,16 +59,19 @@ export class Gyro {
    * Kalibrierschritt beginnen: ab jetzt wird die Drehung aufsummiert.
    * Der Sensor muss dafür laufen – `einschalten()` vorher aufrufen.
    */
-  kalibStart() { this.kalib = [0, 0, 0]; }
+  kalibStart() { this.kalib = [0, 0, 0]; this.kalibSpitze = [0, 0, 0]; this.kalibMax = 0; }
 
   /**
    * Kalibrierschritt abschließen. Gibt die normierte Drehachse zurück, oder null,
    * wenn die Bewegung zu klein war, um daraus eine Richtung zu lesen.
    */
   kalibEnde() {
-    const k = this.kalib; this.kalib = null;
-    if (!k) return null;
-    const l = Math.hypot(k[0], k[1], k[2]);
+    if (!this.kalib) return null;
+    // Nicht die Nettodrehung nehmen, sondern den größten Ausschlag: wer dreht
+    // und vor dem Tippen zurückdreht, hätte sonst netto fast nichts – und die
+    // Richtung käme aus dem Wackeln dazwischen statt aus der Bewegung.
+    const k = this.kalibSpitze, l = this.kalibMax;
+    this.kalib = null;
     if (l < MINDEST) return null;
     return [k[0] / l, k[1] / l, k[2] / l];
   }
@@ -176,7 +179,10 @@ export class Gyro {
     const w = [(r.beta || 0) * RAD, (r.gamma || 0) * RAD, (r.alpha || 0) * RAD];
 
     if (this.kalib) {
-      this.kalib[0] += w[0] * dt; this.kalib[1] += w[1] * dt; this.kalib[2] += w[2] * dt;
+      const k = this.kalib;
+      k[0] += w[0] * dt; k[1] += w[1] * dt; k[2] += w[2] * dt;
+      const l = Math.hypot(k[0], k[1], k[2]);
+      if (l > this.kalibMax) { this.kalibMax = l; this.kalibSpitze = [k[0], k[1], k[2]]; }
       return;
     }
     const a = this.einst.achsen;

@@ -85,13 +85,20 @@ R nachladen · Q Spezial · M Ton an/aus · Esc Menü
 Über **🧭** im Menü lässt sich das Gyroskop zuschalten. Es zielt zusätzlich zum
 Wischen: die grobe Drehung macht der Daumen, das Feinzielen die Hand.
 
-Beim Einschalten kalibriert das Spiel in zwei Bewegungen: einmal das Handy nach
-links drehen, einmal nach oben kippen. Daraus misst es, welche Sensorachse sich
-wobei bewegt – deshalb ist egal, was das Gerät über seine Achsen behauptet, und
-was du bei der Kalibrierung gemacht hast, ist per Definition richtig. Läuft
-etwas verkehrt, unter **Bedienung anpassen** auf **Neu kalibrieren** tippen.
+Beim Einschalten kalibriert das Spiel in drei Schritten: das Handy nach links
+schwenken (so, wie du dich im Spiel umsiehst – nicht wie ein Lenkrad), dann nach
+oben kippen, dann prüfen: ein Punkt bewegt sich genau so, wie das Spiel den Blick
+bewegen würde. Geht er nach rechts, wenn du nach rechts drehst, und nach oben,
+wenn du nach oben kippst, tipp auf **Stimmt** – sonst auf **Nochmal**. So misst
+das Spiel, welche Sensorachse sich wobei bewegt; was das Gerät über seine Achsen
+behauptet, ist egal. Läuft später etwas verkehrt, unter **Bedienung anpassen**
+auf **Neu kalibrieren** tippen.
 Dort stehen auch Stärke, Umkehrschalter und eine Live-Anzeige der gemessenen
 Drehraten.
+
+Unten im Menü steht „Stand TT.MM., HH:MM“ – der Bauzeitpunkt. Zeigt das Handy
+nach einer Änderung noch den alten Stand, liefert der Service Worker die alte
+Version: App schließen und neu öffnen.
 
 Gemessen wird die Drehrate, nicht die Lage – es gibt also keinen festen
 Bezugspunkt, der wegdriften kann. Auf iOS fragt der erste Tipp nach der

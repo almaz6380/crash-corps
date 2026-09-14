@@ -169,26 +169,53 @@ hud.onModus = () => sound.klick();
 // Gyroskop. Der Knopf ist die Nutzergeste, die iOS für die Erlaubnis verlangt.
 // Einschalten heißt immer kalibrieren: zwei Bewegungen, aus denen die Achsen
 // gemessen werden. Ohne gültige Achsen bleibt der Gyro aus.
+let kalibLaeuft = false;   // solange wahr, darf die Schleife den Gyro-Puffer nicht leeren
 async function gyroKalibrieren() {
-  const g = input.gyro;
+  kalibLaeuft = true;
+  try { return await _gyroKalibrieren(input.gyro); }
+  finally { kalibLaeuft = false; }
+}
+async function _gyroKalibrieren(g) {
   let fehler = null;
-  for (let versuch = 0; versuch < 3; versuch++) {
+  for (let versuch = 0; versuch < 4; versuch++) {
     g.kalibStart();
-    let weiter = await hud.kalibSchritt(1, 'Nach links drehen',
-      'Halte das Handy so, wie du spielst. Dreh es jetzt deutlich nach links – so, als würdest du dich im Spiel nach links umsehen. Dann tipp auf Weiter.', fehler);
+    let weiter = await hud.kalibSchritt(1, 'Nach links schwenken',
+      'Halte das Handy so, wie du spielst. Schwenk jetzt das ganze Handy nach links – so, wie du dich im Spiel nach links umsiehst. Nicht wie ein Lenkrad drehen. Dann tipp auf Weiter.', fehler);
     if (!weiter) { hud.kalibAus(); return false; }
     const links = g.kalibEnde();
-    if (!links) { fehler = 'Zu wenig Bewegung gemessen. Dreh das Handy deutlicher.'; continue; }
+    if (!links) { fehler = 'Zu wenig Bewegung gemessen. Schwenk das Handy deutlicher – eine Vierteldrehung reicht.'; continue; }
 
     g.kalibStart();
     weiter = await hud.kalibSchritt(2, 'Nach oben kippen',
-      'Jetzt kipp das Handy nach oben – die Oberkante von dir weg, als würdest du im Spiel nach oben schauen. Dann Weiter.', null);
+      'Jetzt kipp das Handy nach oben – die Oberkante von dir weg, so, wie du im Spiel nach oben schaust. Dann Weiter.', null);
     if (!weiter) { hud.kalibAus(); return false; }
     const oben = g.kalibEnde();
     if (!oben) { fehler = 'Zu wenig Bewegung beim Kippen. Beide Bewegungen bitte nochmal.'; continue; }
 
-    if (g.kalibSetzen(links, oben)) { hud.kalibAus(); return true; }
-    fehler = 'Die beiden Bewegungen waren fast gleich. Erst drehen, dann kippen – deutlich verschieden.';
+    if (!g.kalibSetzen(links, oben)) {
+      fehler = 'Die beiden Bewegungen waren fast gleich. Erst schwenken, dann kippen – deutlich verschieden.';
+      continue;
+    }
+
+    // Prüfen: ein Punkt bewegt sich genau so, wie das Spiel den Blick bewegen
+    // würde. Stimmt es nicht, kalibriert der Spieler neu – ohne Ratespiel.
+    let px = 0, py = 0, lauf = true;
+    const zeigen = () => {
+      if (!lauf) return;
+      const [dyaw, dpitch] = g.take();
+      // yaw+ = Blick nach links → Punkt nach links; pitch+ = nach oben
+      px = Math.max(-1, Math.min(1, px - dyaw * 1.4));
+      py = Math.max(-1, Math.min(1, py + dpitch * 1.4));
+      px *= 0.94; py *= 0.94;              // zieht zur Mitte zurück, wie ein Fadenkreuz-Test
+      hud.kalibPunkt(px, py);
+      requestAnimationFrame(zeigen);
+    };
+    g.take(); zeigen();
+    const stimmt = await hud.kalibSchritt(3, 'Prüfen',
+      'Dreh nach rechts – der Punkt muss nach rechts. Kipp nach oben – der Punkt muss nach oben. Passt es, tipp auf Stimmt. Sonst auf Nochmal.', null, { pruefen: true });
+    lauf = false;
+    if (stimmt) { hud.kalibAus(); return true; }
+    fehler = null;   // "Nochmal" ist kein Fehler – einfach von vorn
   }
   hud.kalibAus();
   return false;
@@ -241,7 +268,9 @@ function loop(now) {
   const dt = Math.min(0.05, (now - last) / 1000); last = now;
   if (input.takeMute()) hud.tonStand(sound.schalten());
   if (input.takeMenu() && running) { running = false; input.showTouch(false); hud.showMenu(true); hud.hint(false); }
-  if (!running) { input.gyro.leeren(); pipeline.render(scene, camera); return; }
+  // Im Menü sammelt sich sonst Drehung an, die beim Start den Blick wegreißt –
+  // außer während der Kalibrierung, da liest der Prüfschritt den Puffer selbst.
+  if (!running) { if (!kalibLaeuft) input.gyro.leeren(); pipeline.render(scene, camera); return; }
   time += dt;
   const alle = [player, ...bots];
   const wasDead = player.dead;
