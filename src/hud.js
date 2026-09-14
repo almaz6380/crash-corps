@@ -32,6 +32,7 @@ export class Hud {
           <button id="gyro-kalib" type="button">Neu kalibrieren</button>
         </div>`}
         <p id="offline" hidden></p>
+        <p id="stand">Stand ${typeof __BUILD__ !== 'undefined' ? __BUILD__ : '?'}</p>
         <p class="help">${TOUCH
           ? 'Links ziehen zum Laufen · rechts wischen zum Umsehen · FEUER halten · ⤒ springen · R nachladen · Q Spezial'
           : 'WASD laufen · Shift sprinten · Leertaste springen · Klick schießen · R nachladen · Q Spezial · M Ton · Esc Menü'}</p>
@@ -54,6 +55,7 @@ export class Hud {
           <h2 id="kalib-titel"></h2>
           <p id="kalib-text"></p>
           <p id="kalib-fehler" hidden></p>
+          <div id="kalib-feld" hidden><div id="kalib-punkt"></div></div>
           <div class="reihe">
             <button id="kalib-abbruch" type="button">Abbrechen</button>
             <button id="kalib-weiter" type="button">Weiter</button>
@@ -146,17 +148,31 @@ export class Hud {
    * Einen Kalibrierschritt zeigen und auf Weiter (true) oder Abbrechen (false)
    * warten. `fehler` erscheint rot über den Knöpfen, etwa nach zu wenig Bewegung.
    */
-  kalibSchritt(nummer, titel, text, fehler = null) {
+  kalibSchritt(nummer, titel, text, fehler = null, { pruefen = false } = {}) {
     const q = (s) => this.kalibEl.querySelector(s);
-    q('#kalib-schritt').textContent = `Gyroskop kalibrieren · Schritt ${nummer} von 2`;
+    q('#kalib-schritt').textContent = `Gyroskop kalibrieren · Schritt ${nummer} von 3`;
     q('#kalib-titel').textContent = titel;
     q('#kalib-text').textContent = text;
     q('#kalib-fehler').hidden = !fehler;
     q('#kalib-fehler').textContent = fehler || '';
+    q('#kalib-feld').hidden = !pruefen;
+    q('#kalib-weiter').textContent = pruefen ? 'Stimmt' : 'Weiter';
+    q('#kalib-abbruch').textContent = pruefen ? 'Nochmal' : 'Abbrechen';
     this.kalibEl.hidden = false;
     return new Promise((res) => { this._kalibAntwort = res; });
   }
-  kalibAus() { this.kalibEl.hidden = true; this._kalibAntwort = null; }
+  kalibAus() { this.kalibEl.hidden = true; this._kalibAntwort = null; this.kalibPunkt(0, 0); }
+
+  /**
+   * Prüfpunkt im dritten Schritt setzen. `x`/`y` in -1..1: x positiv = rechts,
+   * y positiv = oben – genau so, wie das Spiel den Blick bewegen würde.
+   */
+  kalibPunkt(x, y) {
+    const el = this.kalibEl.querySelector('#kalib-punkt');
+    el.style.transform = `translate(${x * 42}%, ${-y * 42}%)`;
+    // Rot, solange der Punkt in der Mitte klebt – sichtbar, sobald er sich bewegt
+    el.classList.toggle('bewegt', Math.abs(x) > 0.05 || Math.abs(y) > 0.05);
+  }
 
   /**
    * Zustand des Gyro-Knopfs nachziehen. Stärke und Umkehr stehen unter

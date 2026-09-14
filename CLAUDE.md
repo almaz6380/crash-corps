@@ -67,9 +67,13 @@ src/
   echter Hardware gescheitert – Sensoren melden je nach Gerät in anderen Achsen und
   mit anderen Vorzeichen. Beim Einschalten macht der Spieler zwei Bewegungen (links
   drehen, oben kippen); die aufsummierte Drehung ergibt je einen Vektor im
-  Gerätesystem, und die *sind* die Gier- und Nickachse. Nie wieder eine Annahme
+  Gerätesystem, und die *sind* die Gier- und Nickachse. Gezählt wird der größte
+  Ausschlag, nicht die Nettodrehung – wer vor dem Tippen zurückdreht, verliert
+  die Richtung sonst. Ein dritter Schritt zeigt einen Punkt, der sich wie der
+  Blick bewegt; erst „Stimmt“ übernimmt die Achsen. Nie wieder eine Annahme
   über x/y/z in diesen Code schreiben – wenn etwas falsch herum läuft, neu
-  kalibrieren, nicht das Vorzeichen raten.
+  kalibrieren, nicht das Vorzeichen raten. Während der Kalibrierung darf die
+  Schleife den Gyro-Puffer nicht leeren (`kalibLaeuft` in `main.js`).
 - Klangfarben stehen nur in `sound.js` (Tabelle `SCHUSS`). Spieler und Bots rufen
   Methoden auf (`schuss`, `treffer`, `schritt` …) und kennen keine Frequenzen.
   Klänge in der Welt bekommen eine Position mit, eigene nicht – daraus ergibt sich
@@ -88,6 +92,9 @@ src/
 8. [ ] Multiplayer-Server (eigenes Repo)
 
 ## Auslieferung
+- Das Menü zeigt unten „Stand TT.MM., HH:MM“ – der Bauzeitpunkt aus `vite.config.js`
+  (`__BUILD__`). Daran erkennt man am Handy, ob der Service Worker die neue
+  Version schon ausliefert.
 - `npm run build` erzeugt `dist/` und trägt über `tools/sw-liste.mjs` die Vorlade-Liste
   und eine Version in den Service Worker ein. Ohne diesen Schritt kennt er die Modelle
   nicht und das Spiel ist offline nur zufällig verfügbar.
