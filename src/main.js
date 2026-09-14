@@ -36,6 +36,13 @@ if ('serviceWorker' in navigator && isSecureContext && window.top === window) {
   navigator.serviceWorker.addEventListener('message', (e) => {
     if (e.data?.typ === 'offline-fortschritt') hud.offline(e.data.anteil);
   });
+  // Übernimmt ein neuer Service Worker die Seite, läuft hier noch das alte
+  // Skript. Einmal neu laden – sonst spielt man tagelang den alten Stand.
+  let hatteSteuerung = !!navigator.serviceWorker.controller;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (hatteSteuerung && !running) location.reload();
+    hatteSteuerung = true;
+  });
 }
 const hud = new Hud(document.getElementById('hud'));
 
@@ -176,49 +183,77 @@ async function gyroKalibrieren() {
   finally { kalibLaeuft = false; }
 }
 async function _gyroKalibrieren(g) {
-  let fehler = null;
-  for (let versuch = 0; versuch < 4; versuch++) {
-    g.kalibStart();
-    let weiter = await hud.kalibSchritt(1, 'Nach links schwenken',
-      'Halte das Handy so, wie du spielst. Schwenk jetzt das ganze Handy nach links – so, wie du dich im Spiel nach links umsiehst. Nicht wie ein Lenkrad drehen. Dann tipp auf Weiter.', fehler);
-    if (!weiter) { hud.kalibAus(); return false; }
-    const links = g.kalibEnde();
-    if (!links) { fehler = 'Zu wenig Bewegung gemessen. Schwenk das Handy deutlicher – eine Vierteldrehung reicht.'; continue; }
+  let fehler = null, gewarnt = false;
+  // Anzeige der Rohwerte in jedem Schritt: so lässt sich aus einem Bildschirm-
+  // foto ablesen, was das Gerät bei welcher Bewegung meldet.
+  let lauf = true, punkt = null;
+  const zeigen = () => {
+    if (!lauf) return;
+    const [b, ga, a] = g.roh, s = g.schwere;
+    hud.kalibMess(`Drehung β ${b} γ ${ga} α ${a} °/s` + (s
+      ? `   Lage x ${s[0].toFixed(1)} y ${s[1].toFixed(1)} z ${s[2].toFixed(1)}`
+      : '   Lage –') + (g.laeuft ? '' : '   (kein Sensor)'));
+    punkt?.();
+    requestAnimationFrame(zeigen);
+  };
+  zeigen();
+  try {
+    for (let versuch = 0; versuch < 5; versuch++) {
+      g.kalibStart();
+      let weiter = await hud.kalibSchritt(1, 'Nach links schwenken',
+        'Halte das Handy wie eine Kamera vor dich. Richte es jetzt auf etwas, das LINKS von dir liegt – die ganze Hand schwenkt mit, wie beim Filmen. Nicht kippen, nicht wie ein Lenkrad drehen. Dann tipp auf Weiter.', fehler);
+      if (!weiter) return false;
+      const links = g.kalibEnde();
+      if (!links) { fehler = 'Zu wenig Bewegung gemessen. Schwenk das Handy deutlicher – eine Vierteldrehung reicht.'; continue; }
+      // Plausibilität: ein Schwenk dreht um die Hochachse, also um die Schwerkraft.
+      // Ein Lenkrad-Drehen oder Kippen dreht quer dazu. Nur einmal warnen – falls
+      // ein Gerät die Schwerkraft in einem anderen System meldet, geht es weiter.
+      const hoch = g.hochanteil(links);
+      if (hoch !== null && hoch < 0.5 && !gewarnt) {
+        gewarnt = true;
+        fehler = 'Das sah nach Kippen oder Lenkrad-Drehen aus, nicht nach einem Schwenk. Richte das Handy wie eine Kamera auf etwas links von dir.';
+        continue;
+      }
 
-    g.kalibStart();
-    weiter = await hud.kalibSchritt(2, 'Nach oben kippen',
-      'Jetzt kipp das Handy nach oben – die Oberkante von dir weg, so, wie du im Spiel nach oben schaust. Dann Weiter.', null);
-    if (!weiter) { hud.kalibAus(); return false; }
-    const oben = g.kalibEnde();
-    if (!oben) { fehler = 'Zu wenig Bewegung beim Kippen. Beide Bewegungen bitte nochmal.'; continue; }
+      g.kalibStart();
+      weiter = await hud.kalibSchritt(2, 'Nach oben kippen',
+        'Jetzt richte die Kamera auf die Decke: Oberkante des Handys von dir weg kippen. Dann Weiter.', null);
+      if (!weiter) return false;
+      const oben = g.kalibEnde();
+      if (!oben) { fehler = 'Zu wenig Bewegung beim Kippen. Beide Bewegungen bitte nochmal.'; continue; }
 
-    if (!g.kalibSetzen(links, oben)) {
-      fehler = 'Die beiden Bewegungen waren fast gleich. Erst schwenken, dann kippen – deutlich verschieden.';
-      continue;
+      if (!g.kalibSetzen(links, oben)) {
+        fehler = 'Die beiden Bewegungen waren fast gleich. Erst schwenken, dann kippen – deutlich verschieden.';
+        continue;
+      }
+
+      // Prüfen: ein Punkt bewegt sich genau so, wie das Spiel den Blick bewegen
+      // würde. „Stimmt“ gibt es erst, wenn er rechts und oben war – eine
+      // Kalibrierung, bei der eine Richtung tot ist, kommt so nicht ins Spiel.
+      let px = 0, py = 0, warRechts = false, warOben = false;
+      punkt = () => {
+        const [dyaw, dpitch] = g.take();
+        // yaw+ = Blick nach links → Punkt nach links; pitch+ = nach oben
+        px = Math.max(-1, Math.min(1, px - dyaw * 1.4));
+        py = Math.max(-1, Math.min(1, py + dpitch * 1.4));
+        px *= 0.94; py *= 0.94;              // zieht zur Mitte zurück, wie ein Fadenkreuz-Test
+        hud.kalibPunkt(px, py);
+        if (px > 0.4) warRechts = true;
+        if (py > 0.4) warOben = true;
+        hud.kalibStimmtFrei(warRechts && warOben);
+      };
+      g.take();
+      const stimmt = await hud.kalibSchritt(3, 'Prüfen',
+        'Dreh nach rechts – der Punkt muss nach rechts. Kipp nach oben – der Punkt muss nach oben. „Stimmt“ wird frei, sobald er beides gemacht hat. Geht er in die falsche Richtung oder gar nicht: Nochmal.', null, { pruefen: true });
+      punkt = null;
+      if (stimmt) return true;
+      fehler = null;   // „Nochmal“ ist kein Fehler – einfach von vorn
     }
-
-    // Prüfen: ein Punkt bewegt sich genau so, wie das Spiel den Blick bewegen
-    // würde. Stimmt es nicht, kalibriert der Spieler neu – ohne Ratespiel.
-    let px = 0, py = 0, lauf = true;
-    const zeigen = () => {
-      if (!lauf) return;
-      const [dyaw, dpitch] = g.take();
-      // yaw+ = Blick nach links → Punkt nach links; pitch+ = nach oben
-      px = Math.max(-1, Math.min(1, px - dyaw * 1.4));
-      py = Math.max(-1, Math.min(1, py + dpitch * 1.4));
-      px *= 0.94; py *= 0.94;              // zieht zur Mitte zurück, wie ein Fadenkreuz-Test
-      hud.kalibPunkt(px, py);
-      requestAnimationFrame(zeigen);
-    };
-    g.take(); zeigen();
-    const stimmt = await hud.kalibSchritt(3, 'Prüfen',
-      'Dreh nach rechts – der Punkt muss nach rechts. Kipp nach oben – der Punkt muss nach oben. Passt es, tipp auf Stimmt. Sonst auf Nochmal.', null, { pruefen: true });
+    return false;
+  } finally {
     lauf = false;
-    if (stimmt) { hud.kalibAus(); return true; }
-    fehler = null;   // "Nochmal" ist kein Fehler – einfach von vorn
+    hud.kalibAus();
   }
-  hud.kalibAus();
-  return false;
 }
 hud.onGyro = async () => {
   sound.klick();

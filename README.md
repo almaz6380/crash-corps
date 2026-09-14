@@ -89,7 +89,11 @@ Beim Einschalten kalibriert das Spiel in drei Schritten: das Handy nach links
 schwenken (so, wie du dich im Spiel umsiehst – nicht wie ein Lenkrad), dann nach
 oben kippen, dann prüfen: ein Punkt bewegt sich genau so, wie das Spiel den Blick
 bewegen würde. Geht er nach rechts, wenn du nach rechts drehst, und nach oben,
-wenn du nach oben kippst, tipp auf **Stimmt** – sonst auf **Nochmal**. So misst
+wenn du nach oben kippst, tipp auf **Stimmt** – der Knopf wird erst frei, wenn
+der Punkt beides gemacht hat; sonst **Nochmal**. Denk beim Schwenken an eine
+Kamera: die Rückseite des Handys zeigt auf etwas links von dir, nicht wie ein
+Lenkrad drehen. Unter dem Text stehen die rohen Sensorwerte; wenn etwas nicht
+klappt, hilft ein Bildschirmfoto davon bei der Fehlersuche. So misst
 das Spiel, welche Sensorachse sich wobei bewegt; was das Gerät über seine Achsen
 behauptet, ist egal. Läuft später etwas verkehrt, unter **Bedienung anpassen**
 auf **Neu kalibrieren** tippen.

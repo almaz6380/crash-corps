@@ -70,7 +70,11 @@ src/
   Gerätesystem, und die *sind* die Gier- und Nickachse. Gezählt wird der größte
   Ausschlag, nicht die Nettodrehung – wer vor dem Tippen zurückdreht, verliert
   die Richtung sonst. Ein dritter Schritt zeigt einen Punkt, der sich wie der
-  Blick bewegt; erst „Stimmt“ übernimmt die Achsen. Nie wieder eine Annahme
+  Blick bewegt; „Stimmt“ wird erst frei, wenn der Punkt rechts und oben war.
+  Die Schwerkraft dient nur zur Anzeige und zur Plausibilitätsprüfung von
+  Schritt 1 (Schwenk = Drehung um die Hochachse), nie zum Zielen; die Prüfung
+  warnt einmal und lässt dann durch. Jeder Schritt zeigt die rohen Sensorwerte
+  – ein Bildschirmfoto davon ist die einzige Ferndiagnose. Nie wieder eine Annahme
   über x/y/z in diesen Code schreiben – wenn etwas falsch herum läuft, neu
   kalibrieren, nicht das Vorzeichen raten. Während der Kalibrierung darf die
   Schleife den Gyro-Puffer nicht leeren (`kalibLaeuft` in `main.js`).
