@@ -40,6 +40,8 @@ export class Gyro {
     this.letzte = 0;                  // Zeitstempel des letzten Ereignisses
     this.ereignisse = 0;              // für die Prüfung: kommen überhaupt Daten?
     this.mess = { gier: 0, nick: 0 };  // letzte Raten in Grad/s, für die Anzeige
+    this.roh = [0, 0, 0];              // rohe Drehrate [beta, gamma, alpha] in Grad/s
+    this.schwere = null;               // Schwerkraft im Gerätesystem, normiert und geglättet
     this.kalib = null;                 // laufende Kalibrierung: aufsummierte Drehung
     this._onMotion = (e) => this._motion(e);
   }
@@ -59,7 +61,25 @@ export class Gyro {
    * Kalibrierschritt beginnen: ab jetzt wird die Drehung aufsummiert.
    * Der Sensor muss dafür laufen – `einschalten()` vorher aufrufen.
    */
-  kalibStart() { this.kalib = [0, 0, 0]; this.kalibSpitze = [0, 0, 0]; this.kalibMax = 0; }
+  kalibStart() {
+    this.kalib = [0, 0, 0]; this.kalibSpitze = [0, 0, 0]; this.kalibMax = 0;
+    // Lage zu Beginn merken: daran lässt sich prüfen, ob die Bewegung um die
+    // Hochachse ging (Schwenk) oder um eine waagerechte (Kippen, Lenkrad).
+    this.kalibSchwere = this.schwere ? [...this.schwere] : null;
+  }
+
+  /**
+   * Wie sehr eine gemessene Drehachse mit der Hochachse (Schwerkraft zu Beginn
+   * des Schritts) zusammenfällt: 1 = reiner Schwenk, 0 = reines Kippen oder
+   * Lenkrad-Drehen. null, wenn das Gerät keine Schwerkraft meldet.
+   */
+  hochanteil(achse) {
+    // Lage vom Schrittbeginn; kam bis dahin noch nichts, die aktuelle. Ein
+    // Schwenk ändert die Lage ohnehin nicht, ein Kippen nur wenig.
+    const g = this.kalibSchwere || this.schwere;
+    if (!g || !achse) return null;
+    return Math.abs(achse[0] * g[0] + achse[1] * g[1] + achse[2] * g[2]);
+  }
 
   /**
    * Kalibrierschritt abschließen. Gibt die normierte Drehachse zurück, oder null,
@@ -177,6 +197,17 @@ export class Gyro {
     // Drehrate im Gerätesystem, in Bogenmaß je Sekunde. Welche Achse was ist,
     // spielt keine Rolle mehr – die Kalibrierung hat es gemessen.
     const w = [(r.beta || 0) * RAD, (r.gamma || 0) * RAD, (r.alpha || 0) * RAD];
+    this.roh = [Math.round(r.beta || 0), Math.round(r.gamma || 0), Math.round(r.alpha || 0)];
+
+    // Schwerkraft mitführen, nur zur Anzeige und zur Plausibilitätsprüfung der
+    // Kalibrierung – gezielt wird ausschließlich über die kalibrierten Achsen.
+    const g = e.accelerationIncludingGravity;
+    if (g && (g.x || g.y || g.z)) {
+      const l = Math.hypot(g.x || 0, g.y || 0, g.z || 0) || 1;
+      const n = [(g.x || 0) / l, (g.y || 0) / l, (g.z || 0) / l];
+      const s = this.schwere;
+      this.schwere = s ? [s[0] * 0.8 + n[0] * 0.2, s[1] * 0.8 + n[1] * 0.2, s[2] * 0.8 + n[2] * 0.2] : n;
+    }
 
     if (this.kalib) {
       const k = this.kalib;

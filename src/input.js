@@ -318,7 +318,7 @@ class TouchControls {
     const mess = el.querySelector('#gyro-mess');
     const zeigen = () => {
       if (el.querySelector('#t-edit').hidden) { this._messLauf = null; return; }
-      mess.textContent = `↔ ${g.mess.gier} ↕ ${g.mess.nick}`;
+      mess.textContent = `↔ ${g.mess.gier} ↕ ${g.mess.nick} · β ${g.roh[0]} γ ${g.roh[1]} α ${g.roh[2]}`;
       this._messLauf = requestAnimationFrame(zeigen);
     };
     this._messZeigen = zeigen;

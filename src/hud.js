@@ -56,6 +56,7 @@ export class Hud {
           <p id="kalib-text"></p>
           <p id="kalib-fehler" hidden></p>
           <div id="kalib-feld" hidden><div id="kalib-punkt"></div></div>
+          <p id="kalib-mess" title="Was der Sensor gerade meldet"></p>
           <div class="reihe">
             <button id="kalib-abbruch" type="button">Abbrechen</button>
             <button id="kalib-weiter" type="button">Weiter</button>
@@ -158,10 +159,19 @@ export class Hud {
     q('#kalib-feld').hidden = !pruefen;
     q('#kalib-weiter').textContent = pruefen ? 'Stimmt' : 'Weiter';
     q('#kalib-abbruch').textContent = pruefen ? 'Nochmal' : 'Abbrechen';
+    // „Stimmt“ gibt es erst, wenn der Punkt wirklich rechts und oben war –
+    // sonst bestätigt man aus Ungeduld eine Kalibrierung, die im Spiel nichts tut.
+    q('#kalib-weiter').disabled = pruefen;
     this.kalibEl.hidden = false;
     return new Promise((res) => { this._kalibAntwort = res; });
   }
-  kalibAus() { this.kalibEl.hidden = true; this._kalibAntwort = null; this.kalibPunkt(0, 0); }
+  kalibAus() { this.kalibEl.hidden = true; this._kalibAntwort = null; this.kalibPunkt(0, 0); this.kalibMess(''); }
+
+  /** „Stimmt“ freigeben, sobald die Prüfung beide Richtungen gesehen hat. */
+  kalibStimmtFrei(frei) { this.kalibEl.querySelector('#kalib-weiter').disabled = !frei; }
+
+  /** Rohe Sensorwerte anzeigen – die einzige Fernanzeige, die es gibt. */
+  kalibMess(text) { this.kalibEl.querySelector('#kalib-mess').textContent = text; }
 
   /**
    * Prüfpunkt im dritten Schritt setzen. `x`/`y` in -1..1: x positiv = rechts,

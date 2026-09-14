@@ -275,5 +275,7 @@ body.touch #ende > div { font-size: 24px; padding: 18px 28px; }
 #kalib-punkt { position: absolute; left: 50%; top: 50%; width: 28px; height: 28px; margin: -14px 0 0 -14px;
   border-radius: 50%; background: var(--red); border: 3px solid var(--ink); transition: background .15s; }
 #kalib-punkt.bewegt { background: #2f7f4d; }
+#kalib #kalib-mess { font: 12px/1.3 ui-monospace, Menlo, Consolas, monospace; opacity: .7; white-space: pre-wrap; min-height: 1.3em; }
+#kalib button:disabled { opacity: .45; box-shadow: none; transform: translate(3px, 3px); cursor: default; }
 #stand { margin: 0; font-size: 11px; color: var(--paper); opacity: .55; }
 @media (max-height: 520px) { #kalib-feld { width: 120px; height: 120px; } }
