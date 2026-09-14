@@ -28,7 +28,8 @@ src/
   render.js    Zwei Stile: Cel-Shading mit Outline oder physikalisch (Himmel, Umgebungslicht,
                Umgebungsverdeckung). Tone-Mapping liegt im Composite-Shader.
   style.js     Stilumschalter (?stil=real)
-  device.js    Touch-Erkennung und Leistungsstufe (Auflösung, Schatten, Verdeckung)
+  device.js    Touch-Erkennung, Leistungsstufe (Auflösung, Schatten, Verdeckung) und die
+               Bühne: Bildmaße, bei hochkant gehaltenem Handy um 90° gedreht
   input.js     Eingabe-Schicht: Tastatur, Maus und Touch gebündelt; Anordnung der
                Bildschirm-Knöpfe (verschiebbar, skalierbar, in localStorage)
   aimassist.js Zielhilfe für Touch: Reibung im Zielkegel und träges Nachführen
@@ -57,6 +58,11 @@ src/
   Kontrollpunkte gehört zur Karte und kommt aus `world.js` (`world.punkte`).
 - Die Toon-Kit-Figuren sind CC0 und dürfen bleiben. Eigene Modelle: siehe public/assets/README.md.
 - Performance-Ziel: 60 fps auf Mittelklasse-Laptop, spielbar auf Handy. Auf Touch-Geräten greift automatisch die niedrigere Leistungsstufe aus `device.js`.
+- Das Bild ist immer quer. Hält jemand das Handy hochkant (Drehsperre), dreht
+  `buehneAnpassen()` in `device.js` die Bühne `#buehne` (Canvas, HUD, Touch-Schicht)
+  per CSS um 90°. Deshalb nie `innerWidth`/`innerHeight` oder `clientX`/`clientY`
+  direkt benutzen: Maße kommen aus `bild()`, Zeigerpositionen aus `zuBild()`.
+  `@media (max-height)` sähe das Hochformat-Fenster – dafür gibt es `body.klein`.
 - Eingaben laufen nur über `input.js`. `player.js` kennt keine Tasten und keine Berührungen, sondern fragt `moveX/moveY`, `fire`, `jump` und die Flanken ab.
 - Blick kommt aus zwei Quellen: `takeLook()` in Pixeln (Maus, Wischen) und
   `takeGyro()` im Bogenmaß. Getrennt halten – das eine wird noch mit der
@@ -77,7 +83,10 @@ src/
   – ein Bildschirmfoto davon ist die einzige Ferndiagnose. Nie wieder eine Annahme
   über x/y/z in diesen Code schreiben – wenn etwas falsch herum läuft, neu
   kalibrieren, nicht das Vorzeichen raten. Während der Kalibrierung darf die
-  Schleife den Gyro-Puffer nicht leeren (`kalibLaeuft` in `main.js`).
+  Schleife den Gyro-Puffer nicht leeren (`kalibLaeuft` in `main.js`). Gespeicherte
+  Achsen bleiben: der Gyro-Knopf kalibriert nur, wenn keine da sind; neu messen
+  geht über „Neu kalibrieren“. iOS gibt den Sensor nur aus einer Geste frei,
+  deshalb holt `main.js` das Einschalten bei der ersten Berührung nach.
 - Klangfarben stehen nur in `sound.js` (Tabelle `SCHUSS`). Spieler und Bots rufen
   Methoden auf (`schuss`, `treffer`, `schritt` …) und kennen keine Frequenzen.
   Klänge in der Welt bekommen eine Position mit, eigene nicht – daraus ergibt sich

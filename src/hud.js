@@ -10,7 +10,6 @@ export class Hud {
     this.root = root;
     root.innerHTML = `
       <div id="loading" hidden></div>
-      <div id="hochkant">Bitte das Gerät quer halten</div>
       <div id="menu">
         <h1>Crash Corps</h1>
         <p class="sub">Wähl Modus und Klasse. Dann rein.</p>

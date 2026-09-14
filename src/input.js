@@ -1,4 +1,4 @@
-import { TOUCH } from './device.js';
+import { TOUCH, bild, zuBild } from './device.js';
 import { Gyro } from './gyro.js';
 
 /**
@@ -142,7 +142,8 @@ class TouchControls {
         </div>
         <p id="t-edit-hint">Knopf ziehen zum Verschieben · antippen und Regler für die Größe</p>
       </div>`;
-    document.body.append(el);
+    // In die Bühne, damit die Schicht mitdreht, wenn das Handy hochkant gehalten wird
+    (document.getElementById('buehne') || document.body).append(el);
     this.el = el;
     this.stick = el.querySelector('#t-stick');
     this.knob = el.querySelector('#t-knob');
@@ -159,25 +160,27 @@ class TouchControls {
     this._onDown = (e) => {
       if (this.editing) return;                       // im Bearbeitungsmodus keine Spieleingabe
       const inMove = move.contains(e.target) || e.target === move;
+      const p = zuBild(e.clientX, e.clientY);      // Bildkoordinaten, auch bei gedrehter Bühne
       if (inMove && this.stickId === null) {
         this.stickId = e.pointerId;
-        this.origin = { x: e.clientX, y: e.clientY };
+        this.origin = p;
         this.stick.hidden = false;
         this.stick.style.width = this.stick.style.height = `${this.layout.stick.size}px`;
         this.stick.style.margin = `${-this.layout.stick.size / 2}px 0 0 ${-this.layout.stick.size / 2}px`;
-        this.stick.style.left = `${e.clientX}px`;
-        this.stick.style.top = `${e.clientY}px`;
+        this.stick.style.left = `${p.x}px`;
+        this.stick.style.top = `${p.y}px`;
         this.knob.style.transform = 'translate(-50%,-50%)';
       } else if ((look.contains(e.target) || e.target === look) && this.lookId === null) {
         this.lookId = e.pointerId;
-        this.lastLook = { x: e.clientX, y: e.clientY };
+        this.lastLook = p;
       } else return;
       e.preventDefault();
     };
     this._onMove = (e) => {
       if (this.editing) return;
+      const p = zuBild(e.clientX, e.clientY);
       if (e.pointerId === this.stickId) {
-        const dx = e.clientX - this.origin.x, dy = e.clientY - this.origin.y;
+        const dx = p.x - this.origin.x, dy = p.y - this.origin.y;
         const len = Math.hypot(dx, dy) || 1;
         const k = Math.min(1, len / radius());
         this.input.stickX = (dx / len) * k;
@@ -186,9 +189,9 @@ class TouchControls {
           `translate(calc(-50% + ${(dx / len) * k * radius()}px), calc(-50% + ${(dy / len) * k * radius()}px))`;
         e.preventDefault();
       } else if (e.pointerId === this.lookId) {
-        this.input.lookX += e.clientX - this.lastLook.x;
-        this.input.lookY += e.clientY - this.lastLook.y;
-        this.lastLook = { x: e.clientX, y: e.clientY };
+        this.input.lookX += p.x - this.lastLook.x;
+        this.input.lookY += p.y - this.lastLook.y;
+        this.lastLook = p;
         e.preventDefault();
       }
     };
@@ -280,17 +283,19 @@ class TouchControls {
       e.preventDefault(); e.stopPropagation();
       this.select(t.dataset.key);
       const r = t.getBoundingClientRect();
-      drag = { key: t.dataset.key, id: e.pointerId, dx: e.clientX - (r.left + r.width / 2), dy: e.clientY - (r.top + r.height / 2) };
+      const m = zuBild(r.left + r.width / 2, r.top + r.height / 2), p = zuBild(e.clientX, e.clientY);
+      drag = { key: t.dataset.key, id: e.pointerId, dx: p.x - m.x, dy: p.y - m.y };
     }, true);
     addEventListener('pointermove', (e) => {
       if (!drag || e.pointerId !== drag.id) return;
       const l = this.layout[drag.key];
       const pad = l.size / 2;
-      l.x = Math.min(1, Math.max(0, (e.clientX - drag.dx) / innerWidth));
-      l.y = Math.min(1, Math.max(0, (e.clientY - drag.dy) / innerHeight));
+      const { w, h } = bild(), p = zuBild(e.clientX, e.clientY);
+      l.x = Math.min(1, Math.max(0, (p.x - drag.dx) / w));
+      l.y = Math.min(1, Math.max(0, (p.y - drag.dy) / h));
       // in den sichtbaren Bereich zwingen
-      l.x = Math.min(1 - pad / innerWidth, Math.max(pad / innerWidth, l.x));
-      l.y = Math.min(1 - pad / innerHeight, Math.max(pad / innerHeight, l.y));
+      l.x = Math.min(1 - pad / w, Math.max(pad / w, l.x));
+      l.y = Math.min(1 - pad / h, Math.max(pad / h, l.y));
       this.applyLayout();
     });
     addEventListener('pointerup', () => { if (drag) { drag = null; this.saveLayout(); } });

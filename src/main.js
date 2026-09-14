@@ -9,7 +9,7 @@ import { preloadCharacters, preloadProps } from './assets.js';
 import { REAL } from './style.js';
 import { preloadTextures } from './surface.js';
 import { Input } from './input.js';
-import { TOUCH, QUALITY } from './device.js';
+import { buehneAnpassen, TOUCH, QUALITY } from './device.js';
 import { Sound } from './sound.js';
 import { Domination, TEAMS } from './domination.js';
 
@@ -89,9 +89,10 @@ let player = null, bots = [], time = 0, running = false;
 let dom = null;              // Domination-Zustand, null im Deathmatch
 
 function resize() {
-  renderer.setSize(innerWidth, innerHeight, false);
-  camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
-  pipeline.setSize(innerWidth, innerHeight, renderer.getPixelRatio());
+  const { w, h } = buehneAnpassen();
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h; camera.updateProjectionMatrix();
+  pipeline.setSize(w, h, renderer.getPixelRatio());
 }
 addEventListener('resize', resize); resize();
 
@@ -260,11 +261,23 @@ hud.onGyro = async () => {
   const g = input.gyro;
   if (g.einst.an && g.laeuft) { g.ausschalten(); hud.gyroStand(false); return false; }
   if (!(await g.einschalten())) { hud.gyroStand(false); return false; }     // keine Erlaubnis
-  const ok = await gyroKalibrieren();
+  // Einmal kalibriert bleibt kalibriert. Neu messen nur auf Wunsch
+  // („Neu kalibrieren“ unter Bedienung anpassen) oder wenn nichts gespeichert ist.
+  const ok = g.kalibriert || await gyroKalibrieren();
   if (!ok) g.ausschalten();
   hud.gyroStand(ok, g.einst);
   return ok;
 };
+// War der Gyro beim letzten Mal an, soll er es wieder sein. iOS gibt den Sensor
+// aber nur aus einer Nutzergeste heraus frei – also bei der ersten Berührung
+// nachholen, was beim Laden nicht ging.
+const gyroNachholen = async () => {
+  const g = input.gyro;
+  if (!g.einst.an || g.laeuft || !g.kalibriert) return;
+  await g.einschalten().catch(() => {});
+  hud.gyroStand(g.einst.an && g.laeuft, g.einst);
+};
+for (const ev of ['click', 'touchend', 'keydown']) addEventListener(ev, gyroNachholen, { once: true, capture: true });
 hud.onGyroKalib = async () => {
   sound.klick();
   const g = input.gyro;

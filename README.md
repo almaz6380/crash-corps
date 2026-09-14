@@ -82,6 +82,10 @@ R nachladen · Q Spezial · M Ton an/aus · Esc Menü
 
 ## Gyroskop
 
+Das Spiel ist immer quer. Ist die Drehsperre des Handys an und der Browser
+bleibt hochkant, dreht sich das Bild von selbst – Handy einfach so drehen, dass
+die Oberkante links liegt.
+
 Über **🧭** im Menü lässt sich das Gyroskop zuschalten. Es zielt zusätzlich zum
 Wischen: die grobe Drehung macht der Daumen, das Feinzielen die Hand.
 
@@ -95,7 +99,8 @@ Kamera: die Rückseite des Handys zeigt auf etwas links von dir, nicht wie ein
 Lenkrad drehen. Unter dem Text stehen die rohen Sensorwerte; wenn etwas nicht
 klappt, hilft ein Bildschirmfoto davon bei der Fehlersuche. So misst
 das Spiel, welche Sensorachse sich wobei bewegt; was das Gerät über seine Achsen
-behauptet, ist egal. Läuft später etwas verkehrt, unter **Bedienung anpassen**
+behauptet, ist egal. Die Kalibrierung bleibt gespeichert – der Gyro-Knopf schaltet danach nur
+noch an und aus. Läuft später etwas verkehrt, unter **Bedienung anpassen**
 auf **Neu kalibrieren** tippen.
 Dort stehen auch Stärke, Umkehrschalter und eine Live-Anzeige der gemessenen
 Drehraten.

@@ -1,8 +1,11 @@
 :root { --ink: #2b2118; --paper: #fff7e6; --sun: #ffd166; --red: #e0522a; }
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; overflow: hidden; background: #9fd7f7; font-family: "Trebuchet MS", "Segoe UI", sans-serif; color: var(--ink); }
-#game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
-#hud { position: fixed; inset: 0; pointer-events: none; }
+#buehne { position: fixed; left: 0; top: 0; width: 100%; height: 100%; }
+/* Hochkant gehalten: die ganze Bühne liegt quer im Fenster. Maße setzt device.js. */
+body.gedreht #buehne { transform-origin: 0 0; transform: rotate(90deg) translateY(-100%); }
+#game { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+#hud { position: absolute; inset: 0; pointer-events: none; }
 #hud button { pointer-events: auto; }
 [hidden] { display: none !important; }
 
@@ -45,7 +48,7 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #9fd7f7; fon
 --------------------------------------------------------------------------- */
 html, body { overscroll-behavior: none; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
 
-#touch { position: fixed; inset: 0; z-index: 5; pointer-events: none; touch-action: none; }
+#touch { position: absolute; inset: 0; z-index: 5; pointer-events: none; touch-action: none; }
 #t-move { position: absolute; left: 0; bottom: 0; width: 45%; height: 72%; pointer-events: auto; touch-action: none; }
 #t-look { position: absolute; right: 0; top: 0; width: 55%; height: 100%; pointer-events: auto; touch-action: none; }
 
@@ -69,21 +72,20 @@ html, body { overscroll-behavior: none; -webkit-user-select: none; user-select: 
 #feed { top: max(70px, calc(env(safe-area-inset-top) + 52px)); }
 
 /* Auf kleinen Bildschirmen HUD kompakter, damit die Daumen nichts verdecken */
-@media (max-height: 520px) {
-  /* Im Querformat eines Handys ist die Höhe knapp. `safe center` zentriert,
-     solange es passt, und rückt sonst an den Anfang statt oben abzuschneiden;
-     zusammen mit dem Rollen bleibt jede Zeile erreichbar. */
-  #menu { gap: 6px; padding: 6px 10px; align-content: safe center; overflow-y: auto; }
-  #menu .sub { font-size: 15px; }
-  #t-gyro { padding: 5px 10px; gap: 4px 10px; font-size: 12px; }
-  #t-gyro input[type="range"] { width: 84px; }
-  #modi button { padding: 6px 12px; font-size: 14px; }
-  #hp { width: 180px; height: 24px; }
-  #ammo { font-size: 26px; }
-  #bottom { left: 12px; right: 12px; bottom: 12px; }
-  #menu h1 { font-size: clamp(32px, 7vw, 56px); }
-  .cls { width: 160px; padding: 12px; }
-}
+/* Im Querformat eines Handys ist die Höhe knapp. `safe center` zentriert, solange
+   es passt, und rückt sonst an den Anfang statt oben abzuschneiden; zusammen mit
+   dem Rollen bleibt jede Zeile erreichbar. Die Klasse setzt device.js – eine
+   @media-Abfrage sähe bei gedrehter Bühne das Hochformat-Fenster. */
+body.klein #menu { gap: 6px; padding: 6px 10px; align-content: safe center; overflow-y: auto; }
+body.klein #menu .sub { font-size: 15px; }
+body.klein #t-gyro { padding: 5px 10px; gap: 4px 10px; font-size: 12px; }
+body.klein #t-gyro input[type="range"] { width: 84px; }
+body.klein #modi button { padding: 6px 12px; font-size: 14px; }
+body.klein #hp { width: 180px; height: 24px; }
+body.klein #ammo { font-size: 26px; }
+body.klein #bottom { left: 12px; right: 12px; bottom: 12px; }
+body.klein #menu h1 { font-size: clamp(32px, 7vw, 56px); }
+body.klein .cls { width: 160px; padding: 12px; }
 
 /* Auf Touch-Geräten liegen HP und Munition zwischen Stick und Schaltflächen,
    sonst verdecken die Daumen sie. */
@@ -94,14 +96,6 @@ body.touch #special { font-size: 13px; }
 body.touch #score { top: max(12px, env(safe-area-inset-top)); left: max(12px, env(safe-area-inset-left)); font-size: 13px; }
 body.touch #score b { font-size: 16px; }
 body.touch #feed { right: 74px; font-size: 13px; }
-
-/* Hochformat ist für einen Shooter unbrauchbar – Hinweis statt kaputter Ansicht */
-#hochkant { display: none; }
-@media (orientation: portrait) {
-  body.touch #hochkant { position: fixed; inset: 0; z-index: 20; display: grid; place-content: center;
-    padding: 32px; text-align: center; background: var(--ink); color: var(--paper);
-    font-size: 22px; font-weight: bold; line-height: 1.5; }
-}
 
 /* Schaltflächen werden absolut gesetzt, damit sie verschiebbar sind. */
 #t-buttons { position: absolute; inset: 0; display: block; pointer-events: none; }
@@ -218,7 +212,7 @@ body.touch #ende > div { font-size: 24px; padding: 18px 28px; }
    dann rutscht ein Knopf der ersten Zeile mit nach unten. Im Raster bekommt die
    Gyro-Zeile einfach die ganze Breite. */
 #t-edit-bar { display: grid; grid-template-columns: auto auto auto auto;
-  justify-items: center; max-width: min(96vw, 900px); }
+  justify-items: center; max-width: min(96%, 900px); }
 #t-gyro { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center;
   padding-top: 7px; border-top: 3px solid rgba(43,33,24,.2);
   font-size: 13px; font-weight: bold; color: var(--ink); }
@@ -258,12 +252,10 @@ body.touch #ende > div { font-size: 24px; padding: 18px 28px; }
 #kalib-abbruch { background: var(--paper); }
 #gyro-kalib { font: bold 12px/1 inherit; color: var(--ink); background: var(--sun);
   border: 3px solid var(--ink); border-radius: 10px; padding: 7px 10px; cursor: pointer; }
-@media (max-height: 520px) {
-  #kalib > div { padding: 14px 18px; gap: 6px; }
-  #kalib h2 { font-size: 20px; }
-  #kalib p { font-size: 13px; }
-  #kalib button { padding: 9px 16px; font-size: 14px; }
-}
+body.klein #kalib > div { padding: 14px 18px; gap: 6px; }
+body.klein #kalib h2 { font-size: 20px; }
+body.klein #kalib p { font-size: 13px; }
+body.klein #kalib button { padding: 9px 16px; font-size: 14px; }
 
 /* Prüffeld im dritten Kalibrierschritt: ein Punkt, der sich wie der Blick bewegt */
 #kalib-feld { position: relative; width: 180px; height: 180px; margin: 4px auto 0; border: 3px solid var(--ink);
@@ -278,4 +270,4 @@ body.touch #ende > div { font-size: 24px; padding: 18px 28px; }
 #kalib #kalib-mess { font: 12px/1.3 ui-monospace, Menlo, Consolas, monospace; opacity: .7; white-space: pre-wrap; min-height: 1.3em; }
 #kalib button:disabled { opacity: .45; box-shadow: none; transform: translate(3px, 3px); cursor: default; }
 #stand { margin: 0; font-size: 11px; color: var(--paper); opacity: .55; }
-@media (max-height: 520px) { #kalib-feld { width: 120px; height: 120px; } }
+body.klein #kalib-feld { width: 120px; height: 120px; }
