@@ -34,6 +34,9 @@ export const LISTEN = {
   // Quaternius „Ultimate Modular Men" – die Clips, die assets.js nennt
   men: ['Idle_Gun', 'Walk', 'Run', 'Run_Left', 'Run_Right', 'Run_Back',
         'Death', 'Roll', 'Idle_Gun_Pointing', 'Gun_Shoot', 'HitRecieve'],
+  // Quaternius „Ultimate Monsters" – Monster ohne Ziel- und Seitwärts-Clips.
+  // `Weapon` ist der Hieb, der beim Schuss über den Oberkörper gelegt wird.
+  monster: ['Idle', 'Walk', 'Run', 'Death', 'HitReact', 'Weapon'],
   // KayKit Adventurers / Skeletons
   kay: ['Idle', 'Walking_A', 'Running_A', 'Running_Strafe_Left', 'Running_Strafe_Right',
         'Walking_Backwards', 'Death_A', 'Hit_A', 'Dodge_Forward',

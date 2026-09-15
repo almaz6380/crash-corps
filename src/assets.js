@@ -13,6 +13,31 @@ import { embeddedBytes } from './embed.js';
  * bei der Klasse `model: '<id>'` setzen. Siehe public/assets/README.md.
  */
 export const CHARACTER_MODELS = {
+  // Quaternius „Ultimate Monsters" (CC0): ein richtiger Ork statt eines grün
+  // eingefärbten Barbaren. Gleiches Knochenschema wie die men_*, aber ohne
+  // `Wrist` – die Hand ist `Index1.R`, wie beim Toon-Kit. Keine Seitwärts- und
+  // keine Zielclips: `Weapon` liegt als Hieb über dem Oberkörper, wenn er feuert.
+  qua_ork: {
+    url: 'assets/characters/qua_ork.glb',
+    yaw: 0,
+    bones: {
+      hips: 'Hips', spine: 'Abdomen', chest: 'Torso', head: 'Head',
+      rightArm: 'UpperArm.R', rightForeArm: 'LowerArm.R', rightHand: 'Index1.R',
+      leftArm: 'UpperArm.L', leftForeArm: 'LowerArm.L', leftHand: 'Index1.L',
+    },
+    clips: { idle: 'Idle', walk: 'Walk', run: 'Run', death: 'Death' },
+    upperBones: ['Abdomen', 'Torso', 'Neck', 'Head', 'Shoulder',
+                 'UpperArm', 'LowerArm', 'Index', 'Middle', 'Pinky', 'Thumb'],
+    layers: { shoot: 'Weapon', hit: 'HitReact' },   // kein `aim`: es gibt keine Zielpose
+    cycle: { walk: 1.0, run: 0.57, walkSpeed: 1.4, runSpeed: 4.5 },
+    // Seine Keule ist an die Knochen gewichtet, nicht angehängt – in der dritten
+    // Person ideal, fürs Ego-Bild unbrauchbar. Daher `form`: dort eine Axt aus gear.js.
+    weapons: { shotgun: 'Orc_Weapon' },
+    weaponHide: ['Orc_Weapon'],
+    viewmodel: { laenge: 0.72, rot: [0.12, 2.75, 0.2], pos: [0, -0.04, 0.06] },
+    tintMaterials: [],                              // die Figur bringt ihre Farbe mit
+  },
+
   // KayKit Character Packs von Kay Lousberg (CC0): Fantasy-Figuren im selben
   // Comic-Maßstab wie das Spiel. Eine Farbatlas-Textur je Figur, ein Material,
   // rund 5700 Dreiecke. Waffen liegen als eigene Meshes an `handslot.r` bereit –
@@ -260,11 +285,26 @@ export function cloneWeaponMesh(id, weapon) {
   let src = null;
   entry.scene.traverse(o => { if (!src && !o.isBone && norm(o.name) === norm(name)) src = o; });
   if (!src) return null;
-  const m = src.clone(true);
+  entry.scene.updateWorldMatrix(true, true);
+  let m;
+  if (src.isSkinnedMesh) {
+    // Gewichtete Waffen (Quaternius-Monster) tragen kein eigenes Gelenk, sondern
+    // hängen an den Handknochen. Ein Klon behielte die Skelett-Referenz der
+    // Vorlage, die nie mitläuft – er stünde in der Bindepose an der falschen
+    // Stelle. Fürs Ego-Bild reicht die starre Geometrie; ihre Ecken liegen im
+    // Modellraum, also wird sie auf den Ursprung zurückgeschoben.
+    const geo = src.geometry.clone();
+    geo.computeBoundingBox();
+    const mitte = geo.boundingBox.getCenter(new THREE.Vector3());
+    geo.translate(-mitte.x, -mitte.y, -mitte.z);
+    geo.deleteAttribute('skinIndex'); geo.deleteAttribute('skinWeight');
+    m = new THREE.Mesh(geo, src.material);
+  } else {
+    m = src.clone(true);
+  }
   m.visible = true;
   m.position.set(0, 0, 0); m.quaternion.identity();
   // Weltskalierung des Originals übernehmen, damit die Waffe in Metern stimmt
-  entry.scene.updateWorldMatrix(true, true);
   const ws = new THREE.Vector3(); src.matrixWorld.decompose(new THREE.Vector3(), new THREE.Quaternion(), ws);
   m.scale.copy(ws);
   m.traverse(o => {

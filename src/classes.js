@@ -5,7 +5,7 @@ export const CLASSES = {
     id: 'brawler', name: 'Grollzahn', tagline: 'Viel Panzer, kurze Lunte.',
     hp: 160, speed: 5.2, color: 0x6fae3e, accent: 0xffd166,
     weapon: 'shotgun', special: 'charge', body: { width: 1.3, height: 2.0, head: 0.5 },
-    model: 'kay_ork',
+    model: 'qua_ork',
   },
   scout: {
     id: 'scout', name: 'Nachtschatten', tagline: 'Schnell rein, schneller raus.',

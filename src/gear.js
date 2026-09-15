@@ -31,8 +31,12 @@ export function roundedBox(w, h, d, r = 0.05) {
 /**
  * Waffe der Klasse. Lauf zeigt nach +z, Griff sitzt im Ursprung –
  * so lässt sie sich direkt an einen Hand-Knochen hängen.
+ *
+ * `kind` ist der Spielwert aus `classes.js` (`shotgun`, `smg`, `rifle`) und
+ * bestimmt normalerweise auch das Aussehen. `form` trennt beides: eine Klasse
+ * kann mit den Werten einer Schrotflinte spielen und trotzdem eine Axt tragen.
  */
-export function buildWeapon(kind, accent) {
+export function buildWeapon(kind, accent, form = kind) {
   const g = new THREE.Group();
   const dark = toon(0x46403a), acc = toon(accent), metal = toon(0x9aa2ae);
   const add = (geo, mat, x, y, z, rx = 0) => {
@@ -41,7 +45,19 @@ export function buildWeapon(kind, accent) {
   };
   const tube = (r, len) => new THREE.CylinderGeometry(r, r, len, 10);
 
-  if (kind === 'shotgun') {
+  if (form === 'axt') {
+    // Stiel entlang +z, Blatt vorn quer dazu – dieselbe Konvention wie beim
+    // Lauf einer Schusswaffe, damit Rückstoß und Mündungsfeuer weiter passen.
+    const holz = toon(0x6b4526), eisen = toon(0x6d7683);
+    add(tube(0.034, 0.74), holz, 0, 0, 0.16, Math.PI / 2);                  // Stiel
+    add(roundedBox(0.06, 0.06, 0.09, 0.02), acc, 0, 0, -0.14);              // Wicklung
+    add(roundedBox(0.07, 0.07, 0.09, 0.02), acc, 0, 0, 0.36);               // Bund
+    const blatt = add(roundedBox(0.035, 0.38, 0.3, 0.04), eisen, 0, 0.04, 0.5);
+    blatt.rotation.y = 0.1;
+    const bart = add(roundedBox(0.03, 0.22, 0.17, 0.03), eisen, 0, -0.17, 0.45);
+    bart.rotation.y = 0.1;
+    add(tube(0.03, 0.1), eisen, 0, 0.26, 0.56, Math.PI / 2);                // Dorn
+  } else if (kind === 'shotgun') {
     add(roundedBox(0.12, 0.14, 0.58, 0.04), dark, 0, 0, 0.14);
     add(tube(0.042, 0.5), metal, 0, 0.05, 0.4, Math.PI / 2);
     add(roundedBox(0.1, 0.09, 0.22, 0.03), acc, 0, -0.05, 0.32);           // Pumpe
@@ -62,7 +78,8 @@ export function buildWeapon(kind, accent) {
   }
   // Mündungspunkt für Effekte
   const muzzle = new THREE.Object3D();
-  muzzle.position.set(0, kind === 'rifle' ? 0.02 : 0.05, kind === 'rifle' ? 0.9 : kind === 'smg' ? 0.48 : 0.66);
+  const z = { axt: 0.56, rifle: 0.9, smg: 0.48 }[form] ?? 0.66;
+  muzzle.position.set(0, form === 'rifle' ? 0.02 : 0.05, z);
   g.add(muzzle); g.userData.muzzle = muzzle;
   return g;
 }
@@ -74,8 +91,12 @@ export function buildWeapon(kind, accent) {
  */
 export function buildViewmodel(cls) {
   const g = new THREE.Group();
-  const builtin = cloneWeaponMesh(cls.model, cls.weapon);
-  const w = builtin || buildWeapon(cls.weapon, cls.accent);
+  const vm = CHARACTER_MODELS[cls.model]?.viewmodel;
+  // Nennt das Manifest eine Form, wird immer prozedural gebaut. Nötig, wenn die
+  // Waffe im Modell an die Knochen gewichtet ist statt angehängt: ein Klon davon
+  // behält das Skelett der Vorlage, das nie mitläuft, und stünde in der Bindepose.
+  const builtin = vm?.form ? null : cloneWeaponMesh(cls.model, cls.weapon);
+  const w = builtin || buildWeapon(cls.weapon, cls.accent, vm?.form || cls.weapon);
   // Im Ego-Bild darf die Waffe nicht in der dunkelsten Toon-Stufe verschwinden
   w.traverse(o => {
     if (!o.isMesh) return;
@@ -88,7 +109,6 @@ export function buildViewmodel(cls) {
     // im Manifest nichts, gilt die Lage des Toon-Kits: Lauf entlang -x,
     // Oberseite +z – erst aufrichten (z → y), dann den Lauf von der Kamera
     // weg drehen (-x → -z).
-    const vm = CHARACTER_MODELS[cls.model]?.viewmodel;
     if (vm) {
       w.rotation.fromArray(vm.rot || [0, 0, 0]);
       // Größe über die gewünschte Länge statt über einen Faktor: wie groß eine
@@ -107,6 +127,14 @@ export function buildViewmodel(cls) {
       w.quaternion.multiplyQuaternions(yaw, roll);
       w.scale.multiplyScalar(0.42);
     }
+  } else if (vm?.form) {
+    // Prozedurale Waffe mit eigener Lage aus dem Manifest
+    w.rotation.fromArray(vm.rot || [0, 0, 0]);
+    if (vm.laenge) {
+      const d = new THREE.Box3().setFromObject(w).getSize(new THREE.Vector3());
+      w.scale.multiplyScalar(vm.laenge / (Math.max(d.x, d.y, d.z) || 1));
+    } else w.scale.setScalar(vm.scale ?? 0.24);
+    if (vm.pos) w.position.fromArray(vm.pos);
   } else {
     w.rotation.y = Math.PI;
     w.scale.setScalar(0.24);
@@ -123,8 +151,10 @@ export function buildViewmodel(cls) {
   g.rotation.set(0.02, -0.16, 0.03);   // leicht eingedreht, sonst sieht man nur den Schaft
   // Eigenes Nahlicht: die Waffe hängt an der Kamera und läge sonst je nach
   // Blickrichtung im Schatten der Sonne. Kurze Reichweite, damit die Arena
-  // davon nichts abbekommt.
-  const lamp = new THREE.PointLight(0xfff0d8, 2.2, 1.6, 2);
+  // davon nichts abbekommt. Für prozedurale Waffen deutlich schwächer: ihre
+  // Toon-Materialien haben keine Textur, die die Helligkeit bricht, und laufen
+  // bei dieser Nähe sonst in die oberste Stufe – dann ist alles weiß.
+  const lamp = new THREE.PointLight(0xfff0d8, builtin ? 2.2 : 1.0, 1.6, 2);
   lamp.position.set(0.15, 0.35, 0.3);
   g.add(lamp);
   g.userData.home = g.position.clone();

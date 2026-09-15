@@ -4,7 +4,7 @@ Class-based Cartoon-Arena-Shooter im Browser, seit dem Figurentausch im Fantasy-
 
 ## Stack
 - Vite + Three.js (ES-Module, kein Framework)
-- Figuren als glTF-Modelle aus `public/assets/characters/` (KayKit Character Pack von Kay Lousberg, CC0), geladen über `assets.js`. Ihre Waffen liegen als Meshes an `handslot.r` im Modell und werden über `weapons`/`weaponHide` ein- und ausgeblendet; Modelle ohne eigene Waffen bekommen eine prozedurale aus `gear.js` am Handknochen. Arena aus Toon-Kit-Props (`public/assets/props/`), Effekte per Code.
+- Figuren als glTF-Modelle aus `public/assets/characters/` (KayKit Character Pack von Kay Lousberg und Ultimate Monsters von Quaternius, beide CC0), geladen über `assets.js`. Ihre Waffen liegen als Meshes an `handslot.r` im Modell und werden über `weapons`/`weaponHide` ein- und ausgeblendet; Modelle ohne eigene Waffen bekommen eine prozedurale aus `gear.js` am Handknochen. Arena aus Toon-Kit-Props (`public/assets/props/`), Effekte per Code.
 - Look: zwei Stile in `render.js`, umschaltbar über `?stil=real`. Standard ist Cel-Shading mit
   Lichtstufen-Rampe und Outline; `real` nutzt physikalische Materialien, Himmelslicht und
   Umgebungsverdeckung. ACES-Tone-Mapping passiert im Composite-Shader, nicht im Renderer –
@@ -70,7 +70,11 @@ tools/
   wenn Hut oder Helm in der Bounding-Box stecken (der Maßstab kommt aus der
   Gesamthöhe); `tintMix` regelt, wie stark die Klassenfarbe in eine texturierte
   Figur mischt; `viewmodel` beschreibt die Lage der mitgelieferten Waffe im
-  Ego-Bild, mit `laenge` in Metern statt eines Faktors.
+  Ego-Bild, mit `laenge` in Metern statt eines Faktors, und mit `form` wahlweise
+  eine prozedurale Waffe aus `gear.js` statt der mitgelieferten. Ist die Waffe im
+  Modell an die Knochen gewichtet statt angehängt, backt `cloneWeaponMesh` sie
+  fürs Ego-Bild zu einem starren Mesh um – ein Klon behielte sonst das Skelett
+  der Vorlage und stünde in der Bindepose.
 - Mannschaften: jede Figur hat `team` (0 = Spielerseite). Wer auf wen schießen darf,
   entscheidet allein diese Zahl – `main.js` reicht den Bots die passende Gegnerliste.
   Deathmatch ist derselbe Code: Spieler in Mannschaft 0, alle Bots in Mannschaft 1.
