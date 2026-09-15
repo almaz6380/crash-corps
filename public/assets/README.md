@@ -1,8 +1,30 @@
 # Assets
 
 Alle Modelle sind **CC0 1.0** (gemeinfrei, auch kommerziell, keine Namensnennung
-nötig). Zwei Quellen: Kay Lousberg (kaylousberg.com) für die Fantasy-Figuren,
-Quaternius (quaternius.com) für Arena-Props und die früheren Figuren.
+nötig). Zwei Quellen: Kay Lousberg (kaylousberg.com) für Schurke und Magier,
+Quaternius (quaternius.com) für den Ork, die Arena-Props und die früheren Figuren.
+
+## characters/qua_ork.glb — „Ultimate Monsters" (im Spiel aktiv)
+
+Ein richtiger Ork: grün, Hauer, Irokese, Stachelkeule. Ein Material `Atlas`,
+7344 Dreiecke, 43 Knochen nach Quaternius-Schema – aber **ohne `Wrist`**, die
+Hand heißt `Index1.R`, und statt `Chest` gibt es `Torso`.
+
+Zwei Eigenheiten gegenüber den KayKit-Figuren:
+
+- **Keine Ziel- und keine Seitwärts-Clips.** Ohne `runLeft/Right/Back` fällt die
+  Richtungsmischung in `animation.js` weg, der Ork läuft immer vorwärts. Statt
+  einer Zielpose bekommt er `Weapon` als Schuss-Ebene: bei jedem Schuss ein
+  Keulenhieb. Deshalb hat sein Eintrag kein `layers.aim`.
+- **Seine Keule ist an die Knochen gewichtet, nicht angehängt.** In der dritten
+  Person ideal. Für das Ego-Bild backt `cloneWeaponMesh` sie zu einem starren
+  Mesh um und schiebt sie auf den Ursprung – ein einfacher Klon behielte das
+  Skelett der Vorlage, das nie mitläuft, und stünde in der Bindepose.
+
+Von 14 Clips sind 6 übrig (`tools/glb-schlanken.mjs --liste=monster`): aus
+1,22 MB werden 0,42 MB.
+Quelle: https://quaternius.com/packs/ultimatemonsters.html — dort auch Goblin,
+Dämon, Yeti, Ninja und rund 45 weitere, alle mit demselben Rig.
 
 ## characters/kay_*.glb — „KayKit Character Pack: Adventurers" (im Spiel aktiv)
 
@@ -14,9 +36,11 @@ Manifest statt einer prozeduralen Waffe aus `gear.js`.
 
 | Datei | Quelle | Klasse | Waffe |
 |---|---|---|---|
-| `kay_ork.glb`     | Barbarian, grün eingefärbt | Grollzahn    | `2H_Axe` |
-| `kay_schurke.glb` | Rogue                      | Nachtschatten| `2H_Crossbow` |
-| `kay_magier.glb`  | Mage                       | Runenweber   | `2H_Staff` |
+| `kay_schurke.glb` | Rogue | Nachtschatten | `2H_Crossbow` |
+| `kay_magier.glb`  | Mage  | Runenweber    | `2H_Staff` |
+
+Der Barbar aus demselben Paket wäre ein guter vierter Anwärter; sein Eintrag
+`kay_ork` steht noch im Manifest, die Datei liegt aber nicht mehr hier.
 
 Die Pakete bringen 76 Clips mit (kämpfen, sitzen, liegen, jubeln). Im Spiel sind
 14 übrig; der Rest ist mit `tools/glb-schlanken.mjs` entfernt – das spart je
@@ -97,7 +121,9 @@ Dann:
    - `grip`: Versatz, Drehung, Größe der prozeduralen Waffe am Handknochen.
    - `viewmodel`: Lage der mitgelieferten Waffe im Ego-Bild. `laenge` gibt die
      gewünschte Länge in Metern an, statt eines Faktors – wie groß eine Waffe
-     im Modell gebaut ist, ist von Paket zu Paket verschieden.
+     im Modell gebaut ist, ist von Paket zu Paket verschieden. `form` erzwingt
+     stattdessen eine prozedurale Waffe aus `gear.js` (`axt`, `shotgun`, `smg`,
+     `rifle`), unabhängig vom Spielwert der Klasse.
    - `scaleBias`: Ausgleich, wenn Hut, Helm oder erhobener Stab in der
      Bounding-Box stecken. Der Maßstab kommt aus der Gesamthöhe, sonst
      schrumpft der Körper.
