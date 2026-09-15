@@ -1,9 +1,9 @@
 import * as THREE from 'three';
 
 export const WEAPONS = {
-  shotgun: { name: 'Donnerbüchse', damage: 14, pellets: 7, spread: 0.09, cooldown: 0.9, mag: 6, reload: 1.8, range: 22, auto: false },
-  smg:     { name: 'Nähmaschine', damage: 9,  pellets: 1, spread: 0.035, cooldown: 0.08, mag: 32, reload: 1.4, range: 45, auto: true },
-  rifle:   { name: 'Langfinger',  damage: 70, pellets: 1, spread: 0.002, cooldown: 1.3, mag: 5, reload: 2.2, range: 120, auto: false },
+  shotgun: { name: 'Spalterklinge', damage: 14, pellets: 7, spread: 0.09, cooldown: 0.9, mag: 6, reload: 1.8, range: 22, auto: false },
+  smg:     { name: 'Bolzenwerfer', damage: 9,  pellets: 1, spread: 0.035, cooldown: 0.08, mag: 32, reload: 1.4, range: 45, auto: true },
+  rifle:   { name: 'Runenstab',    damage: 70, pellets: 1, spread: 0.002, cooldown: 1.3, mag: 5, reload: 2.2, range: 120, auto: false },
 };
 
 /** Waffenzustand für eine Figur (Spieler oder Bot). */

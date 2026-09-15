@@ -1,10 +1,10 @@
 # Crash Corps (Arbeitstitel)
 
-Class-based Cartoon-Arena-Shooter im Browser. Inspiriert von Team-Fortress-artigen Mobile-Shootern (bunt, überzeichnet, Klassen, Domination), aber eigene Marke: eigene Namen, eigene Figuren, eigene Assets. **Kein Nachbau eines bestehenden Spiels** – Namen, Charakterdesigns und Assets fremder Spiele werden nicht übernommen.
+Class-based Cartoon-Arena-Shooter im Browser, seit dem Figurentausch im Fantasy-Gewand: Ork, Schurke, Magier statt Soldaten, Axt, Armbrust und Zauberstab statt Gewehren. Inspiriert von Team-Fortress-artigen Mobile-Shootern (bunt, überzeichnet, Klassen, Domination), aber eigene Marke: eigene Namen, eigene Figuren, eigene Assets. **Kein Nachbau eines bestehenden Spiels** – Namen, Charakterdesigns und Assets fremder Spiele werden nicht übernommen; das gilt für Fantasy-Vorbilder genauso wie für Shooter.
 
 ## Stack
 - Vite + Three.js (ES-Module, kein Framework)
-- Figuren als glTF-Modelle aus `public/assets/characters/` (Quaternius Ultimate Modular Men, CC0), geladen über `assets.js`. Waffen prozedural aus `gear.js` am Handknochen. Arena aus Toon-Kit-Props (`public/assets/props/`), Effekte per Code.
+- Figuren als glTF-Modelle aus `public/assets/characters/` (KayKit Character Pack von Kay Lousberg, CC0), geladen über `assets.js`. Ihre Waffen liegen als Meshes an `handslot.r` im Modell und werden über `weapons`/`weaponHide` ein- und ausgeblendet; Modelle ohne eigene Waffen bekommen eine prozedurale aus `gear.js` am Handknochen. Arena aus Toon-Kit-Props (`public/assets/props/`), Effekte per Code.
 - Look: zwei Stile in `render.js`, umschaltbar über `?stil=real`. Standard ist Cel-Shading mit
   Lichtstufen-Rampe und Outline; `real` nutzt physikalische Materialien, Himmelslicht und
   Umgebungsverdeckung. ACES-Tone-Mapping passiert im Composite-Shader, nicht im Renderer –
@@ -45,12 +45,32 @@ src/
   animation.js Skelett-Clips (Stehen/Gehen/Rennen, Anschlag-Varianten, Tod) + Knochen-Overlays als Ersatz
   hud.js       DOM-HUD (HP, Munition, Fadenkreuz, Killfeed, Score, Klassenwahl)
   style.css
+tools/
+  glb-info.mjs      Liest den JSON-Teil einer GLB: Knochen, Clips, Materialien,
+                    Maße – und druckt eine Vorlage für den Manifest-Eintrag
+  glb-schlanken.mjs Wirft alle Clips außer einer Liste weg und packt neu
+  assets-liste.mjs  Welche Assets das Spiel zur Laufzeit wirklich holt
+  sw-liste.mjs      Trägt Liste und Version in den Service Worker ein
+  einzeldatei.mjs   Packt den Build in eine einzelne HTML-Datei
 ```
 
 ## Regeln für Änderungen
 - Gameplay-Werte (HP, Schaden, Cooldowns) leben nur in `classes.js` / `weapons.js`, nirgends hartcodiert.
 - Kein Server-Code in diesem Repo, bis der Single-Player-Loop sauber ist. Multiplayer kommt als separater Schritt (autoritativer Server, Colyseus oder eigenes WS-Protokoll).
 - Neue Klasse = Eintrag in `classes.js` (inkl. `model`) + ggf. Modell-Eintrag in `assets.js`. Sonst nichts anfassen.
+- Neue Figur: **erst `node tools/glb-info.mjs <datei.glb>`**, dann den Eintrag schreiben.
+  Ein falscher Knochenname gibt nur eine Warnung in der Konsole, ein falscher
+  Clip-Name gar nichts, und ein `tintMaterials`, das auf kein Material passt,
+  färbt stillschweigend nicht ein. Fertige Pakete vorher durch
+  `tools/glb-schlanken.mjs` schicken – 76 Clips statt 14 kosten je Figur rund 2,7 MB.
+  Der Dateiname muss dem Wert von `model:` entsprechen, und der muss ein
+  einfach zitierter String sein: `tools/assets-liste.mjs` sucht ihn per
+  regulärem Ausdruck, sonst fehlt die Figur offline und in der Einzeldatei.
+- Manifest-Schlüssel jenseits der Knochen und Clips: `scaleBias` gleicht aus,
+  wenn Hut oder Helm in der Bounding-Box stecken (der Maßstab kommt aus der
+  Gesamthöhe); `tintMix` regelt, wie stark die Klassenfarbe in eine texturierte
+  Figur mischt; `viewmodel` beschreibt die Lage der mitgelieferten Waffe im
+  Ego-Bild, mit `laenge` in Metern statt eines Faktors.
 - Mannschaften: jede Figur hat `team` (0 = Spielerseite). Wer auf wen schießen darf,
   entscheidet allein diese Zahl – `main.js` reicht den Bots die passende Gegnerliste.
   Deathmatch ist derselbe Code: Spieler in Mannschaft 0, alle Bots in Mannschaft 1.

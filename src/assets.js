@@ -13,6 +13,88 @@ import { embeddedBytes } from './embed.js';
  * bei der Klasse `model: '<id>'` setzen. Siehe public/assets/README.md.
  */
 export const CHARACTER_MODELS = {
+  // KayKit Character Packs von Kay Lousberg (CC0): Fantasy-Figuren im selben
+  // Comic-Maßstab wie das Spiel. Eine Farbatlas-Textur je Figur, ein Material,
+  // rund 5700 Dreiecke. Waffen liegen als eigene Meshes an `handslot.r` bereit –
+  // Axt, Armbrust, Zauberstab –, deshalb `weapons` statt prozeduraler Waffe.
+  // Aus den mitgelieferten 76 Clips sind 14 übrig, siehe tools/glb-schlanken.mjs.
+  kay_ork: {
+    url: 'assets/characters/kay_ork.glb',
+    yaw: 0,
+    scaleBias: 1.0,
+    bones: {
+      hips: 'hips', spine: 'spine', chest: 'chest', head: 'head',
+      rightArm: 'upperarm.r', rightForeArm: 'lowerarm.r', rightHand: 'wrist.r',
+      leftArm: 'upperarm.l', leftForeArm: 'lowerarm.l', leftHand: 'wrist.l',
+    },
+    clips: {
+      idle: 'Idle', walk: 'Walking_A', run: 'Running_A',
+      runLeft: 'Running_Strafe_Left', runRight: 'Running_Strafe_Right', runBack: 'Walking_Backwards',
+      death: 'Death_A', roll: 'Dodge_Forward',
+    },
+    // Knochennamen tragen die Seite als Endung (`.r`), der Vergleich schneidet
+    // am Punkt ab – hier stehen also die Stämme.
+    upperBones: ['spine', 'chest', 'neck', 'head', 'upperarm', 'lowerarm', 'wrist', 'hand', 'handslot'],
+    layers: { aim: '2H_Melee_Idle', shoot: '2H_Ranged_Shoot', hit: 'Hit_A' },
+    cycle: { walk: 1.07, run: 0.8, walkSpeed: 1.5, runSpeed: 4.6 },
+    weapons: { shotgun: '2H_Axe' },
+    weaponHide: ['1H_Axe', '1H_Axe_Offhand', '2H_Axe', 'Barbarian_Round_Shield', 'Mug'],
+    // Die Axt liegt im Modell mit dem Stiel entlang +y; -x kippt ihn nach vorn.
+    viewmodel: { rot: [-1.05, 0.45, 0.3], laenge: 0.66, pos: [0, -0.04, 0.04] },
+    // Grün einfärben macht aus dem Barbaren einen Ork. Schwach genug, dass die
+    // Zeichnung der Textur nicht zugekleistert wird.
+    tintMaterials: ['barbarian_texture'],
+    tintMix: 0.42,
+  },
+
+  kay_schurke: {
+    url: 'assets/characters/kay_schurke.glb',
+    yaw: 0,
+    bones: {
+      hips: 'hips', spine: 'spine', chest: 'chest', head: 'head',
+      rightArm: 'upperarm.r', rightForeArm: 'lowerarm.r', rightHand: 'wrist.r',
+      leftArm: 'upperarm.l', leftForeArm: 'lowerarm.l', leftHand: 'wrist.l',
+    },
+    clips: {
+      idle: 'Idle', walk: 'Walking_A', run: 'Running_A',
+      runLeft: 'Running_Strafe_Left', runRight: 'Running_Strafe_Right', runBack: 'Walking_Backwards',
+      death: 'Death_A', roll: 'Dodge_Forward',
+    },
+    upperBones: ['spine', 'chest', 'neck', 'head', 'upperarm', 'lowerarm', 'wrist', 'hand', 'handslot'],
+    layers: { aim: '2H_Ranged_Aiming', shoot: '2H_Ranged_Shoot', hit: 'Hit_A' },
+    cycle: { walk: 1.07, run: 0.8, walkSpeed: 1.5, runSpeed: 4.6 },
+    weapons: { smg: '2H_Crossbow' },
+    weaponHide: ['1H_Crossbow', '2H_Crossbow', 'Knife', 'Knife_Offhand', 'Throwable'],
+    // Die Armbrust zeigt schon entlang +z, muss also nur umgedreht werden.
+    viewmodel: { rot: [0.08, Math.PI, 0.06], laenge: 0.6, pos: [0, 0.02, 0.02] },
+    tintMaterials: [],
+  },
+
+  kay_magier: {
+    url: 'assets/characters/kay_magier.glb',
+    yaw: 0,
+    bones: {
+      hips: 'hips', spine: 'spine', chest: 'chest', head: 'head',
+      rightArm: 'upperarm.r', rightForeArm: 'lowerarm.r', rightHand: 'wrist.r',
+      leftArm: 'upperarm.l', leftForeArm: 'lowerarm.l', leftHand: 'wrist.l',
+    },
+    clips: {
+      idle: 'Idle', walk: 'Walking_A', run: 'Running_A',
+      runLeft: 'Running_Strafe_Left', runRight: 'Running_Strafe_Right', runBack: 'Walking_Backwards',
+      death: 'Death_A', roll: 'Dodge_Forward',
+    },
+    upperBones: ['spine', 'chest', 'neck', 'head', 'upperarm', 'lowerarm', 'wrist', 'hand', 'handslot'],
+    layers: { aim: 'Spellcast_Raise', shoot: 'Spellcast_Shoot', hit: 'Hit_A' },
+    cycle: { walk: 1.07, run: 0.8, walkSpeed: 1.5, runSpeed: 4.6 },
+    weapons: { rifle: '2H_Staff' },
+    weaponHide: ['1H_Wand', '2H_Staff', 'Spellbook', 'Spellbook_open'],
+    // Der Stab liegt entlang +y, wird schräg nach vorn gekippt.
+    viewmodel: { rot: [-0.85, 0.35, 0.15], laenge: 0.8, pos: [0, -0.1, 0.04] },
+    // Der spitze Hut steckt in der Bounding-Box: ohne Ausgleich schrumpft der Körper.
+    scaleBias: 1.12,
+    tintMaterials: [],
+  },
+
   // Quaternius "Ultimate Modular Men" (CC0): menschliche Proportionen, eigene
   // Clips für Waffe halten, zielen, schießen, Treffer, Tod. Ohne Waffen-Meshes,
   // die Waffe kommt aus gear.js und hängt am Handgelenk.
@@ -112,42 +194,6 @@ export const CHARACTER_MODELS = {
                  'RocketLauncher', 'ShortCannon', 'Shotgun', 'Shovel', 'SMG', 'Sniper', 'Sniper_2'],
     tintMaterials: ['Character_Main'],        // nur die Kleidung bekommt die Klassenfarbe
   },
-  toon_enemy: {
-    url: 'assets/characters/toon_enemy.glb',
-    yaw: 0,
-    bones: {
-      hips: 'Hips', spine: 'Abdomen', chest: 'Torso', head: 'Head',
-      rightArm: 'UpperArm.R', rightForeArm: 'LowerArm.R', rightHand: 'Index1.R',
-      leftArm: 'UpperArm.L', leftForeArm: 'LowerArm.L', leftHand: 'Index1.L',
-    },
-    clips: {
-      idle: 'Idle', walk: 'Walk', run: 'Run',
-      aimIdle: 'Idle_Shoot', aimWalk: 'Walk_Shoot', aimRun: 'Run_Shoot',
-      death: 'Death', hit: 'HitReact',
-    },
-    weapons: { shotgun: 'Shotgun', smg: 'SMG', rifle: 'Sniper_2' },
-    weaponHide: ['AK', 'GrenadeLauncher', 'Knife_1', 'Knife_2', 'Pistol', 'Revolver', 'Revolver_Small',
-                 'RocketLauncher', 'ShortCannon', 'Shotgun', 'Shovel', 'SMG', 'Sniper', 'Sniper_2'],
-    tintMaterials: ['Enemy_Red'],
-  },
-  toon_hazmat: {
-    url: 'assets/characters/toon_hazmat.glb',
-    yaw: 0,
-    bones: {
-      hips: 'Hips', spine: 'Abdomen', chest: 'Torso', head: 'Head',
-      rightArm: 'UpperArm.R', rightForeArm: 'LowerArm.R', rightHand: 'Index1.R',
-      leftArm: 'UpperArm.L', leftForeArm: 'LowerArm.L', leftHand: 'Index1.L',
-    },
-    clips: {
-      idle: 'Idle', walk: 'Walk', run: 'Run',
-      aimIdle: 'Idle_Shoot', aimWalk: 'Walk_Shoot', aimRun: 'Run_Shoot',
-      death: 'Death', hit: 'HitReact',
-    },
-    weapons: { shotgun: 'Shotgun', smg: 'SMG', rifle: 'Sniper_2' },
-    weaponHide: ['AK', 'GrenadeLauncher', 'Knife_1', 'Knife_2', 'Pistol', 'Revolver', 'Revolver_Small',
-                 'RocketLauncher', 'ShortCannon', 'Shotgun', 'Shovel', 'SMG', 'Sniper', 'Sniper_2'],
-    tintMaterials: ['Hazmat_Main'],
-  },
 };
 
 const cache = new Map();
@@ -239,7 +285,10 @@ export function instantiate(id, { height, tint, weapon } = {}) {
   const { def } = entry;
 
   const root = skinClone(entry.scene);
-  if (height) root.scale.setScalar(height / entry.height);
+  // Der Maßstab kommt aus der Gesamthöhe des Modells. Ein spitzer Hut oder ein
+  // erhobener Stab stecken mit drin und würden den Körper schrumpfen lassen –
+  // `scaleBias` gleicht das aus.
+  if (height) root.scale.setScalar((height / entry.height) * (def.scaleBias || 1));
 
   // Materialien pro Figur klonen: Einfärbung und Treffer-Blitz dürfen nicht
   // auf alle Instanzen durchschlagen.
@@ -254,7 +303,9 @@ export function instantiate(id, { height, tint, weapon } = {}) {
       if (REAL) realisticMaterial(c);   // Figuren ohne Weltraum-Projektion, die würde beim Animieren wandern
       if (tint && (!def.tintMaterials || def.tintMaterials.includes(m.name))) {
         // Modelle mit Textur werden überblendet, flache Toon-Modelle bekommen die Farbe direkt
-        if (c.map) c.color.lerp(new THREE.Color(tint), 0.8); else c.color.set(tint);
+        // Mit Textur wird nur hineingemischt, sonst überdeckt die Klassenfarbe die
+      // Zeichnung. Wie stark, sagt `tintMix`.
+      if (c.map) c.color.lerp(new THREE.Color(tint), def.tintMix ?? 0.8); else c.color.set(tint);
       }
       materials.push(c); return c;
     });

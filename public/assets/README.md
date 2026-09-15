@@ -1,10 +1,32 @@
 # Assets
 
-Alle Figuren stammen von Quaternius (quaternius.com), Lizenz **CC0 1.0**
-(gemeinfrei, auch kommerziell, keine Namensnennung nötig). Die glTF-Exporte der
-Pakete wurden nach GLB gepackt, Inhalt unverändert.
+Alle Modelle sind **CC0 1.0** (gemeinfrei, auch kommerziell, keine Namensnennung
+nötig). Zwei Quellen: Kay Lousberg (kaylousberg.com) für die Fantasy-Figuren,
+Quaternius (quaternius.com) für Arena-Props und die früheren Figuren.
 
-## characters/men_*.glb — „Ultimate Modular Men" (im Spiel aktiv)
+## characters/kay_*.glb — „KayKit Character Pack: Adventurers" (im Spiel aktiv)
+
+Comic-Fantasy, eine Farbatlas-Textur je Figur (1024×1024), ein Material, rund
+5700 Dreiecke. Rig mit 41 Knochen: `hips`, `spine`, `chest`, `head`,
+`upperarm.l/r`, `lowerarm.l/r`, `wrist.l/r`, `hand.l/r`, `handslot.l/r`.
+An `handslot.r` hängen die Waffen als eigene Meshes – deshalb `weapons` im
+Manifest statt einer prozeduralen Waffe aus `gear.js`.
+
+| Datei | Quelle | Klasse | Waffe |
+|---|---|---|---|
+| `kay_ork.glb`     | Barbarian, grün eingefärbt | Grollzahn    | `2H_Axe` |
+| `kay_schurke.glb` | Rogue                      | Nachtschatten| `2H_Crossbow` |
+| `kay_magier.glb`  | Mage                       | Runenweber   | `2H_Staff` |
+
+Die Pakete bringen 76 Clips mit (kämpfen, sitzen, liegen, jubeln). Im Spiel sind
+14 übrig; der Rest ist mit `tools/glb-schlanken.mjs` entfernt – das spart je
+Figur rund 2,7 MB, und zwar nicht nur an Kurvendaten, sondern vor allem an
+Buchhaltung im JSON-Teil der Datei.
+Quelle: https://kaylousberg.itch.io/kaykit-adventurers
+Ebenfalls CC0 und passend: „Character Pack: Skeletons" (vier Skelette, gleiches
+Rig) – https://kaylousberg.itch.io/kaykit-skeletons
+
+## characters/men_*.glb — „Ultimate Modular Men" (Alternative, nicht aktiv)
 
 Menschliche Proportionen, 62 Knochen, keine eigenen Waffen (die kommen aus
 `gear.js` und hängen an `Wrist.R`). Clips: `Idle`, `Idle_Gun`,
@@ -13,20 +35,20 @@ Menschliche Proportionen, 62 Knochen, keine eigenen Waffen (die kommen aus
 
 | Datei | Figur | Klasse |
 |---|---|---|
-| `men_spacesuit.glb` | Spacesuit | Rammbock |
-| `men_punk.glb`      | Punk      | Flitzer |
-| `men_swat.glb`      | Swat      | Adlerauge |
+| `men_spacesuit.glb` | Spacesuit | – |
+| `men_punk.glb`      | Punk      | – |
+| `men_swat.glb`      | Swat      | – |
 
 Weitere Figuren im selben Paket (gleicher Rig, gleiche Clips): Adventurer,
 Beach, Casual_2, Casual_Hoodie, Farmer, King, Suit, Worker.
 Quelle: https://quaternius.com/packs/ultimatemodularcharacters.html
 
-## characters/toon_*.glb — „Toon Shooter Game Kit" (Alternative, nicht aktiv)
+## characters/toon_soldier.glb — „Toon Shooter Game Kit" (Alternative, nicht aktiv)
 
 Comic-Proportionen mit großem Kopf. 43 Knochen, 14 Waffen-Meshes am Knochen
 `Index1.R`, Clips `Idle`, `Walk`, `Run`, `Idle_Shoot`, `Walk_Shoot`, `Run_Shoot`,
-`Death`, `HitReact`. Bleibt als zweiter Stil im Manifest; umschalten über
-`model:` in `classes.js`. Das Paket enthält außerdem Arena-Props (Container,
+`Death`, `HitReact`. Bleibt als Beispiel dafür im Manifest, wie mitgelieferte
+Waffen über `weapons`/`weaponHide` angesprochen werden. Das Paket enthält außerdem Arena-Props (Container,
 Sandsäcke, Kisten, Fässer, Zäune, Bäume) – noch nicht eingebunden.
 Quelle: https://quaternius.com/packs/toonshootergamekit.html
 
@@ -41,6 +63,25 @@ Quelle: https://quaternius.com/packs/toonshootergamekit.html
 
 ## Eigene Figuren einhängen
 
+Zwei Werkzeuge nehmen das Raten heraus:
+
+```
+node tools/glb-info.mjs <datei.glb>
+```
+Zeigt Knochen, Clips samt Dauer, Materialien (inklusive der Regel, die im Stil
+`?stil=real` greifen wird), Maße und den Speicherbedarf – und druckt am Ende
+eine Vorlage für den Manifest-Eintrag. Ohne das schreibt man den Eintrag blind:
+ein falscher Knochenname gibt nur eine Warnung in der Konsole, ein falscher
+Clip-Name gar nichts.
+
+```
+node tools/glb-schlanken.mjs --liste=kay quelle.glb ziel.glb
+```
+Wirft alle Clips außer den gebrauchten weg und packt die Datei neu. Fertige
+Pakete bringen oft 70 bis 90 Animationen mit; das Spiel benutzt vierzehn.
+
+Dann:
+
 1. GLB nach `public/assets/characters/<name>.glb` legen.
 2. In `src/assets.js` unter `CHARACTER_MODELS` eintragen:
    - `bones`: Hüfte, Wirbelsäule, Brust, Kopf, Ober-/Unterarme, Hände.
@@ -52,7 +93,16 @@ Quelle: https://quaternius.com/packs/toonshootergamekit.html
      `gear.js` eine prozedurale Waffe und hängt sie mit `grip` an `rightHand`.
    - `tintMaterials`: welche Materialien die Klassenfarbe bekommen.
    - `yaw`: Drehung, falls das Modell nicht nach +z schaut (Mixamo: `Math.PI`).
+     Verlässlich prüfen lässt sich das am Umhang: der hängt hinten.
    - `grip`: Versatz, Drehung, Größe der prozeduralen Waffe am Handknochen.
+   - `viewmodel`: Lage der mitgelieferten Waffe im Ego-Bild. `laenge` gibt die
+     gewünschte Länge in Metern an, statt eines Faktors – wie groß eine Waffe
+     im Modell gebaut ist, ist von Paket zu Paket verschieden.
+   - `scaleBias`: Ausgleich, wenn Hut, Helm oder erhobener Stab in der
+     Bounding-Box stecken. Der Maßstab kommt aus der Gesamthöhe, sonst
+     schrumpft der Körper.
+   - `tintMix`: wie stark die Klassenfarbe in eine texturierte Figur mischt
+     (Standard 0.8). Bei Atlas-Texturen sind 0.4 bis 0.5 genug.
 3. In `src/classes.js` bei der Klasse `model: '<name>'` setzen.
 
 Modelle ohne Anschlag-Clips (z. B. Mixamo-Export mit nur Idle/Walk/Run)

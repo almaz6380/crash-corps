@@ -1,6 +1,19 @@
 # Crash Corps
 
-Class-based Cartoon-Arena-Shooter im Browser. Vite + Three.js, kein Framework.
+Class-based Cartoon-Arena-Shooter im Browser, im Fantasy-Gewand. Vite + Three.js,
+kein Framework.
+
+Drei Klassen treten in derselben Arena gegeneinander an:
+
+| Klasse | Rolle | Waffe | Spezial |
+|---|---|---|---|
+| **Grollzahn** | 160 HP, langsam | Spalterklinge (Streitaxt) | Sturmangriff |
+| **Nachtschatten** | 90 HP, sehr schnell | Bolzenwerfer (Armbrust) | Schattenschritt |
+| **Runenweber** | 110 HP, präzise | Runenstab | Zauberblick |
+
+Die Figuren stammen aus dem KayKit Character Pack von Kay Lousberg (CC0); ihre
+Waffen hängen als eigene Meshes am Handknochen. Wie man weitere Figuren einhängt,
+steht in [public/assets/README.md](public/assets/README.md).
 
 ## Starten
 
