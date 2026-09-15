@@ -84,7 +84,9 @@ export class Hud {
     for (const c of Object.values(CLASSES)) {
       const el = document.createElement('button');
       el.className = 'cls'; el.style.setProperty('--c', '#' + c.color.toString(16).padStart(6, '0'));
-      el.innerHTML = `<b>${c.name}</b><span>${c.tagline}</span><small>${c.hp} HP · Tempo ${c.speed}</small>`;
+      el.dataset.klasse = c.id;
+      el.innerHTML = `<figure class="figur"></figure>`
+        + `<b>${c.name}</b><span>${c.tagline}</span><small>${c.hp} HP · Tempo ${c.speed}</small>`;
       el.onclick = () => this.onPick?.(c.id);
       list.append(el);
     }
@@ -287,6 +289,21 @@ export class Hud {
     el.hidden = text == null;
     if (text != null) el.textContent = text;
   }
+  /**
+   * Bilder der Figuren in die Klassenkarten hängen. Kommen erst, wenn die
+   * Modelle geladen sind – bis dahin bleibt der Platz leer statt zu springen.
+   * @param {Record<string,string>} bilder Klassen-Id → Data-URL
+   */
+  klassenBilder(bilder) {
+    for (const el of this.root.querySelectorAll('#classes .cls')) {
+      const url = bilder[el.dataset.klasse];
+      if (!url) continue;
+      const f = el.querySelector('.figur');
+      f.style.backgroundImage = `url(${url})`;
+      f.classList.add('da');
+    }
+  }
+
   showMenu(on) { this.root.querySelector('#menu').hidden = !on; this.root.querySelector('#play').hidden = on; }
   hint(on) { this.root.querySelector('#hint').hidden = !on; }
   kill(text) {

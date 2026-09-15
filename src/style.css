@@ -15,6 +15,11 @@ body.gedreht #buehne { transform-origin: 0 0; transform: rotate(90deg) translate
 #classes { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
 .cls { --c: var(--red); width: 200px; padding: 18px 16px; border: 4px solid var(--ink); border-radius: 18px; background: var(--paper); cursor: pointer; text-align: left; display: grid; gap: 6px; box-shadow: 6px 6px 0 var(--ink); transition: transform .08s; }
 .cls:hover, .cls:focus-visible { transform: translate(-3px,-3px); box-shadow: 9px 9px 0 var(--ink); outline: none; }
+/* Platz für das Figurenbild. Steht von Anfang an da, damit die Karte nicht
+   springt, wenn die Bilder nach dem Laden nachgereicht werden. */
+.figur { margin: 0; height: 132px; background: radial-gradient(ellipse at 50% 88%, rgba(43,33,24,.18), transparent 62%);
+  background-size: contain; background-repeat: no-repeat; background-position: center bottom; }
+.figur.da { background-size: auto 100%, contain; }
 .cls b { font-size: 24px; color: var(--c); }
 .cls span { font-size: 14px; }
 .cls small { font-size: 12px; opacity: .65; }
@@ -85,7 +90,14 @@ body.klein #hp { width: 180px; height: 24px; }
 body.klein #ammo { font-size: 26px; }
 body.klein #bottom { left: 12px; right: 12px; bottom: 12px; }
 body.klein #menu h1 { font-size: clamp(32px, 7vw, 56px); }
-body.klein .cls { width: 160px; padding: 12px; }
+/* Im Querformat eines Handys ist die Höhe knapp: die Figur steht neben dem Text,
+   nicht darüber. Sonst wächst die Karte über den Bildschirm hinaus. */
+body.klein .cls { width: 214px; padding: 10px 12px; grid-template-columns: 58px 1fr;
+  grid-template-areas: "figur name" "figur spruch" "figur werte"; align-items: center; column-gap: 10px; }
+body.klein .figur { height: 100%; min-height: 62px; grid-area: figur; }
+body.klein .cls b { grid-area: name; font-size: 19px; }
+body.klein .cls span { grid-area: spruch; }
+body.klein .cls small { grid-area: werte; }
 
 /* Auf Touch-Geräten liegen HP und Munition zwischen Stick und Schaltflächen,
    sonst verdecken die Daumen sie. */
