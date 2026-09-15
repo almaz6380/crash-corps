@@ -17,6 +17,8 @@
  *   node tools/glb-schlanken.mjs --liste=men quelle.glb ziel.glb
  *   node tools/glb-schlanken.mjs --liste=men --quantisieren quelle.glb ziel.glb
  *   node tools/glb-schlanken.mjs --liste=kay --textur=512 quelle.glb ziel.glb
+ *   node tools/glb-schlanken.mjs --dreiecke=7000 --textur=512 quelle.glb ziel.glb Idle Walk Run
+ *   node tools/glb-schlanken.mjs --dreiecke=7000 --fehler=0.05 quelle.glb ziel.glb Idle Walk Run
  *
  * Mit `--liste` greifen die unten hinterlegten Zusammenstellungen; sie müssen zu
  * dem passen, was der Eintrag in `src/assets.js` unter `clips` und `layers`
@@ -28,7 +30,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { NodeIO } from '@gltf-transform/core';
 import { ALL_EXTENSIONS } from '@gltf-transform/extensions';
-import { prune, dedup, weld, quantize, textureCompress } from '@gltf-transform/functions';
+import { prune, dedup, weld, quantize, textureCompress, simplify } from '@gltf-transform/functions';
 
 /** Feste Zusammenstellungen je Figurenfamilie. Namen wie in der Quelldatei. */
 export const LISTEN = {
@@ -47,7 +49,20 @@ export const LISTEN = {
 
 const mb = (n) => `${(n / 1048576).toFixed(2)} MB`;
 
-async function schlanken(quelle, ziel, behalten, { quantisieren = false, textur = 0 } = {}) {
+/** Dreiecke aller Meshes zusammenzählen. */
+function dreiecke(wurzel) {
+  let n = 0;
+  for (const m of wurzel.listMeshes()) {
+    for (const p of m.listPrimitives()) {
+      const idx = p.getIndices();
+      n += (idx ? idx.getCount() : p.getAttribute('POSITION')?.getCount() || 0) / 3;
+    }
+  }
+  return Math.round(n);
+}
+
+async function schlanken(quelle, ziel, behalten,
+  { quantisieren = false, textur = 0, ziel_dreiecke = 0, fehler = 0.02 } = {}) {
   // Ohne die Erweiterungen schreibt der Ausgang stillschweigend eine kaputte
   // Datei: die Daten wären quantisiert, die Kennzeichnung dafür fehlte.
   const io = new NodeIO().registerExtensions(ALL_EXTENSIONS);
@@ -55,6 +70,7 @@ async function schlanken(quelle, ziel, behalten, { quantisieren = false, textur 
   const wurzel = doc.getRoot();
 
   const vorher = fs.statSync(quelle).size;
+  const dreieckeVorher = dreiecke(wurzel);
   const alle = wurzel.listAnimations();
   const soll = new Set(behalten);
   const da = new Set(alle.map((a) => a.getName()));
@@ -76,6 +92,28 @@ async function schlanken(quelle, ziel, behalten, { quantisieren = false, textur 
     dedup(),                                        // gleiche Meshes und Accessoren zusammenlegen
     prune({ keepAttributes: false, keepLeaves: true }),   // Knochen bleiben, auch ungenutzte
   ];
+  // Dreiecke reduzieren. Figuren aus Bild-zu-3D-Diensten kommen mit Hunderttausenden
+  // bis Millionen; die Arena zeichnet jedes Bild zweimal (Normalen-Pass, dann Farbe),
+  // jedes Dreieck zählt also doppelt. `weld()` muss davor laufen – auf doppelten
+  // Ecken zerreißt das Vereinfachen die Oberfläche.
+  //
+  // Die Hautgewichte überleben, aber ab etwa 90 % Reduktion franst die Verformung
+  // an Schultern und Fingern aus. Für dieses Spiel sind 6000 bis 8000 gut.
+  if (ziel_dreiecke && dreieckeVorher > ziel_dreiecke) {
+    const { MeshoptSimplifier } = await import('meshoptimizer');
+    await MeshoptSimplifier.ready;
+    schritte.push(weld());
+    schritte.push(simplify({
+      simplifier: MeshoptSimplifier,
+      ratio: ziel_dreiecke / dreieckeVorher,
+      // Erlaubte Abweichung als Anteil der Modellgröße. Der Vereinfacher hört
+      // vorher auf, wenn er das Ziel nicht ohne größeren Fehler erreicht – bei
+      // einem sauberen Low-Poly-Modell ist das richtig so. Ein KI-Mesh mit
+      // Millionen Dreiecken braucht dagegen Spielraum, sonst bleibt es dick.
+      error: fehler,
+      lockBorder: true,      // Ränder festhalten, sonst franst die Silhouette aus
+    }));
+  }
   // Texturen verkleinern. Figuren aus KI-Diensten kommen gern mit 2K oder 4K;
   // im Spiel steht eine Figur selten größer als eine Handbreit auf dem Schirm,
   // und das Offline-Paket zählt jedes Kilobyte.
@@ -100,10 +138,18 @@ async function schlanken(quelle, ziel, behalten, { quantisieren = false, textur 
     const b = t.getSize();
     return b ? `${b[0]}×${b[1]}` : '?';
   });
+  const dreieckeNachher = dreiecke(wurzel);
   console.log(`${path.basename(quelle).padEnd(24)} ${mb(vorher).padStart(8)} → ${mb(nachher).padStart(8)}`
     + `   ${(100 - (nachher / vorher) * 100).toFixed(0)} % kleiner`
     + `   Clips ${alle.length} → ${alle.length - weg}`
+    + `   Dreiecke ${dreieckeVorher}${dreieckeNachher !== dreieckeVorher ? ` → ${dreieckeNachher}` : ''}`
     + (bilder.length ? `   Texturen ${bilder.join(', ')}` : ''));
+  // Nicht stillschweigend zu dick bleiben: der Vereinfacher hört bei der
+  // erlaubten Abweichung auf, nicht beim Wunschwert.
+  if (ziel_dreiecke && dreieckeNachher > ziel_dreiecke * 1.15) {
+    console.log(`  \x1b[33mZiel ${ziel_dreiecke} nicht erreicht – die erlaubte Abweichung (--fehler=${fehler}) bremst.`
+      + ` Höher setzen, etwa --fehler=0.05.\x1b[0m`);
+  }
   if (fehlend.length) {
     console.log(`  \x1b[33mNicht gefunden: ${fehlend.join(', ')}\x1b[0m`);
     console.log(`  \x1b[33mVorhanden wäre: ${[...da].slice(0, 12).join(', ')} …\x1b[0m`);
@@ -118,7 +164,7 @@ const [quelle, ziel, ...clips] = rein;
 const behalten = liste ? LISTEN[liste] : clips;
 
 if (!quelle || !ziel || !behalten?.length) {
-  console.error('Aufruf: node tools/glb-schlanken.mjs [--liste=…] [--textur=512] [--quantisieren] <quelle.glb> <ziel.glb> [Clip …]');
+  console.error('Aufruf: node tools/glb-schlanken.mjs [--liste=…] [--dreiecke=7000] [--fehler=0.02] [--textur=512] [--quantisieren] <quelle.glb> <ziel.glb> [Clip …]');
   console.error(`Listen: ${Object.keys(LISTEN).join(', ')}`);
   process.exit(1);
 }
@@ -127,5 +173,7 @@ if (liste && !LISTEN[liste]) { console.error(`Unbekannte Liste: ${liste}`); proc
 const { fehlend } = await schlanken(quelle, ziel, behalten, {
   quantisieren: args.includes('--quantisieren'),
   textur: +(args.find((a) => a.startsWith('--textur='))?.split('=')[1] || 0),
+  ziel_dreiecke: +(args.find((a) => a.startsWith('--dreiecke='))?.split('=')[1] || 0),
+  fehler: +(args.find((a) => a.startsWith('--fehler='))?.split('=')[1] || 0.02),
 });
 process.exit(fehlend.length ? 2 : 0);
