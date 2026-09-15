@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { cloneWeaponMesh } from './assets.js';
+import { cloneWeaponMesh, CHARACTER_MODELS } from './assets.js';
 
 /**
  * Waffen und Ausrüstung. Die Figuren kommen als Modelle aus public/assets/,
@@ -84,12 +84,29 @@ export function buildViewmodel(cls) {
     o.castShadow = false;
   });
   if (builtin) {
-    // Toon-Kit-Waffen liegen auf der Seite: Lauf entlang -x, Oberseite +z.
-    // Erst aufrichten (z → y), dann den Lauf von der Kamera weg drehen (-x → -z).
-    const roll = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), -Math.PI / 2);
-    const yaw = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), -Math.PI / 2);
-    w.quaternion.multiplyQuaternions(yaw, roll);
-    w.scale.multiplyScalar(0.42);
+    // Wie die Waffe im Modell liegt, ist von Paket zu Paket verschieden. Steht
+    // im Manifest nichts, gilt die Lage des Toon-Kits: Lauf entlang -x,
+    // Oberseite +z – erst aufrichten (z → y), dann den Lauf von der Kamera
+    // weg drehen (-x → -z).
+    const vm = CHARACTER_MODELS[cls.model]?.viewmodel;
+    if (vm) {
+      w.rotation.fromArray(vm.rot || [0, 0, 0]);
+      // Größe über die gewünschte Länge statt über einen Faktor: wie groß eine
+      // Waffe im Modell gebaut ist, ist von Paket zu Paket verschieden, die
+      // Länge im Ego-Bild ist dagegen immer dieselbe Handbreit.
+      if (vm.laenge) {
+        const d = new THREE.Box3().setFromObject(w).getSize(new THREE.Vector3());
+        w.scale.multiplyScalar(vm.laenge / (Math.max(d.x, d.y, d.z) || 1));
+      } else {
+        w.scale.multiplyScalar(vm.scale ?? 0.42);
+      }
+      if (vm.pos) w.position.fromArray(vm.pos);
+    } else {
+      const roll = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), -Math.PI / 2);
+      const yaw = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), -Math.PI / 2);
+      w.quaternion.multiplyQuaternions(yaw, roll);
+      w.scale.multiplyScalar(0.42);
+    }
   } else {
     w.rotation.y = Math.PI;
     w.scale.setScalar(0.24);

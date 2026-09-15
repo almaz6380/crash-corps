@@ -7,29 +7,18 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
+import { runtimeAssets } from './assets-liste.mjs';
 
 const DIST = 'dist';
 const out = process.argv[2] || 'dist/crash-corps-einzeldatei.html';
 
-// Welche Assets werden zur Laufzeit wirklich geholt?
-const classes = fs.readFileSync('src/classes.js', 'utf8');
-const models = [...classes.matchAll(/model:\s*'([^']+)'/g)].map((m) => m[1]);
-const world = fs.readFileSync('src/world.js', 'utf8');
-const props = [...world.matchAll(/'([A-Za-z0-9_]+)'/g)]
-  .map((m) => m[1])
-  .filter((n) => fs.existsSync(`public/assets/props/${n}.glb`));
-const texSets = fs.readdirSync('public/assets/textures').filter((d) =>
-  fs.statSync(`public/assets/textures/${d}`).isDirectory());
-
+// Welche Assets werden zur Laufzeit wirklich geholt? Dieselbe Auswahl wie für
+// die Vorlade-Liste des Service Workers – die Regel steht nur an einer Stelle,
+// sonst wandert eine Änderung in die eine Datei und nicht in die andere.
 const embed = {};
-const add = (rel) => {
-  const file = path.join('public', rel);
-  if (!fs.existsSync(file)) return;
-  embed[rel] = fs.readFileSync(file).toString('base64');
-};
-for (const m of new Set(models)) add(`assets/characters/${m}.glb`);
-for (const p of new Set(props)) add(`assets/props/${p}.glb`);
-for (const t of texSets) for (const f of ['diff', 'nor', 'rough']) add(`assets/textures/${t}/${f}.jpg`);
+for (const rel of runtimeAssets()) {
+  embed[rel] = fs.readFileSync(path.join('public', rel)).toString('base64');
+}
 
 // Gebautes HTML zerlegen und Skript/Stil einbetten
 const html = fs.readFileSync(path.join(DIST, 'index.html'), 'utf8');
