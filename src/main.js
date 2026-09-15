@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { CLASSES } from './classes.js';
+import { klassenBilder } from './vorschau.js';
 import { buildWorld, WORLD_PROPS } from './world.js';
 import { Player } from './player.js';
 import { Bot } from './bots.js';
@@ -299,7 +300,13 @@ Promise.all([
   preloadProps(WORLD_PROPS, (p) => hud.loading(`Arena … ${Math.round(p * 100)}%`)),
   REAL ? preloadTextures((p) => hud.loading(`Oberflächen … ${Math.round(p * 100)}%`)) : null,
 ])
-  .then(() => { world = buildWorld(scene, renderer); hud.loading(null); hud.showMenu(true); })
+  .then(() => {
+    world = buildWorld(scene, renderer);
+    // Bilder der Figuren für die Klassenwahl. Aus der Ich-Perspektive sieht man
+    // die eigene Figur nie – ohne diese Vorschau wählt man blind.
+    hud.klassenBilder(klassenBilder(Object.values(CLASSES)));
+    hud.loading(null); hud.showMenu(true);
+  })
   .catch((err) => {
     console.error(err);
     hud.loading('Assets konnten nicht geladen werden. Liegen die Modelle in public/assets/?');

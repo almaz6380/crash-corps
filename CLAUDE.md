@@ -43,6 +43,9 @@ src/
   surface.js   Oberflächen für den realistischen Stil: PBR-Texturen, bei Props ohne UVs
                über Weltraum-Projektion (triplanar)
   animation.js Skelett-Clips (Stehen/Gehen/Rennen, Anschlag-Varianten, Tod) + Knochen-Overlays als Ersatz
+  vorschau.js  Standbilder der Figuren für die Klassenwahl. Einmal beim Laden in
+               einen eigenen kleinen Renderer, der danach weggeworfen wird –
+               aus der Ich-Perspektive sieht man die eigene Figur sonst nie
   hud.js       DOM-HUD (HP, Munition, Fadenkreuz, Killfeed, Score, Klassenwahl)
   style.css
 tools/
@@ -82,6 +85,9 @@ tools/
   Kontrollpunkte gehört zur Karte und kommt aus `world.js` (`world.punkte`).
 - Die Toon-Kit-Figuren sind CC0 und dürfen bleiben. Eigene Modelle: siehe public/assets/README.md.
 - Performance-Ziel: 60 fps auf Mittelklasse-Laptop, spielbar auf Handy. Auf Touch-Geräten greift automatisch die niedrigere Leistungsstufe aus `device.js`.
+- Die Klassenkarten zeigen ein Bild der Figur, erzeugt von `vorschau.js`. Auf
+  kleinen Bildschirmen steht es neben dem Text statt darüber (`body.klein`),
+  sonst wächst das Menü über den Bildschirm hinaus.
 - Das Bild ist immer quer. Hält jemand das Handy hochkant (Drehsperre), dreht
   `buehneAnpassen()` in `device.js` die Bühne `#buehne` (Canvas, HUD, Touch-Schicht)
   per CSS um 90°. Deshalb nie `innerWidth`/`innerHeight` oder `clientX`/`clientY`
