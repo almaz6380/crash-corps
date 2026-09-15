@@ -16,6 +16,7 @@
  *   node tools/glb-schlanken.mjs quelle.glb ziel.glb Idle Walking_A Running_A …
  *   node tools/glb-schlanken.mjs --liste=men quelle.glb ziel.glb
  *   node tools/glb-schlanken.mjs --liste=men --quantisieren quelle.glb ziel.glb
+ *   node tools/glb-schlanken.mjs --liste=kay --textur=512 quelle.glb ziel.glb
  *
  * Mit `--liste` greifen die unten hinterlegten Zusammenstellungen; sie müssen zu
  * dem passen, was der Eintrag in `src/assets.js` unter `clips` und `layers`
@@ -27,7 +28,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { NodeIO } from '@gltf-transform/core';
 import { ALL_EXTENSIONS } from '@gltf-transform/extensions';
-import { prune, dedup, weld, quantize } from '@gltf-transform/functions';
+import { prune, dedup, weld, quantize, textureCompress } from '@gltf-transform/functions';
 
 /** Feste Zusammenstellungen je Figurenfamilie. Namen wie in der Quelldatei. */
 export const LISTEN = {
@@ -46,7 +47,7 @@ export const LISTEN = {
 
 const mb = (n) => `${(n / 1048576).toFixed(2)} MB`;
 
-async function schlanken(quelle, ziel, behalten, { quantisieren = false } = {}) {
+async function schlanken(quelle, ziel, behalten, { quantisieren = false, textur = 0 } = {}) {
   // Ohne die Erweiterungen schreibt der Ausgang stillschweigend eine kaputte
   // Datei: die Daten wären quantisiert, die Kennzeichnung dafür fehlte.
   const io = new NodeIO().registerExtensions(ALL_EXTENSIONS);
@@ -75,6 +76,13 @@ async function schlanken(quelle, ziel, behalten, { quantisieren = false } = {}) 
     dedup(),                                        // gleiche Meshes und Accessoren zusammenlegen
     prune({ keepAttributes: false, keepLeaves: true }),   // Knochen bleiben, auch ungenutzte
   ];
+  // Texturen verkleinern. Figuren aus KI-Diensten kommen gern mit 2K oder 4K;
+  // im Spiel steht eine Figur selten größer als eine Handbreit auf dem Schirm,
+  // und das Offline-Paket zählt jedes Kilobyte.
+  if (textur) {
+    const sharp = (await import('sharp')).default;
+    schritte.push(textureCompress({ encoder: sharp, resize: [textur, textur], resizeFilter: 'lanczos3' }));
+  }
   // Optional: Ecken zusammenfassen und Zahlen kleiner speichern. Three liest
   // KHR_mesh_quantization von sich aus, am Loader in assets.js ändert sich
   // nichts. Trotzdem nicht der Standard – es verändert die Geometrie.
@@ -88,9 +96,14 @@ async function schlanken(quelle, ziel, behalten, { quantisieren = false } = {}) 
   await io.write(ziel, doc);
   const nachher = fs.statSync(ziel).size;
 
+  const bilder = wurzel.listTextures().map((t) => {
+    const b = t.getSize();
+    return b ? `${b[0]}×${b[1]}` : '?';
+  });
   console.log(`${path.basename(quelle).padEnd(24)} ${mb(vorher).padStart(8)} → ${mb(nachher).padStart(8)}`
     + `   ${(100 - (nachher / vorher) * 100).toFixed(0)} % kleiner`
-    + `   Clips ${alle.length} → ${alle.length - weg}`);
+    + `   Clips ${alle.length} → ${alle.length - weg}`
+    + (bilder.length ? `   Texturen ${bilder.join(', ')}` : ''));
   if (fehlend.length) {
     console.log(`  \x1b[33mNicht gefunden: ${fehlend.join(', ')}\x1b[0m`);
     console.log(`  \x1b[33mVorhanden wäre: ${[...da].slice(0, 12).join(', ')} …\x1b[0m`);
@@ -105,12 +118,14 @@ const [quelle, ziel, ...clips] = rein;
 const behalten = liste ? LISTEN[liste] : clips;
 
 if (!quelle || !ziel || !behalten?.length) {
-  console.error('Aufruf: node tools/glb-schlanken.mjs [--liste=men|kay] <quelle.glb> <ziel.glb> [Clip …]');
+  console.error('Aufruf: node tools/glb-schlanken.mjs [--liste=…] [--textur=512] [--quantisieren] <quelle.glb> <ziel.glb> [Clip …]');
   console.error(`Listen: ${Object.keys(LISTEN).join(', ')}`);
   process.exit(1);
 }
 if (liste && !LISTEN[liste]) { console.error(`Unbekannte Liste: ${liste}`); process.exit(1); }
 
-const { fehlend } = await schlanken(quelle, ziel, behalten,
-  { quantisieren: args.includes('--quantisieren') });
+const { fehlend } = await schlanken(quelle, ziel, behalten, {
+  quantisieren: args.includes('--quantisieren'),
+  textur: +(args.find((a) => a.startsWith('--textur='))?.split('=')[1] || 0),
+});
 process.exit(fehlend.length ? 2 : 0);
