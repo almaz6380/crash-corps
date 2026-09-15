@@ -100,9 +100,19 @@ Clip-Name gar nichts.
 
 ```
 node tools/glb-schlanken.mjs --liste=kay quelle.glb ziel.glb
+node tools/glb-schlanken.mjs --dreiecke=7000 --textur=512 quelle.glb ziel.glb Idle Walk Run
 ```
 Wirft alle Clips außer den gebrauchten weg und packt die Datei neu. Fertige
 Pakete bringen oft 70 bis 90 Animationen mit; das Spiel benutzt vierzehn.
+
+Für Figuren aus Bild-zu-3D-Diensten (Meshy, Tripo, Hunyuan3D) zusätzlich:
+`--dreiecke=<n>` reduziert die Geometrie, `--textur=<px>` die Bildgröße. Solche
+Figuren kommen mit Hunderttausenden bis Millionen Dreiecken und 2K- oder
+4K-Texturen; die Arena zeichnet jedes Bild zweimal, jedes Dreieck zählt also
+doppelt. Zielwert 6000 bis 8000 Dreiecke. Erreicht der Vereinfacher das Ziel
+nicht, bremst die erlaubte Abweichung – dann `--fehler=0.05` setzen. Die
+Hautgewichte überleben; ab etwa 90 Prozent Reduktion franst die Verformung an
+Schultern und Fingern aus.
 
 Dann:
 

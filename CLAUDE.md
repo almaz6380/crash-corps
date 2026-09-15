@@ -51,7 +51,8 @@ src/
 tools/
   glb-info.mjs      Liest den JSON-Teil einer GLB: Knochen, Clips, Materialien,
                     Maße – und druckt eine Vorlage für den Manifest-Eintrag
-  glb-schlanken.mjs Wirft alle Clips außer einer Liste weg und packt neu
+  glb-schlanken.mjs Wirft alle Clips außer einer Liste weg und packt neu; dazu
+                    --dreiecke und --textur für Figuren aus Bild-zu-3D-Diensten
   assets-liste.mjs  Welche Assets das Spiel zur Laufzeit wirklich holt
   sw-liste.mjs      Trägt Liste und Version in den Service Worker ein
   einzeldatei.mjs   Packt den Build in eine einzelne HTML-Datei
