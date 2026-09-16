@@ -1,10 +1,10 @@
 # Assets
 
 Alle Modelle sind **CC0 1.0** (gemeinfrei, auch kommerziell, keine Namensnennung
-nötig). Zwei Quellen: Kay Lousberg (kaylousberg.com) für Schurke und Magier,
-Quaternius (quaternius.com) für den Ork, die Arena-Props und die früheren Figuren.
+nötig). Zwei Quellen: Kay Lousberg (kaylousberg.com) für alle drei Spielfiguren,
+Quaternius (quaternius.com) für die Arena-Props und die Figuren auf der Reserve.
 
-## characters/qua_ork.glb — „Ultimate Monsters" (im Spiel aktiv)
+## characters/qua_ork.glb — „Ultimate Monsters" (Alternative, nicht aktiv)
 
 Ein richtiger Ork: grün, Hauer, Irokese, Stachelkeule. Ein Material `Atlas`,
 7344 Dreiecke, 43 Knochen nach Quaternius-Schema – aber **ohne `Wrist`**, die
@@ -23,6 +23,10 @@ Zwei Eigenheiten gegenüber den KayKit-Figuren:
 
 Von 14 Clips sind 6 übrig (`tools/glb-schlanken.mjs --liste=monster`): aus
 1,22 MB werden 0,42 MB.
+
+Warum er wieder auf der Reserve sitzt: neben den KayKit-Figuren fiel er ab –
+anderer Zeichner, andere Handschrift, in derselben Arena sieht man das. Wer ihn
+zurückholen will, setzt in `classes.js` bei `brawler` wieder `model: 'qua_ork'`.
 Quelle: https://quaternius.com/packs/ultimatemonsters.html — dort auch Goblin,
 Dämon, Yeti, Ninja und rund 45 weitere, alle mit demselben Rig.
 
@@ -36,11 +40,13 @@ Manifest statt einer prozeduralen Waffe aus `gear.js`.
 
 | Datei | Quelle | Klasse | Waffe |
 |---|---|---|---|
-| `kay_schurke.glb` | Rogue | Nachtschatten | `2H_Crossbow` |
-| `kay_magier.glb`  | Mage  | Runenweber    | `2H_Staff` |
+| `kay_barbar.glb`  | Barbarian | Grimmbart | `2H_Axe` |
+| `kay_schurke.glb` | Rogue     | Nachtschatten | `2H_Crossbow` |
+| `kay_magier.glb`  | Mage      | Runenweber    | `2H_Staff` |
 
-Der Barbar aus demselben Paket wäre ein guter vierter Anwärter; sein Eintrag
-`kay_ork` steht noch im Manifest, die Datei liegt aber nicht mehr hier.
+Der Barbar trägt vier Waffen und einen Schild am Gürtel; `weaponHide` blendet
+alles außer der Streitaxt aus. Eingefärbt wird er nicht (`tintMaterials: []`) –
+die Textur bringt ihre Farbe mit.
 
 Die Pakete bringen 76 Clips mit (kämpfen, sitzen, liegen, jubeln). Im Spiel sind
 14 übrig; der Rest ist mit `tools/glb-schlanken.mjs` entfernt – das spart je

@@ -1,10 +1,10 @@
 # Crash Corps (Arbeitstitel)
 
-Class-based Cartoon-Arena-Shooter im Browser, seit dem Figurentausch im Fantasy-Gewand: Ork, Schurke, Magier statt Soldaten, Axt, Armbrust und Zauberstab statt Gewehren. Inspiriert von Team-Fortress-artigen Mobile-Shootern (bunt, überzeichnet, Klassen, Domination), aber eigene Marke: eigene Namen, eigene Figuren, eigene Assets. **Kein Nachbau eines bestehenden Spiels** – Namen, Charakterdesigns und Assets fremder Spiele werden nicht übernommen; das gilt für Fantasy-Vorbilder genauso wie für Shooter.
+Class-based Cartoon-Arena-Shooter im Browser, seit dem Figurentausch im Fantasy-Gewand: Barbar, Schurke, Magier statt Soldaten, Axt, Armbrust und Zauberstab statt Gewehren. Inspiriert von Team-Fortress-artigen Mobile-Shootern (bunt, überzeichnet, Klassen, Domination), aber eigene Marke: eigene Namen, eigene Figuren, eigene Assets. **Kein Nachbau eines bestehenden Spiels** – Namen, Charakterdesigns und Assets fremder Spiele werden nicht übernommen; das gilt für Fantasy-Vorbilder genauso wie für Shooter.
 
 ## Stack
 - Vite + Three.js (ES-Module, kein Framework)
-- Figuren als glTF-Modelle aus `public/assets/characters/` (KayKit Character Pack von Kay Lousberg und Ultimate Monsters von Quaternius, beide CC0), geladen über `assets.js`. Ihre Waffen liegen als Meshes an `handslot.r` im Modell und werden über `weapons`/`weaponHide` ein- und ausgeblendet; Modelle ohne eigene Waffen bekommen eine prozedurale aus `gear.js` am Handknochen. Arena aus Toon-Kit-Props (`public/assets/props/`), Effekte per Code.
+- Figuren als glTF-Modelle aus `public/assets/characters/` (im Spiel alle drei aus dem KayKit Character Pack von Kay Lousberg, CC0; Quaternius-Modelle liegen als Alternativen daneben), geladen über `assets.js`. Ihre Waffen liegen als Meshes an `handslot.r` im Modell und werden über `weapons`/`weaponHide` ein- und ausgeblendet; Modelle ohne eigene Waffen bekommen eine prozedurale aus `gear.js` am Handknochen. Arena aus Toon-Kit-Props (`public/assets/props/`), Effekte per Code.
 - Look: zwei Stile in `render.js`, umschaltbar über `?stil=real`. Standard ist Cel-Shading mit
   Lichtstufen-Rampe und Outline; `real` nutzt physikalische Materialien, Himmelslicht und
   Umgebungsverdeckung. ACES-Tone-Mapping passiert im Composite-Shader, nicht im Renderer –
