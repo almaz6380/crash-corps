@@ -3,6 +3,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { clone as skinClone } from 'three/addons/utils/SkeletonUtils.js';
 import { REAL } from './style.js';
 import { realisticMaterial, SURFACE_FOR_PROP } from './surface.js';
+import { figurMaterial } from './figurlook.js';
 import { embeddedBytes } from './embed.js';
 
 /**
@@ -341,6 +342,9 @@ export function instantiate(id, { height, tint, weapon } = {}) {
     const cloned = mats.map(m => {
       const c = m.clone();
       if (REAL) realisticMaterial(c);   // Figuren ohne Weltraum-Projektion, die würde beim Animieren wandern
+      // Saum und Bodenverdunkelung: gibt der Figur Form und trennt sie vom
+      // Hintergrund. Ohne das steht sie flach in einer Helligkeitsstufe.
+      figurMaterial(c, entry.height);
       if (tint && (!def.tintMaterials || def.tintMaterials.includes(m.name))) {
         // Modelle mit Textur werden überblendet, flache Toon-Modelle bekommen die Farbe direkt
         // Mit Textur wird nur hineingemischt, sonst überdeckt die Klassenfarbe die
