@@ -43,6 +43,9 @@ src/
   surface.js   Oberflächen für den realistischen Stil: PBR-Texturen, bei Props ohne UVs
                über Weltraum-Projektion (triplanar)
   animation.js Skelett-Clips (Stehen/Gehen/Rennen, Anschlag-Varianten, Tod) + Knochen-Overlays als Ersatz
+  figurlook.js Beleuchtung der Figuren: weniger Fülllicht, schmaler Saum,
+               Bodenverdunkelung. Greift nur in Figurenmaterialien, nicht in die
+               Arena – dort ist das Licht eingestellt und soll so bleiben
   vorschau.js  Standbilder der Figuren für die Klassenwahl. Einmal beim Laden in
                einen eigenen kleinen Renderer, der danach weggeworfen wird –
                aus der Ich-Perspektive sieht man die eigene Figur sonst nie
@@ -88,6 +91,13 @@ tools/
   Kontrollpunkte gehört zur Karte und kommt aus `world.js` (`world.punkte`).
 - Die Toon-Kit-Figuren sind CC0 und dürfen bleiben. Eigene Modelle: siehe public/assets/README.md.
 - Performance-Ziel: 60 fps auf Mittelklasse-Laptop, spielbar auf Handy. Auf Touch-Geräten greift automatisch die niedrigere Leistungsstufe aus `device.js`.
+- Figuren behalten ihr physikalisches Material aus dem Loader, während Props und
+  Welt auf Toon-Material umgestellt werden. Damit hängen sie allein am Licht der
+  Arena, und das ist für Figuren zu flach. `figurlook.js` zieht deshalb je Figur
+  den indirekten Lichtanteil herunter (`fuellAnteil`), legt einen schmalen Saum
+  auf die Silhouette und dunkelt zum Boden hin ab. Regler stehen in `LOOK`.
+  Den Saum sparsam dosieren: zu viel, und die Figur bekommt einen milchigen
+  Schleier und verliert ihre Farbe.
 - Die Klassenkarten zeigen ein Bild der Figur, erzeugt von `vorschau.js`. Auf
   kleinen Bildschirmen steht es neben dem Text statt darüber (`body.klein`),
   sonst wächst das Menü über den Bildschirm hinaus.
