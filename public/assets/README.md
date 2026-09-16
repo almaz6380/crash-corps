@@ -85,6 +85,41 @@ Jedes solide Prop bekommt einen unsichtbaren Kollisionsquader aus seiner
 Bounding-Box; Bewegung und Sichtlinien laufen dagegen, das Modell ist Optik.
 Quelle: https://quaternius.com/packs/toonshootergamekit.html
 
+## Eigene Figur bauen, ohne zu bezahlen
+
+Die KI-3D-Dienste lassen einen kostenlos erzeugen, aber nicht kostenlos
+herunterladen – das ist ihr Geschäftsmodell. Zwei Werkzeuge kommen ohne diese
+Schranke aus, und zusammen ergeben sie eine vollständige Kette:
+
+| Werkzeug | Rolle | Lizenz |
+|---|---|---|
+| TRELLIS (Microsoft) | Bild zu 3D | MIT, kommerziell erlaubt |
+| Mixamo (Adobe) | Skelett und Animationen | frei, keine Namensnennung nötig |
+
+Die beiden sprechen verschiedene Formate, dafür gibt es zwei Umrechner:
+
+```
+node tools/glb-nach-obj.mjs figur.glb ordner/
+```
+Schreibt OBJ, MTL und Textur und packt sie als ZIP – so nimmt Mixamo die Figur
+entgegen, glTF versteht es nicht. Die Geometrie wird dabei in Weltkoordinaten
+ausgerechnet, weil der Rigger mit lokalen Systemen durcheinanderkommt.
+
+```
+node tools/fbx-nach-glb.mjs ziel.glb koerper.fbx=Idle laufen.fbx=Walk rennen.fbx=Run
+```
+Holt die Mixamo-Dateien zurück und führt sie zu einer GLB zusammen. Die erste
+Datei muss den Körper enthalten („With Skin"), die weiteren dürfen ohne sein.
+Zwei Dinge erledigt das Skript dabei stillschweigend, die sonst still
+schiefgehen: **Mixamo nennt jede Animation „mixamo.com"** – ohne Umbenennen
+hießen alle Clips gleich und das Spiel fände immer denselben. Und **die Kanäle
+zeigen auf die Knochen ihrer eigenen Datei** – sie werden über den Namen auf das
+Skelett der ersten umgehängt, die Zweitskelette fliegen raus. Ohne das hätte die
+Figur nach drei Animationen 129 Knochen statt 43.
+
+Beide Werkzeuge nehmen auch GLB als Eingabe, damit sich die Kette ohne
+Mixamo-Dateien prüfen lässt.
+
 ## Eigene Figuren einhängen
 
 Zwei Werkzeuge nehmen das Raten heraus:
@@ -105,7 +140,7 @@ node tools/glb-schlanken.mjs --dreiecke=7000 --textur=512 quelle.glb ziel.glb Id
 Wirft alle Clips außer den gebrauchten weg und packt die Datei neu. Fertige
 Pakete bringen oft 70 bis 90 Animationen mit; das Spiel benutzt vierzehn.
 
-Für Figuren aus Bild-zu-3D-Diensten (Meshy, Tripo, Hunyuan3D) zusätzlich:
+Für Figuren aus Bild-zu-3D-Diensten (TRELLIS, Meshy, Tripo, Hunyuan3D) zusätzlich:
 `--dreiecke=<n>` reduziert die Geometrie, `--textur=<px>` die Bildgröße. Solche
 Figuren kommen mit Hunderttausenden bis Millionen Dreiecken und 2K- oder
 4K-Texturen; die Arena zeichnet jedes Bild zweimal, jedes Dreieck zählt also
