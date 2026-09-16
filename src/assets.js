@@ -14,8 +14,9 @@ import { embeddedBytes } from './embed.js';
  * bei der Klasse `model: '<id>'` setzen. Siehe public/assets/README.md.
  */
 export const CHARACTER_MODELS = {
-  // Quaternius „Ultimate Monsters" (CC0): ein richtiger Ork statt eines grün
-  // eingefärbten Barbaren. Gleiches Knochenschema wie die men_*, aber ohne
+  // Quaternius „Ultimate Monsters" (CC0): ein echter Ork. Liegt als Alternative
+  // bereit, im Spiel steckt derzeit der Barbar – zwei Zeichner in einer Arena
+  // sah man der Figur an. Gleiches Knochenschema wie die men_*, aber ohne
   // `Wrist` – die Hand ist `Index1.R`, wie beim Toon-Kit. Keine Seitwärts- und
   // keine Zielclips: `Weapon` liegt als Hieb über dem Oberkörper, wenn er feuert.
   qua_ork: {
@@ -44,8 +45,8 @@ export const CHARACTER_MODELS = {
   // rund 5700 Dreiecke. Waffen liegen als eigene Meshes an `handslot.r` bereit –
   // Axt, Armbrust, Zauberstab –, deshalb `weapons` statt prozeduraler Waffe.
   // Aus den mitgelieferten 76 Clips sind 14 übrig, siehe tools/glb-schlanken.mjs.
-  kay_ork: {
-    url: 'assets/characters/kay_ork.glb',
+  kay_barbar: {
+    url: 'assets/characters/kay_barbar.glb',
     yaw: 0,
     scaleBias: 1.0,
     bones: {
@@ -67,10 +68,7 @@ export const CHARACTER_MODELS = {
     weaponHide: ['1H_Axe', '1H_Axe_Offhand', '2H_Axe', 'Barbarian_Round_Shield', 'Mug'],
     // Die Axt liegt im Modell mit dem Stiel entlang +y; -x kippt ihn nach vorn.
     viewmodel: { rot: [-1.05, 0.45, 0.3], laenge: 0.66, pos: [0, -0.04, 0.04] },
-    // Grün einfärben macht aus dem Barbaren einen Ork. Schwach genug, dass die
-    // Zeichnung der Textur nicht zugekleistert wird.
-    tintMaterials: ['barbarian_texture'],
-    tintMix: 0.42,
+    tintMaterials: [],                              // die Figur bringt ihre Farbe mit
   },
 
   kay_schurke: {

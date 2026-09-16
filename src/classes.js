@@ -2,10 +2,10 @@
 // `model` verweist auf einen Eintrag in assets.js (Datei in public/assets/).
 export const CLASSES = {
   brawler: {
-    id: 'brawler', name: 'Grollzahn', tagline: 'Viel Panzer, kurze Lunte.',
-    hp: 160, speed: 5.2, color: 0x6fae3e, accent: 0xffd166,
+    id: 'brawler', name: 'Grimmbart', tagline: 'Viel Panzer, kurze Lunte.',
+    hp: 160, speed: 5.2, color: 0xb65a2a, accent: 0xffd166,
     weapon: 'shotgun', special: 'charge', body: { width: 1.3, height: 2.0, head: 0.5 },
-    model: 'qua_ork',
+    model: 'kay_barbar',
   },
   scout: {
     id: 'scout', name: 'Nachtschatten', tagline: 'Schnell rein, schneller raus.',
