@@ -53,6 +53,8 @@ tools/
                     Maße – und druckt eine Vorlage für den Manifest-Eintrag
   glb-schlanken.mjs Wirft alle Clips außer einer Liste weg und packt neu; dazu
                     --dreiecke und --textur für Figuren aus Bild-zu-3D-Diensten
+  glb-nach-obj.mjs  GLB nach OBJ+MTL+Textur als ZIP – so nimmt Mixamo eine Figur an
+  fbx-nach-glb.mjs  Mixamo-FBX zurück nach GLB und alle Clips in eine Datei
   assets-liste.mjs  Welche Assets das Spiel zur Laufzeit wirklich holt
   sw-liste.mjs      Trägt Liste und Version in den Service Worker ein
   einzeldatei.mjs   Packt den Build in eine einzelne HTML-Datei
