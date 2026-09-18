@@ -14,6 +14,80 @@ import { embeddedBytes } from './embed.js';
  * bei der Klasse `model: '<id>'` setzen. Siehe public/assets/README.md.
  */
 export const CHARACTER_MODELS = {
+  // Aus drei Quaternius-Paketen (alle CC0) zusammengesetzt, siehe
+  // tools/figur-bauen.mjs: Kopf und Körper aus „Universal Base Characters",
+  // Kleidung aus „Modular Character Outfits – Fantasy", Bewegungen aus der
+  // „Universal Animation Library". Ein Skelett mit 65 Knochen, das alle drei
+  // teilen – deshalb lassen sie sich überhaupt mischen.
+  //
+  // Die drei Einträge unterscheiden sich nur in Datei, Einfärbung und den
+  // Kampf-Clips: der Barbar schlägt zu (Sword_Attack), der Waldläufer legt an
+  // (Pistol_*), der Magier wirkt einen Zauber (Spell_Simple_*). Waffen bringen
+  // die Modelle keine mit, die kommen prozedural aus gear.js an `hand_r`.
+  qua_barbar: {
+    url: 'assets/characters/qua_barbar.glb',
+    yaw: 0,
+    bones: {
+      hips: 'pelvis', spine: 'spine_01', chest: 'spine_03', head: 'Head',
+      rightArm: 'upperarm_r', rightForeArm: 'lowerarm_r', rightHand: 'hand_r',
+      leftArm: 'upperarm_l', leftForeArm: 'lowerarm_l', leftHand: 'hand_l',
+    },
+    clips: { idle: 'Idle', walk: 'Walk', run: 'Run', death: 'Death', roll: 'Roll' },
+    // Der Vergleich in `buildLayerClips` schneidet am Punkt ab und prüft dann
+    // mit startsWith – hier stehen also die Stämme, `spine` trifft spine_01..03.
+    upperBones: ['spine', 'neck', 'Head', 'clavicle', 'upperarm', 'lowerarm',
+                 'hand', 'index', 'middle', 'pinky', 'ring', 'thumb'],
+    layers: { aim: 'Aim', shoot: 'Shoot', hit: 'Hit' },
+    cycle: { walk: 1.33, run: 0.93, walkSpeed: 1.5, runSpeed: 4.2 },
+    waffenform: 'axt',
+    grip: { pos: [0, 0.06, 0.02], rot: [-1.5708, 0, 0], scale: 0.9 },
+    // Prozedurale Waffen zeigen entlang +z; im Ego-Bild hängt die Waffe vor der
+    // Kamera, die nach -z blickt – deshalb ist die Grunddrehung rund um π.
+    viewmodel: { form: 'axt', laenge: 0.72, rot: [0.12, 2.75, 0.2], pos: [0, -0.04, 0.05] },
+    tintMaterials: ['MI_Peasant'],      // Hose und Stiefel, nicht die nackte Haut
+    tintMix: 0.5,
+  },
+
+  qua_schurke: {
+    url: 'assets/characters/qua_schurke.glb',
+    yaw: 0,
+    bones: {
+      hips: 'pelvis', spine: 'spine_01', chest: 'spine_03', head: 'Head',
+      rightArm: 'upperarm_r', rightForeArm: 'lowerarm_r', rightHand: 'hand_r',
+      leftArm: 'upperarm_l', leftForeArm: 'lowerarm_l', leftHand: 'hand_l',
+    },
+    clips: { idle: 'Idle', walk: 'Walk', run: 'Run', death: 'Death', roll: 'Roll' },
+    upperBones: ['spine', 'neck', 'Head', 'clavicle', 'upperarm', 'lowerarm',
+                 'hand', 'index', 'middle', 'pinky', 'ring', 'thumb'],
+    layers: { aim: 'Aim', shoot: 'Shoot', hit: 'Hit' },
+    cycle: { walk: 1.33, run: 0.93, walkSpeed: 1.5, runSpeed: 4.2 },
+    waffenform: 'armbrust',
+    grip: { pos: [0, 0.06, 0.02], rot: [-1.5708, 0, 0], scale: 0.9 },
+    viewmodel: { form: 'armbrust', laenge: 0.62, rot: [0.06, Math.PI, 0.03], pos: [0, 0.0, 0.04] },
+    tintMaterials: ['MI_Ranger'],
+    tintMix: 0.45,
+  },
+
+  qua_magier: {
+    url: 'assets/characters/qua_magier.glb',
+    yaw: 0,
+    bones: {
+      hips: 'pelvis', spine: 'spine_01', chest: 'spine_03', head: 'Head',
+      rightArm: 'upperarm_r', rightForeArm: 'lowerarm_r', rightHand: 'hand_r',
+      leftArm: 'upperarm_l', leftForeArm: 'lowerarm_l', leftHand: 'hand_l',
+    },
+    clips: { idle: 'Idle', walk: 'Walk', run: 'Run', death: 'Death', roll: 'Roll' },
+    upperBones: ['spine', 'neck', 'Head', 'clavicle', 'upperarm', 'lowerarm',
+                 'hand', 'index', 'middle', 'pinky', 'ring', 'thumb'],
+    layers: { aim: 'Aim', shoot: 'Shoot', hit: 'Hit' },
+    cycle: { walk: 1.33, run: 0.93, walkSpeed: 1.5, runSpeed: 4.2 },
+    waffenform: 'stab',
+    grip: { pos: [0, 0.06, 0.02], rot: [-1.5708, 0, 0], scale: 0.9 },
+    viewmodel: { form: 'stab', laenge: 0.8, rot: [0.1, 2.9, 0.08], pos: [0, -0.03, 0.05] },
+    tintMaterials: ['MI_Peasant', 'MI_Ranger'],   // Kittel und Kapuze
+    tintMix: 0.5,
+  },
+
   // Quaternius „Ultimate Monsters" (CC0): ein echter Ork. Liegt als Alternative
   // bereit, im Spiel steckt derzeit der Barbar – zwei Zeichner in einer Arena
   // sah man der Figur an. Gleiches Knochenschema wie die men_*, aber ohne

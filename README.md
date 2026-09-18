@@ -11,9 +11,10 @@ Drei Klassen treten in derselben Arena gegeneinander an:
 | **Nachtschatten** | 90 HP, sehr schnell | Bolzenwerfer (Armbrust) | Schattenschritt |
 | **Runenweber** | 110 HP, präzise | Runenstab | Zauberblick |
 
-Alle drei Figuren stammen aus dem KayKit Character Pack von Kay Lousberg (CC0);
-ihre Waffen hängen als eigene Meshes am Handknochen. Wie man weitere Figuren einhängt,
-steht in [public/assets/README.md](public/assets/README.md).
+Die drei Figuren sind aus drei CC0-Paketen von Quaternius zusammengesetzt –
+Körper und Kopf, Kleidung, Bewegungen – mit `tools/figur-bauen.mjs`. Ihre Waffen
+baut `gear.js` prozedural. Wie man weitere Figuren einhängt, steht in
+[public/assets/README.md](public/assets/README.md).
 
 ## Starten
 

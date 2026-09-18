@@ -1,8 +1,43 @@
 # Assets
 
 Alle Modelle sind **CC0 1.0** (gemeinfrei, auch kommerziell, keine Namensnennung
-nötig). Zwei Quellen: Kay Lousberg (kaylousberg.com) für alle drei Spielfiguren,
-Quaternius (quaternius.com) für die Arena-Props und die Figuren auf der Reserve.
+nötig). Zwei Quellen: Quaternius (quaternius.com) für die drei Spielfiguren, das
+Dorf und die Arena-Props, Kay Lousberg (kaylousberg.com) für die Figuren auf der
+Reserve.
+
+## characters/qua_barbar|schurke|magier.glb — selbst zusammengesetzt (im Spiel aktiv)
+
+Diese drei Figuren liegen in keinem Paket fertig herum; sie werden aus drei
+gebaut, mit `tools/figur-bauen.mjs`:
+
+| Paket | liefert |
+|---|---|
+| Universal Base Characters | Körper, Kopf, Gesicht, Haare, Bart |
+| Modular Character Outfits – Fantasy | Kleidung: Bauer und Waldläufer |
+| Universal Animation Library | 43 Bewegungen, davon 9 im Spiel |
+
+Alle drei teilen dasselbe Skelett mit 65 Knochen (`root`, `pelvis`, `spine_01`
+… `hand_r`), deshalb lassen sie sich überhaupt mischen. Das Werkzeug nimmt die
+Animationsbibliothek als Gerüst, wirft ihre Anzeigepuppe weg und hängt die Haut
+der Einzelteile auf deren Knochen um.
+
+**Der Haken, den man kennen muss:** Die Outfits sind für die Proportion
+„Regular" geschnitten, kostenlos ist aber nur „Superhero". Der nackte Körper
+schaut sonst durch die Kleidung. `--behalten=` schneidet ihn deshalb über die
+Hautgewichte zurecht – beim Waldläufer und Magier auf den Kopf, beim Barbaren
+auf Kopf und Oberkörper, denn der geht mit nacktem Oberkörper in den Kampf.
+
+Was kostenlos **nicht** dabei ist: Ritter, Magier-Robe, Adliger und die großen
+Monster (Oger, Werwolf, Dämon). Die stecken in den kostenpflichtigen
+„Source"-Fassungen, 20 $ je Paket auf itch.io.
+
+Waffen bringen die Figuren keine mit. Axt, Armbrust und Zauberstab baut
+`gear.js` prozedural; welche Form eine Figur trägt, sagt `waffenform` im
+Manifest, die Lage an der Hand `grip`.
+
+Größen je Figur: rund 9000 Dreiecke, eine 512er-Farbtextur je Material,
+0,98 bis 1,24 MB. Ohne `--nur-farbe` (Normalen- und Rauheitskarten) und ohne
+`resample` (Schlüsselbilder) wären es 2,9 MB.
 
 ## characters/qua_ork.glb — „Ultimate Monsters" (Alternative, nicht aktiv)
 

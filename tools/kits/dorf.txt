@@ -1,0 +1,41 @@
+# Auswahl aus dem Medieval Village MegaKit (Quaternius, CC0).
+# Raster: Wände 2 m breit, 3,12 m hoch; Böden 2×2 m; Treppen 2 m breit, 1,2 m hoch.
+
+# Wände
+Wall_Plaster_Straight
+Wall_Plaster_Window_Wide_Round
+Wall_Plaster_Door_Round
+Wall_Plaster_WoodGrid
+Wall_UnevenBrick_Straight
+Wall_UnevenBrick_Window_Wide_Round
+Wall_UnevenBrick_Door_Round
+Wall_Arch
+Corner_Exterior_Brick
+Corner_Exterior_Wood
+
+# Böden und Decken
+Floor_WoodDark
+Floor_Brick
+Floor_UnevenBrick
+
+# Dächer
+Roof_RoundTiles_6x8
+Roof_RoundTiles_4x6
+Roof_Tower_RoundTiles
+
+# Treppen und Balkone – die zweite Ebene
+Stairs_Exterior_Straight
+Stairs_Exterior_Platform
+Balcony_Simple_Straight
+Balcony_Simple_Corner
+
+# Ausstattung
+Prop_Wagon
+Prop_Crate
+Prop_Chimney
+Prop_WoodenFence_Single
+Prop_WoodenFence_Extension1
+Prop_MetalFence_Simple
+Prop_Vine1
+Prop_Brick1
+Prop_Support
