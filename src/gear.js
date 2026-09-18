@@ -57,6 +57,30 @@ export function buildWeapon(kind, accent, form = kind) {
     const bart = add(roundedBox(0.03, 0.22, 0.17, 0.03), eisen, 0, -0.17, 0.45);
     bart.rotation.y = 0.1;
     add(tube(0.03, 0.1), eisen, 0, 0.26, 0.56, Math.PI / 2);                // Dorn
+  } else if (form === 'armbrust') {
+    // Schaft entlang +z, Bogen quer vorn. Die Sehne ist ein flaches Dreieck –
+    // eine echte Linie würde im Cel-Stil ohne Umriss verschwinden.
+    const holz = toon(0x7a4f2a), eisen = toon(0x8a939f);
+    add(roundedBox(0.07, 0.08, 0.52, 0.025), holz, 0, 0, 0.1);              // Schaft
+    add(roundedBox(0.06, 0.13, 0.08, 0.02), holz, 0, -0.08, -0.08);         // Griff
+    const bogenL = add(roundedBox(0.26, 0.045, 0.05, 0.02), eisen, -0.15, 0.03, 0.3);
+    const bogenR = add(roundedBox(0.26, 0.045, 0.05, 0.02), eisen, 0.15, 0.03, 0.3);
+    bogenL.rotation.z = 0.22; bogenR.rotation.z = -0.22;
+    add(roundedBox(0.58, 0.012, 0.012, 0.004), acc, 0, 0.03, 0.14);         // Sehne
+    add(roundedBox(0.05, 0.05, 0.16, 0.02), acc, 0, 0.06, 0.24);            // Nuss
+    add(tube(0.012, 0.34), toon(0x5c4632), 0, 0.07, 0.3, Math.PI / 2);      // Bolzen
+  } else if (form === 'stab') {
+    // Langer Schaft, Kristall vorn. Der Kristall ist selbstleuchtend, damit er
+    // im Schatten der Arena nicht abstirbt – Zauber sollen glühen.
+    const holz = toon(0x6a4a2e);
+    const kristall = new THREE.MeshToonMaterial({ color: accent, emissive: accent, emissiveIntensity: 0.6 });
+    add(tube(0.03, 0.92), holz, 0, 0, 0.22, Math.PI / 2);                   // Schaft
+    add(roundedBox(0.07, 0.07, 0.1, 0.025), acc, 0, 0, -0.16);              // Knauf
+    add(roundedBox(0.075, 0.075, 0.1, 0.03), acc, 0, 0, 0.5);               // Fassung
+    const stein = add(new THREE.OctahedronGeometry(0.1), kristall, 0, 0.02, 0.62);
+    stein.rotation.set(0.3, 0.4, 0);
+    const ring = add(new THREE.TorusGeometry(0.14, 0.014, 6, 12), acc, 0, 0.02, 0.6);
+    ring.rotation.y = Math.PI / 2;
   } else if (kind === 'shotgun') {
     add(roundedBox(0.12, 0.14, 0.58, 0.04), dark, 0, 0, 0.14);
     add(tube(0.042, 0.5), metal, 0, 0.05, 0.4, Math.PI / 2);
@@ -78,7 +102,7 @@ export function buildWeapon(kind, accent, form = kind) {
   }
   // Mündungspunkt für Effekte
   const muzzle = new THREE.Object3D();
-  const z = { axt: 0.56, rifle: 0.9, smg: 0.48 }[form] ?? 0.66;
+  const z = { axt: 0.56, armbrust: 0.52, stab: 0.72, rifle: 0.9, smg: 0.48 }[form] ?? 0.66;
   muzzle.position.set(0, form === 'rifle' ? 0.02 : 0.05, z);
   g.add(muzzle); g.userData.muzzle = muzzle;
   return g;
@@ -95,8 +119,9 @@ export function buildViewmodel(cls) {
   // Nennt das Manifest eine Form, wird immer prozedural gebaut. Nötig, wenn die
   // Waffe im Modell an die Knochen gewichtet ist statt angehängt: ein Klon davon
   // behält das Skelett der Vorlage, das nie mitläuft, und stünde in der Bindepose.
-  const builtin = vm?.form ? null : cloneWeaponMesh(cls.model, cls.weapon);
-  const w = builtin || buildWeapon(cls.weapon, cls.accent, vm?.form || cls.weapon);
+  const form = vm?.form || CHARACTER_MODELS[cls.model]?.waffenform;
+  const builtin = form ? null : cloneWeaponMesh(cls.model, cls.weapon);
+  const w = builtin || buildWeapon(cls.weapon, cls.accent, form || cls.weapon);
   // Im Ego-Bild darf die Waffe nicht in der dunkelsten Toon-Stufe verschwinden
   w.traverse(o => {
     if (!o.isMesh) return;

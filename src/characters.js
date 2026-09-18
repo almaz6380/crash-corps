@@ -25,7 +25,9 @@ export function buildCharacter(cls) {
   if (inst.builtinWeapon) {
     weapon = inst.builtinWeapon;
   } else {
-    weapon = buildWeapon(cls.weapon, cls.accent);
+    // `waffenform` trennt Spielwert und Aussehen: die Klasse rechnet mit den
+    // Werten einer Schrotflinte und trägt trotzdem eine Axt.
+    weapon = buildWeapon(cls.weapon, cls.accent, def.waffenform || cls.weapon);
     holder = new THREE.Object3D();
     if (inst.hand && def.grip) {
       g.updateWorldMatrix(true, true);

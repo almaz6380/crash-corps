@@ -4,7 +4,7 @@ Class-based Cartoon-Arena-Shooter im Browser, seit dem Figurentausch im Fantasy-
 
 ## Stack
 - Vite + Three.js (ES-Module, kein Framework)
-- Figuren als glTF-Modelle aus `public/assets/characters/` (im Spiel alle drei aus dem KayKit Character Pack von Kay Lousberg, CC0; Quaternius-Modelle liegen als Alternativen daneben), geladen über `assets.js`. Ihre Waffen liegen als Meshes an `handslot.r` im Modell und werden über `weapons`/`weaponHide` ein- und ausgeblendet; Modelle ohne eigene Waffen bekommen eine prozedurale aus `gear.js` am Handknochen. Arena aus Toon-Kit-Props (`public/assets/props/`), Effekte per Code.
+- Figuren als glTF-Modelle aus `public/assets/characters/`, geladen über `assets.js`. Die drei Spielfiguren sind aus drei CC0-Paketen von Quaternius selbst zusammengebaut (Körper, Kleidung, Bewegungen – `tools/figur-bauen.mjs`) und tragen prozedurale Waffen aus `gear.js` am Handknochen; welche Form, sagt `waffenform`. Die KayKit-Figuren liegen als Alternativen daneben: bei ihnen hängen die Waffen als Meshes an `handslot.r` und werden über `weapons`/`weaponHide` ein- und ausgeblendet. Arena aus Toon-Kit-Props (`public/assets/props/`), Effekte per Code.
 - Look: zwei Stile in `render.js`, umschaltbar über `?stil=real`. Standard ist Cel-Shading mit
   Lichtstufen-Rampe und Outline; `real` nutzt physikalische Materialien, Himmelslicht und
   Umgebungsverdeckung. ACES-Tone-Mapping passiert im Composite-Shader, nicht im Renderer –
@@ -52,6 +52,11 @@ src/
   hud.js       DOM-HUD (HP, Munition, Fadenkreuz, Killfeed, Score, Klassenwahl)
   style.css
 tools/
+  figur-bauen.mjs   Baut eine Spielfigur aus Körper, Kleidung und einer
+                    Animationsbibliothek zusammen; schneidet den nackten Körper
+                    über die Hautgewichte zurecht
+  kit-packen.mjs    Packt einen modularen Bausatz (Wände, Dächer, Treppen) in
+                    eine GLB mit geteilten Texturen
   glb-info.mjs      Liest den JSON-Teil einer GLB: Knochen, Clips, Materialien,
                     Maße – und druckt eine Vorlage für den Manifest-Eintrag
   glb-schlanken.mjs Wirft alle Clips außer einer Liste weg und packt neu; dazu
