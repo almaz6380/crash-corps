@@ -8,19 +8,40 @@ import { spawnProp } from './assets.js';
 const RAMP = celRamp(4);
 const SIZE = 60;                 // Kantenlänge der Arena
 export const STEP_UP = 0.55;     // maximale Stufenhöhe, die Figuren erklimmen
-const PLATFORM_H = 2.3;          // Höhe der begehbaren Ebene (Containerdach)
+const PLATFORM_H = 2.4;          // Höhe der Galerien – zwei Treppenmodule à 1,2 m
+const ZELLE = 2;                 // Rastermaß des Bausatzes: Wände sind 2 m breit
+const WAND_H = 3.12;             // Höhe eines Wandstücks, also eines Stockwerks
 
 /** Baumaterial im jeweiligen Stil: Toon-Rampe oder physikalisch mit Struktur. */
 const build = (color, name, set = 'rust_coarse_01') => REAL
   ? realisticMaterial(new THREE.MeshStandardMaterial({ color, name }), { set, scale: 0.35 })
   : new THREE.MeshToonMaterial({ color, gradientMap: RAMP });
 
-/** Props, die die Arena braucht – main.js lädt sie vor dem Aufbau. */
+/**
+ * Props, die die Arena braucht – main.js lädt sie vor dem Aufbau.
+ *
+ * Alles mit `dorf:` davor kommt aus einem Bausatz: eine GLB, in der jedes Teil
+ * als benannter Knoten liegt (tools/kit-packen.mjs). Die Bäume stehen nur außen
+ * am Horizont und bleiben aus dem alten Toon-Kit.
+ */
 export const WORLD_PROPS = [
-  'Structure_2', 'Structure_4', 'Container_Long', 'Container_Small', 'Crate',
-  'SackTrench', 'SackTrench_Small', 'BrickWall_2', 'Barrier_Large', 'Barrier_Single',
-  'CardboardBoxes_2', 'Pallet', 'ExplodingBarrel', 'GasTank', 'Pipes', 'Debris_Tires',
-  'Debris_BrokenCar', 'Tank', 'TrafficCone', 'StreetLight', 'MetalFence', 'Tree_1', 'Tree_2',
+  // Wände: Putz für Wohnhäuser, Bruchstein für Mauern und Scheunen
+  'dorf:Wall_Plaster_Straight', 'dorf:Wall_Plaster_Window_Wide_Round',
+  'dorf:Wall_Plaster_Door_Round', 'dorf:Wall_Plaster_WoodGrid',
+  'dorf:Wall_UnevenBrick_Straight', 'dorf:Wall_UnevenBrick_Window_Wide_Round',
+  'dorf:Wall_UnevenBrick_Door_Round', 'dorf:Wall_Arch',
+  'dorf:Corner_Exterior_Brick', 'dorf:Corner_Exterior_Wood',
+  // Böden, Dächer, Aufstiege
+  'dorf:Floor_WoodDark', 'dorf:Floor_Brick', 'dorf:Floor_UnevenBrick',
+  'dorf:Roof_RoundTiles_6x8', 'dorf:Roof_RoundTiles_6x6', 'dorf:Roof_RoundTiles_6x4',
+  'dorf:Roof_RoundTiles_4x6', 'dorf:Roof_Tower_RoundTiles',
+  'dorf:Stairs_Exterior_Straight', 'dorf:Stairs_Exterior_Platform',
+  'dorf:Balcony_Simple_Straight', 'dorf:Balcony_Simple_Corner',
+  // Ausstattung
+  'dorf:Prop_Wagon', 'dorf:Prop_Crate', 'dorf:Prop_Chimney', 'dorf:Prop_Support',
+  'dorf:Prop_WoodenFence_Single', 'dorf:Prop_WoodenFence_Extension1',
+  'dorf:Prop_MetalFence_Simple', 'dorf:Prop_Vine1', 'dorf:Prop_Brick1',
+  'Tree_1', 'Tree_2',
 ];
 
 /** Bemalter Arenaboden: Asphalt in der Mitte, Schotterwege, Gras außen. */
@@ -53,39 +74,56 @@ function arenaFloorTexture() {
     }
   }
 
-  // Schotterwege zwischen den drei Punkten und in die Ecken
-  x.lineCap = 'round'; x.strokeStyle = concretePat || '#9c8b6d'; x.lineWidth = m(5.5);
+  // Erdwege zwischen den drei Punkten und zu den Toren
+  x.lineCap = 'round'; x.strokeStyle = asphaltPat || '#8a7454'; x.lineWidth = m(5.5);
   const path = (pts) => { x.beginPath(); x.moveTo(px(pts[0][0]), px(pts[0][1])); for (const p of pts.slice(1)) x.lineTo(px(p[0]), px(p[1])); x.stroke(); };
-  path([[-20, 20], [-8, 8], [8, -8], [20, -20]]);
-  path([[-24, -24], [-10, -6], [10, 6], [24, 24]]);
-  path([[0, -26], [0, -10]]); path([[0, 26], [0, 10]]);
-  x.globalAlpha = 0.5; x.strokeStyle = concretePat || '#8d7d61'; x.lineWidth = m(3.2);
-  path([[-20, 20], [-8, 8], [8, -8], [20, -20]]);
+  path([[-22, 18], [-10, 7], [10, -7], [22, -18]]);
+  path([[-24, -22], [-10, -6], [10, 6], [24, 22]]);
+  path([[0, -28], [0, -10]]); path([[0, 28], [0, 10]]);
+  x.globalAlpha = 0.45; x.strokeStyle = '#6f5c40'; x.lineWidth = m(3.0);
+  path([[-22, 18], [-10, 7], [10, -7], [22, -18]]);
   x.globalAlpha = 1;
 
-  // Asphaltplatte in der Mitte
-  x.fillStyle = asphaltPat || '#5f5f63';
-  x.beginPath(); x.roundRect(px(-11), px(-11), m(22), m(22), m(1.6)); x.fill();
-  x.strokeStyle = '#6b6b70'; x.lineWidth = m(0.5); x.stroke();
-  x.strokeStyle = '#c8b45e'; x.lineWidth = m(0.28);       // Markierung
-  x.setLineDash([m(1.4), m(1.1)]);
-  x.beginPath(); x.moveTo(px(-11), px(0)); x.lineTo(px(11), px(0)); x.stroke();
-  x.setLineDash([]);
-  x.strokeStyle = '#c8b45e'; x.lineWidth = m(0.22);
-  x.beginPath(); x.rect(px(-9.6), px(-9.6), m(19.2), m(19.2)); x.stroke();
+  // Marktplatz: Kopfsteinpflaster. Die Steine werden gemalt statt gekachelt –
+  // eine Textur in dieser Größe zu wiederholen sähe man der Fläche sofort an.
+  const pflaster = () => {
+    x.fillStyle = concretePat || '#8d8a84';
+    x.beginPath(); x.roundRect(px(-11), px(-11), m(22), m(22), m(1.4)); x.fill();
+    x.save();
+    x.beginPath(); x.roundRect(px(-11), px(-11), m(22), m(22), m(1.4)); x.clip();
+    // Fugen dunkel unterlegen, Steine darüber – andersherum (helle Fugen)
+    // sieht die Fläche aus wie gefliest, nicht wie gepflastert.
+    x.fillStyle = '#4a453d';
+    x.fillRect(px(-11), px(-11), m(22), m(22));
+    const stein = m(0.34);
+    const n = Math.ceil(m(22) / stein) + 1;
+    for (let zy = 0; zy < n; zy++) {
+      for (let zx = 0; zx < n; zx++) {
+        const ox = px(-11) + zx * stein + (zy % 2) * stein / 2;
+        const oy = px(-11) + zy * stein;
+        const grau = 104 + ((zx * 7 + zy * 13) % 6) * 8;
+        x.fillStyle = `rgb(${grau + 8},${grau + 2},${grau - 8})`;
+        x.beginPath();
+        x.roundRect(ox + m(0.03), oy + m(0.03), stein - m(0.06), stein - m(0.06), m(0.06));
+        x.fill();
+      }
+    }
+    x.restore();
+  };
+  pflaster();
 
-  // Beton unter den beiden Seitenplattformen
-  x.fillStyle = concretePat || '#6c6c70';
-  for (const [cx, cz] of [[20, -20], [-20, 20]]) {
-    x.beginPath(); x.roundRect(px(cx - 6), px(cz - 6), m(12), m(12), m(0.8)); x.fill();
+  // Getretene Erde unter den Galerien und vor den Toren
+  x.fillStyle = asphaltPat || '#7e6a4c';
+  for (const [cx, cz] of [[-20, 20], [20, -20], [0, 27], [0, -27]]) {
+    x.beginPath(); x.roundRect(px(cx - 6), px(cz - 5), m(12), m(10), m(1.2)); x.fill();
   }
 
-  // Öl- und Erdflecken
-  for (let i = 0; i < 40; i++) {
+  // Pfützen, Schlamm und Strohflecken
+  for (let i = 0; i < 46; i++) {
     const ax = Math.random() * S, ay = Math.random() * S, r = m(1 + Math.random() * 3.5);
     const g = x.createRadialGradient(ax, ay, 0, ax, ay, r);
-    const dark = Math.random() < 0.35;
-    g.addColorStop(0, dark ? 'rgba(35,30,28,0.55)' : 'rgba(150,116,72,0.5)');
+    const nass = Math.random() < 0.3;
+    g.addColorStop(0, nass ? 'rgba(52,48,40,0.5)' : 'rgba(150,126,78,0.45)');
     g.addColorStop(1, 'rgba(0,0,0,0)');
     x.fillStyle = g; x.beginPath(); x.arc(ax, ay, r, 0, 7); x.fill();
   }
@@ -158,46 +196,57 @@ export function buildWorld(scene, renderer) {
     return p;
   };
 
-  const metal = build(0x8b8f96, 'Metal');
-  const metalDark = build(0x6f747b, 'Metal2');
+  const holz = build(0x7a5a38, 'Wood', 'brown_planks_05');
+  const holzDunkel = build(0x5b4128, 'Wood2', 'brown_planks_05');
 
   /**
-   * Begehbare Platte. Der Kollisionsquader sitzt nur unter der Oberkante,
-   * darunter kann man durchlaufen – dadurch entsteht ein offenes Erdgeschoss.
+   * Begehbare Galerie. Der Kollisionsquader sitzt nur unter der Oberkante,
+   * darunter läuft man durch – so entsteht ein offener Gang unter dem Steg.
    */
   const deck = (x, z, w, d, h = PLATFORM_H) => {
-    const slab = new THREE.Mesh(new THREE.BoxGeometry(w, 0.36, d), metal);
-    slab.position.set(x, h - 0.18, z); slab.castShadow = slab.receiveShadow = true; group.add(slab);
-    // Umlaufende Kante: nur Optik, damit man die Ebene von unten als Ebene erkennt
-    for (const [ox, oz, ew, ed] of [[0, -d / 2, w, 0.16], [0, d / 2, w, 0.16], [-w / 2, 0, 0.16, d], [w / 2, 0, 0.16, d]]) {
-      const rim = new THREE.Mesh(new THREE.BoxGeometry(ew, 0.22, ed), metalDark);
-      rim.position.set(x + ox, h + 0.08, z + oz); rim.castShadow = true; group.add(rim);
+    const slab = new THREE.Mesh(new THREE.BoxGeometry(w, 0.3, d), holz);
+    slab.position.set(x, h - 0.15, z); slab.castShadow = slab.receiveShadow = true; group.add(slab);
+    // Unterzug: von unten soll man Balken sehen, keine schwebende Platte
+    for (const ox of [-w / 2 + 0.3, 0, w / 2 - 0.3]) {
+      const balken = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.26, d), holzDunkel);
+      balken.position.set(x + ox, h - 0.42, z); balken.castShadow = true; group.add(balken);
     }
-    // Kollisionsquader dünner als die sichtbare Platte, damit auch die größte
-    // Klasse (1,9 m) unter den Dächern durchpasst
     box3(x - w / 2, h - 0.2, z - d / 2, x + w / 2, h, z + d / 2);
     return slab;
   };
 
+  /** Holzpfosten unter einer Galerie. */
+  const pfosten = (x, z, h = PLATFORM_H) => {
+    const p = new THREE.Mesh(new THREE.BoxGeometry(0.22, h - 0.3, 0.22), holzDunkel);
+    p.position.set(x, (h - 0.3) / 2, z); p.castShadow = true; group.add(p);
+    box3(x - 0.14, 0, z - 0.14, x + 0.14, h - 0.3, z + 0.14);
+  };
+
   /**
-   * Rampe. Sichtbar als geneigte Platte, begehbar über unsichtbare Stufen –
-   * jede niedriger als STEP_UP, dadurch läuft man sie ohne Sprung hoch.
-   * `dir` ist die Aufstiegsrichtung in 90°-Schritten (0 = nach +z).
+   * Geländer aus Bausatzteilen entlang einer Kante. `dir` ist die Richtung, in
+   * die das Geländer zeigt (0 = +z), `laenge` in Metern.
    */
-  const rampUp = (x, z, dir, { length = 5.2, width = 2.6, height = PLATFORM_H, steps = 6, base = 0 } = {}) => {
-    const g = new THREE.Group();
-    g.position.set(x, base, z); g.rotation.y = dir * Math.PI / 2;
-    const slope = Math.atan2(height, length);
-    const plate = new THREE.Mesh(new THREE.BoxGeometry(width, 0.18, Math.hypot(length, height)), metalDark);
-    plate.position.y = height / 2; plate.rotation.x = -slope;
-    plate.castShadow = plate.receiveShadow = true; g.add(plate);
-    for (const s of [-1, 1]) {                                  // Seitenwangen
-      const rail = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.3, Math.hypot(length, height)), metal);
-      rail.position.set(s * (width / 2 - 0.06), height / 2 + 0.16, 0); rail.rotation.x = -slope;
-      rail.castShadow = true; g.add(rail);
+  const gelaender = (x, z, dir, laenge) => {
+    const n = Math.max(1, Math.round(laenge / ZELLE));
+    for (let i = 0; i < n; i++) {
+      const t = -laenge / 2 + ZELLE / 2 + i * ZELLE;
+      const ry = dir * Math.PI / 2;
+      const ox = Math.cos(ry) * t, oz = -Math.sin(ry) * t;
+      place('dorf:Balcony_Simple_Straight', x + ox, z + oz, ry, { solid: false, y: PLATFORM_H });
     }
-    group.add(g);
-    // Stufen als achsenparallele Quader in Weltkoordinaten
+  };
+
+  /**
+   * Unsichtbare Aufstiegshilfe: eine Reihe Quader, jeder niedriger als STEP_UP,
+   * dadurch läuft man hinauf, ohne zu springen. Darüber liegt die sichtbare
+   * Treppe aus dem Bausatz – die Geometrie einer Treppe selbst als Kollision zu
+   * nehmen wäre zu fein, man bliebe an jeder Stufenkante hängen.
+   *
+   * `dir` ist die Aufstiegsrichtung in 90°-Schritten (0 = nach +z). Am Fuß und
+   * am Kopf entsteht je ein Wegpunkt, damit die Bots den Aufstieg finden statt
+   * gegen die Galerie zu laufen.
+   */
+  const rampUp = (x, z, dir, { length = 4.16, width = 2, height = PLATFORM_H, steps = 6, base = 0 } = {}) => {
     const toWorld = (lx, lz) => {
       switch (((dir % 4) + 4) % 4) {
         case 0: return [x + lx, z + lz];
@@ -212,123 +261,191 @@ export function buildWorld(scene, renderer) {
       const a = toWorld(-width / 2, lz0), b = toWorld(width / 2, lz1);
       box3(Math.min(a[0], b[0]), 0, Math.min(a[1], b[1]), Math.max(a[0], b[0]), h, Math.max(a[1], b[1]));
     }
-    // Wegpunkte, damit Bots die Rampe finden statt gegen die Plattform zu laufen
-    const foot = toWorld(0, -length / 2 - 1.2), head = toWorld(0, length / 2 + 0.8);
+    const fuss = toWorld(0, -length / 2 - 1.2), kopf = toWorld(0, length / 2 + 0.8);
     ramps.push({
-      bottom: new THREE.Vector3(foot[0], base, foot[1]),
-      top: new THREE.Vector3(head[0], base + height, head[1]),
+      bottom: new THREE.Vector3(fuss[0], base, fuss[1]),
+      top: new THREE.Vector3(kopf[0], base + height, kopf[1]),
     });
   };
 
-  // ---- Außengrenze ----
+  /**
+   * Treppe auf eine Galerie. Sichtbar zwei Treppenmodule übereinander, begehbar
+   * über die unsichtbaren Stufen aus `rampUp` – die Bots brauchen außerdem die
+   * Wegpunkte, die `rampUp` hinterlegt.
+   *
+   * Ein Modul steigt 1 m auf 2,08 m Tiefe; auf 1,2 m gestreckt ergeben zwei
+   * Module genau die Galeriehöhe.
+   */
+  const treppe = (x, z, dir) => {
+    const ry = dir * Math.PI / 2;
+    for (const [i, y] of [[0, 0], [1, 1.2]]) {
+      const t = -2.08 + i * 2.08;
+      const ox = Math.cos(ry) * t, oz = -Math.sin(ry) * t;
+      const s = place('dorf:Stairs_Exterior_Straight', x + ox, z + oz, ry + Math.PI, { solid: false, y });
+      s.scale.set(1, 1.2, 1);
+    }
+    rampUp(x, z, dir, { length: 4.16, width: 2, height: PLATFORM_H, steps: 6 });
+  };
+
+  /**
+   * Haus aufs 2-m-Raster: Wände ringsum, Dach obendrauf, ein Quader als
+   * Kollision. Innen ist es voll – Häuser sind Deckung, keine Kulisse zum
+   * Betreten. Ein offenes Erdgeschoss würde die Bots nur verirren lassen.
+   *
+   * `nx`/`nz` sind Zellen à 2 m. Fenster und Türen werden über die Position
+   * verteilt, damit nicht jede Wand gleich aussieht.
+   */
+  const haus = (x, z, nx, nz, { stein = false, dach = true, tuer = 0 } = {}) => {
+    const w = nx * ZELLE, d = nz * ZELLE;
+    const art = stein ? 'UnevenBrick' : 'Plaster';
+    const wand = `dorf:Wall_${art}_Straight`;
+    const fenster = `dorf:Wall_${art}_Window_Wide_Round`;
+    const tuerWand = `dorf:Wall_${art}_Door_Round`;
+
+    let n = 0;
+    /** Eine Wandreihe entlang einer Seite. `dir`: 0 = +z, 1 = +x, 2 = -z, 3 = -x. */
+    const seite = (dir, anzahl, quer) => {
+      for (let i = 0; i < anzahl; i++) {
+        const t = -(anzahl * ZELLE) / 2 + ZELLE / 2 + i * ZELLE;
+        const ry = dir * Math.PI / 2;
+        // Die Position wird je Seite ausgerechnet statt gedreht: der Bausatz
+        // stellt die Wand mit der Außenseite nach +z, also zeigt ry nach außen.
+        const pos = [
+          [x + t, z + quer], [x + quer, z - t], [x - t, z - quer], [x - quer, z + t],
+        ][dir];
+        const teil = (n === tuer) ? tuerWand : (n % 3 === 1 ? fenster : wand);
+        place(teil, pos[0], pos[1], ry, { solid: false });
+        n++;
+      }
+    };
+    seite(0, nx, d / 2);
+    seite(1, nz, w / 2);
+    seite(2, nx, d / 2);
+    seite(3, nz, w / 2);
+
+    // Ecken verdecken die Stoßkanten der Wandstücke
+    for (const [ex, ez, ry] of [[-w / 2, -d / 2, 0], [w / 2, -d / 2, Math.PI / 2],
+                                [w / 2, d / 2, Math.PI], [-w / 2, d / 2, -Math.PI / 2]]) {
+      place(stein ? 'dorf:Corner_Exterior_Brick' : 'dorf:Corner_Exterior_Wood', x + ex, z + ez, ry, { solid: false });
+    }
+
+    if (dach) {
+      // Die Dächer sind auf Grundflächen in Metern zugeschnitten und stehen
+      // rund anderthalb Meter über. Ein zu großes Dach auf einem kleinen Haus
+      // ragt meterweit in die Gasse und nimmt die Sicht – deshalb wird nach der
+      // tatsächlichen Grundfläche gewählt und notfalls um 90° gedreht.
+      const zuschnitt = { '6x8': [6, 8], '6x6': [6, 6], '6x4': [6, 4], '4x6': [4, 6] };
+      let teil = null, ry = 0;
+      for (const [name, [rw, rd]] of Object.entries(zuschnitt)) {
+        if (rw === w && rd === d) { teil = name; ry = 0; break; }
+        if (rd === w && rw === d) { teil = name; ry = Math.PI / 2; break; }
+      }
+      // Für Häuser ohne genauen Zuschnitt (4×4) das schmalste Dach nehmen.
+      if (!teil) { teil = '4x6'; ry = w > d ? Math.PI / 2 : 0; }
+      place(`dorf:Roof_RoundTiles_${teil}`, x, z, ry, { solid: false, y: WAND_H });
+    }
+    // Ein Quader für das ganze Haus statt einer pro Wand: weniger Kollider,
+    // und niemand bleibt in einer Fuge zwischen zwei Wandstücken hängen.
+    box3(x - w / 2 - 0.15, 0, z - d / 2 - 0.15, x + w / 2 + 0.15, WAND_H, z + d / 2 + 0.15);
+    return { x, z, w, d };
+  };
+
+  // ---- Dorfmauer mit zwei Toren ----
   const H = 5, T = 1;
   addBox(0, H / 2, -SIZE / 2, SIZE, H, T); addBox(0, H / 2, SIZE / 2, SIZE, H, T);
   addBox(-SIZE / 2, H / 2, 0, T, H, SIZE); addBox(SIZE / 2, H / 2, 0, T, H, SIZE);
-  for (let i = 0; i < 17; i++) {
-    const s = i * 3.5 - 28;
-    place('MetalFence', s, -SIZE / 2, 0, { solid: false });
-    place('MetalFence', s, SIZE / 2, 0, { solid: false });
-    place('MetalFence', -SIZE / 2, s, Math.PI / 2, { solid: false });
-    place('MetalFence', SIZE / 2, s, Math.PI / 2, { solid: false });
+  for (let i = 0; i < 15; i++) {
+    const s = i * 4 - 28;
+    const tor = Math.abs(s) < 2.5;               // Lücke für die Torbögen
+    for (const [mx, mz, ry] of [[s, -SIZE / 2, 0], [s, SIZE / 2, Math.PI],
+                                [-SIZE / 2, s, Math.PI / 2], [SIZE / 2, s, -Math.PI / 2]]) {
+      if (tor && Math.abs(mz) === SIZE / 2) continue;
+      for (const dx of [-1, 1]) {
+        place('dorf:Wall_UnevenBrick_Straight', mx + (ry % Math.PI ? 0 : dx), mz + (ry % Math.PI ? dx : 0), ry, { solid: false });
+      }
+    }
+  }
+  for (const [tz, ry] of [[-SIZE / 2, 0], [SIZE / 2, Math.PI]]) {
+    place('dorf:Wall_Arch', 0, tz, ry, { solid: false });
   }
   for (let i = 0; i < 30; i++) {
     const a = (i / 30) * Math.PI * 2 + (i % 2) * 0.12, r = 37 + (i % 3) * 4;
     place(i % 2 ? 'Tree_1' : 'Tree_2', Math.cos(a) * r, Math.sin(a) * r, a, { solid: false, scale: 0.9 + (i % 4) * 0.12 });
   }
-  for (const [x, z] of [[-27, -27], [27, 27], [-27, 27], [27, -27]]) place('StreetLight', x, z, Math.atan2(-x, -z), { pad: 0.1 });
 
-  // ---- Mitte: Containerhalle mit begehbarem Dach, Durchgang auf Bodenhöhe ----
-  place('Container_Long', 0, -3.2, 0, { pad: 0.15 });
-  place('Container_Long', 0, 3.2, 0, { pad: 0.15 });
-  deck(0, 0, 5.2, 7.4);
-  rampUp(0, 6.5, 2, { length: 5.6 });          // von Norden hoch
-  rampUp(0, -6.5, 0, { length: 5.6 });         // von Süden hoch
-  for (const s of [-1, 1]) {                   // Deckung auf dem Dach
-    place('SackTrench_Small', s * 1.9, 0, Math.PI / 2, { y: PLATFORM_H, solid: false });
-    box3(s * 1.9 - 0.5, PLATFORM_H, -1.3, s * 1.9 + 0.5, PLATFORM_H + 1, 1.3);
-  }
-  place('Pipes', -6.4, -1.6, 0, { y: 2.13, pad: 0.2 });
-  place('GasTank', 6.4, 1.6, 0.4);
+  // ---- Marktplatz in der Mitte: offen, mit Galerie darüber (Punkt B) ----
+  // Zwei Häuser rahmen den Platz, dazwischen spannt sich ein Steg. Wer den
+  // Punkt hält, steht oben und ist von drei Seiten sichtbar.
+  haus(-7, 0, 3, 4, { tuer: 6 });
+  haus(7, 0, 3, 4, { tuer: 2 });
+  deck(0, 0, 8, 7.4);
+  for (const [px, pz] of [[-3.6, -3.4], [3.6, -3.4], [-3.6, 3.4], [3.6, 3.4]]) pfosten(px, pz);
+  gelaender(0, -3.7, 2, 8); gelaender(0, 3.7, 0, 8);
+  treppe(0, 6.4, 2); treppe(0, -6.4, 0);
+  place('dorf:Prop_Crate', -2.4, 0, 0.3, { y: PLATFORM_H });
+  place('dorf:Prop_Crate', 2.4, 0.6, -0.2, { y: PLATFORM_H });
+  place('dorf:Prop_Wagon', -4.4, -8.6, 0.4);
+  place('dorf:Prop_Wagon', 4.4, 8.6, Math.PI + 0.3);
 
-  // ---- Zwei Seitenplattformen auf den Kontrollpunkten ----
-  for (const [cx, cz, dir] of [[20, -20, 1], [-20, 20, 3]]) {
+  // ---- Zwei Höfe mit Galerie (Punkte A und C) ----
+  // Die Häuser stehen hinter der Galerie, zur Ecke hin. Die Treppe muss nach
+  // innen zeigen: nach außen läge ihr Fuß jenseits der Spielfeldgrenze, und
+  // Bots liefen endlos gegen die Mauer, weil ihr Wegpunkt unerreichbar ist.
+  for (const [cx, cz] of [[-20, 20], [20, -20]]) {
     const sx = Math.sign(cx), sz = Math.sign(cz);
-    place('Container_Long', cx, cz - 2.4, 0, { pad: 0.15 });
-    place('Container_Long', cx, cz + 2.4, 0, { pad: 0.15 });
-    deck(cx, cz, 5.2, 6.0);
-    rampUp(cx - sx * 5.4, cz, dir, { length: 5.6, width: 2.4 });
-    place('SackTrench_Small', cx, cz + sz * 2.2, sz > 0 ? 0 : Math.PI, { y: PLATFORM_H, solid: false });
-    box3(cx - 1.3, PLATFORM_H, cz + sz * 2.2 - 0.5, cx + 1.3, PLATFORM_H + 1, cz + sz * 2.2 + 0.5);
-    place('Crate', cx + sx * 4.2, cz - sz * 4.2, 0.3);
+    const auf = sx > 0 ? 1 : 3;                  // Aufstiegsrichtung: zur Ecke hin
+    // Bündig an die Spielfeldgrenze: bliebe ein halber Meter Luft, würden sich
+    // Bots in der Ritze zwischen Hauswand und Mauer festfahren.
+    haus(cx + sx * 6.5, cz, 2, 3, { stein: true });
+    haus(cx, cz + sz * 6.5, 3, 2, { tuer: 1 });
+    deck(cx, cz, 7, 6);
+    for (const [px, pz] of [[-3, -2.6], [3, -2.6], [-3, 2.6], [3, 2.6]]) pfosten(cx + px, cz + pz);
+    gelaender(cx, cz - 3, 2, 7); gelaender(cx, cz + 3, 0, 7);
+    treppe(cx - sx * 5.6, cz, auf);
+    place('dorf:Prop_Crate', cx + sx * 2.6, cz + sz * 1.8, 0.2, { y: PLATFORM_H });
+    place('dorf:Prop_Crate', cx - sx * 3.6, cz - sz * 4.4, 0.4);
+    place('dorf:Prop_Vine1', cx + sx * 4.4, cz + 2.2, sx > 0 ? Math.PI : 0, { solid: false, y: 0.4 });
   }
 
-  // ---- Landmarken in den beiden freien Ecken ----
-  place('Structure_2', 21, 19, Math.PI, { pad: 0.4 });
-  place('Structure_4', -21, -19, 0, { pad: 0.4 });
+  // ---- Wohnhäuser, die die Gassen bilden ----
+  haus(-18, -4, 3, 3);
+  haus(18, 4, 3, 3, { tuer: 4 });
+  haus(-6, -18, 3, 2, { stein: true, tuer: 3 });
+  haus(6, 18, 3, 2, { stein: true });
+  haus(-22, -18, 2, 2);
+  haus(22, 18, 2, 2, { tuer: 1 });
+  haus(16, -8, 2, 3, { stein: true });
+  haus(-16, 8, 2, 3, { stein: true, tuer: 2 });
 
-  // ---- Gassen und Deckung ----
-  place('Container_Long', -12, -1.5, Math.PI / 2, { pad: 0.15 });
-  place('Container_Long', 12, 1.5, Math.PI / 2, { pad: 0.15 });
-  place('Container_Small', -7.5, -13, 0.2, { pad: 0.15 });
-  place('Container_Small', 7.5, 13, 0.2, { pad: 0.15 });
-  for (const [x, z, r] of [[-16, -9, 0], [16, 9, Math.PI], [-4, 17, Math.PI / 2], [4, -17, -Math.PI / 2]]) {
-    place('SackTrench', x, z, r);
-    place('Crate', x + Math.cos(r + 1) * 2.4, z + Math.sin(r + 1) * 2.4, r * 0.5);
+  // Der Turm als Landmarke – von außen sieht man, wo Norden ist
+  for (const [tx, tz] of [[-26.5, 3], [26.5, -3]]) {
+    haus(tx, tz, 2, 2, { stein: true, dach: false });
+    place('dorf:Roof_Tower_RoundTiles', tx, tz, 0, { solid: false, y: WAND_H });
   }
-  for (const [x, z] of [[-22, -6], [22, 6], [-9, 22], [9, -22]]) {
-    place('BrickWall_2', x, z, Math.abs(x) > Math.abs(z) ? Math.PI / 2 : 0);
-    place('ExplodingBarrel', x + 1.6, z + 1.4, 0);
-  }
-  place('CardboardBoxes_2', -14, 14, -0.4); place('Crate', -12.6, 15.4, 0.2);
-  place('CardboardBoxes_2', 14, -14, -0.4); place('Crate', 12.6, -15.4, 0.2);
-  place('Barrier_Large', 0, 20, 0); place('Barrier_Large', 0, -20, 0);
-  place('Barrier_Single', -24, 14, Math.PI / 2); place('Barrier_Single', 24, -14, Math.PI / 2);
-  place('Debris_BrokenCar', 12, -25, 1.9);
-  place('Tank', -12, 25, 0.4);
-  place('Debris_Tires', 23, 23, 0.3); place('Debris_Tires', -23, -23, 1.1);
-  place('Pallet', -18, 24, 0.3, { solid: false }); place('Pallet', 18, -24, 0.3, { solid: false });
-  for (const [x, z] of [[6, -12], [-6, 12], [15, 0], [-15, 0]]) place('TrafficCone', x, z, 0, { solid: false });
-  // Deckung entlang der Diagonalen zwischen Mitte und Seitenplattformen
-  for (const [x, z, r] of [[-11, 11, 0.6], [11, -11, 0.6], [-14, 4, 1.4], [14, -4, 1.4]]) {
-    place('SackTrench_Small', x, z, r);
-    place('Debris_Tires', x + 2.6, z + 1.2, r);
-  }
-  place('Container_Small', -18, -12, 0.6, { pad: 0.15 });
-  place('Container_Small', 18, 12, 0.6, { pad: 0.15 });
-  place('Crate', -16.4, -9.4, 0.2); place('Crate', 16.4, 9.4, 0.2);
 
-  // ---- Gedeckte Flankengänge an Ost- und Westkante, mit begehbarem Dach ----
-  for (const side of [1, -1]) {
-    const cx = side * 24;
-    for (const z of [-6.6, -2.2, 2.2, 6.6]) {
-      place('Container_Long', cx - 2.3, z, Math.PI / 2, { pad: 0.15 });
-      place('Container_Long', cx + 2.3, z, Math.PI / 2, { pad: 0.15 });
+  // ---- Schornsteine, Zäune, Kisten ----
+  for (const [x, z] of [[-7, -2.4], [7, 2.4], [-18, -5.4], [18, 5.4], [-6, -18], [6, 18]]) {
+    place('dorf:Prop_Chimney', x, z, 0, { solid: false, y: WAND_H - 0.4 });
+  }
+  for (const [x, z, ry] of [[-12, 12, 0], [12, -12, 0], [-13.6, 10.2, Math.PI / 2], [13.6, -10.2, Math.PI / 2]]) {
+    for (let i = -1; i <= 1; i++) {
+      const ox = Math.cos(ry) * i * 2, oz = -Math.sin(ry) * i * 2;
+      place(i ? 'dorf:Prop_WoodenFence_Extension1' : 'dorf:Prop_WoodenFence_Single', x + ox, z + oz, ry, { solid: false });
     }
-    deck(cx, 0, 4.6, 17.6);
-    rampUp(cx, side > 0 ? -12.2 : 12.2, side > 0 ? 0 : 2, { length: 5.2, width: 2.4 });
-    place('SackTrench_Small', cx, side * 6.5, side > 0 ? 0 : Math.PI, { y: PLATFORM_H, solid: false });
-    box3(cx - 1.3, PLATFORM_H, side * 6.5 - 0.5, cx + 1.3, PLATFORM_H + 1, side * 6.5 + 0.5);
-    place('ExplodingBarrel', cx - 1.4, -side * 7.6, 0);
+    box3(x - (ry ? 0.3 : 3), 0, z - (ry ? 3 : 0.3), x + (ry ? 0.3 : 3), 0.85, z + (ry ? 3 : 0.3));
+  }
+  for (const [x, z, r] of [[-11, -9, 0.3], [11, 9, -0.4], [-3, 13, 0.8], [3, -13, 1.2],
+                           [-23, 12, 0.2], [23, -12, 0.6], [9, -22, 0.9], [-9, 22, 0.1]]) {
+    place('dorf:Prop_Crate', x, z, r);
+    place('dorf:Prop_Crate', x + Math.cos(r) * 1.2, z + Math.sin(r) * 1.2, r + 0.6);
+    place('dorf:Prop_Brick1', x + 1.8, z - 1.1, r, { solid: false });
+  }
+  // Gitterzäune trennen zwei Hinterhöfe ab, ohne die Sicht zu nehmen
+  for (const [x, z, ry] of [[-14, -14, 0], [14, 14, 0]]) {
+    for (let i = -1; i <= 1; i++) place('dorf:Prop_MetalFence_Simple', x + i * 2, z, ry, { solid: false });
+    box3(x - 3, 0, z - 0.2, x + 3, 2.87, z + 0.2);
   }
 
-  // ---- Aussichtsturm: gestapelte Container, höchster Punkt der Arena.
-  // Eine lange Rampe hinauf – wer oben steht, sieht über die halbe Arena,
-  // braucht aber Zeit für den Auf- und Abstieg.
-  for (const [tx, tz, dir] of [[-8, -22, 3], [8, 22, 1]]) {
-    const sx = dir === 3 ? 1 : -1;
-    for (const y of [0, 2.1]) {
-      place('Container_Long', tx, tz - 1.15, 0, { y, pad: 0.12 });
-      place('Container_Long', tx, tz + 1.15, 0, { y, pad: 0.12 });
-    }
-    deck(tx, tz, 4.8, 4.8, 4.4);
-    rampUp(tx + sx * 7.15, tz, dir, { length: 9.5, width: 2.4, height: 4.4, steps: 11 });
-    place('SackTrench_Small', tx, tz - Math.sign(tz) * 1.9, tz > 0 ? 0 : Math.PI, { y: 4.4, solid: false });
-    box3(tx - 1.3, 4.4, tz - Math.sign(tz) * 1.9 - 0.5, tx + 1.3, 5.4, tz - Math.sign(tz) * 1.9 + 0.5);
-  }
-
-  // ---- Deckung im Erdgeschoss der Mittelhalle ----
-  place('CardboardBoxes_2', -1.7, -2.6, 0.3); place('CardboardBoxes_2', 1.7, 2.6, -0.3);
-  place('Pallet', 0, -1.4, 0.2, { solid: false }); place('Pallet', 0, 1.4, -0.2, { solid: false });
 
 
   // Licht: Sonne + Himmel

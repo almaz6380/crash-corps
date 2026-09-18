@@ -3,7 +3,8 @@
 Class-based Cartoon-Arena-Shooter im Browser, im Fantasy-Gewand. Vite + Three.js,
 kein Framework.
 
-Drei Klassen treten in derselben Arena gegeneinander an:
+Drei Klassen treten in einem mittelalterlichen Dorf gegeneinander an – Marktplatz,
+Gassen, Holzgalerien über den Höfen:
 
 | Klasse | Rolle | Waffe | Spezial |
 |---|---|---|---|
@@ -83,7 +84,7 @@ der Workflow bei jedem Push auf `main`.
 **Deathmatch** – jeder gegen jeden, du allein gegen fünf Bots.
 
 **Domination** – drei gegen drei um die Kontrollpunkte **A**, **B** und **C**. Sie liegen
-auf den Plattformdächern, man muss also über eine Rampe hoch. Wer allein im Ring steht,
+auf den Holzgalerien über Marktplatz und Höfen, man muss also über eine Treppe hoch. Wer allein im Ring steht,
 zieht ihn zu seiner Mannschaft; stehen beide Mannschaften drauf, bewegt sich nichts.
 Ein gegnerischer Punkt muss erst neutralisiert und dann erobert werden – das dauert
 doppelt so lange wie ein freier. Jeder gehaltene Punkt bringt zwei Zähler pro Sekunde,
