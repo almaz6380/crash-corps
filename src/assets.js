@@ -485,18 +485,52 @@ export function instantiate(id, { height, tint, weapon } = {}) {
 // ---------------------------------------------------------------------------
 const propCache = new Map();
 
-/** Lädt Props aus public/assets/props/<name>.glb. */
+const kitLaden = new Map();      // Bausatzname → laufendes Laden
+
+/**
+ * Ein Bausatz ist eine GLB, in der jedes Teil als benannter Knoten liegt
+ * (gebaut mit tools/kit-packen.mjs). Der Vorteil gegenüber einer Datei je Teil:
+ * gleiche Texturen liegen nur einmal darin. Nach dem Laden landet jedes Teil
+ * unter „<bausatz>:<teil>" im selben Zwischenspeicher wie die Einzel-Props –
+ * `spawnProp` merkt keinen Unterschied.
+ */
+function ladeKit(loader, kit) {
+  if (!kitLaden.has(kit)) {
+    kitLaden.set(kit, loadGltf(loader, `assets/props/${kit}.glb`).then((gltf) => {
+      for (const teil of [...gltf.scene.children]) {
+        teil.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+        propCache.set(`${kit}:${teil.name}`, teil);
+      }
+    }));
+  }
+  return kitLaden.get(kit);
+}
+
+/**
+ * Lädt Props aus public/assets/props/<name>.glb. Enthält ein Name einen
+ * Doppelpunkt, ist er ein Teil aus einem Bausatz: „dorf:Wall_Plaster_Straight".
+ */
 export async function preloadProps(names, onProgress) {
   const loader = new GLTFLoader();
   const list = [...new Set(names)].filter(n => !propCache.has(n));
+  const kits = [...new Set(list.filter(n => n.includes(':')).map(n => n.split(':')[0]))];
   let done = 0;
-  await Promise.all(list.map(async (name) => {
-    const gltf = await loadGltf(loader, `assets/props/${name}.glb`);
-    const root = gltf.scene;
-    root.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
-    propCache.set(name, root);
-    onProgress?.(++done / list.length, name);
-  }));
+  const schritte = list.length + kits.length;
+  await Promise.all([
+    ...kits.map(async (kit) => {
+      await ladeKit(loader, kit);
+      onProgress?.(++done / schritte, kit);
+    }),
+    ...list.filter(n => !n.includes(':')).map(async (name) => {
+      const gltf = await loadGltf(loader, `assets/props/${name}.glb`);
+      const root = gltf.scene;
+      root.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+      propCache.set(name, root);
+      onProgress?.(++done / schritte, name);
+    }),
+  ]);
+  const fehlend = list.filter(n => !propCache.has(n));
+  if (fehlend.length) console.warn('Prop nicht im Bausatz:', fehlend.join(', '));
 }
 
 /**
