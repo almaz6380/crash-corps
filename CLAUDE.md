@@ -4,7 +4,7 @@ Class-based Cartoon-Arena-Shooter im Browser, seit dem Figurentausch im Fantasy-
 
 ## Stack
 - Vite + Three.js (ES-Module, kein Framework)
-- Figuren als glTF-Modelle aus `public/assets/characters/`, geladen über `assets.js`. Die drei Spielfiguren sind aus drei CC0-Paketen von Quaternius selbst zusammengebaut (Körper, Kleidung, Bewegungen – `tools/figur-bauen.mjs`) und tragen prozedurale Waffen aus `gear.js` am Handknochen; welche Form, sagt `waffenform`. Die KayKit-Figuren liegen als Alternativen daneben: bei ihnen hängen die Waffen als Meshes an `handslot.r` und werden über `weapons`/`weaponHide` ein- und ausgeblendet. Arena aus Toon-Kit-Props (`public/assets/props/`), Effekte per Code.
+- Figuren als glTF-Modelle aus `public/assets/characters/`, geladen über `assets.js`. Die drei Spielfiguren sind aus drei CC0-Paketen von Quaternius selbst zusammengebaut (Körper, Kleidung, Bewegungen – `tools/figur-bauen.mjs`) und tragen prozedurale Waffen aus `gear.js` am Handknochen; welche Form, sagt `waffenform`. Die KayKit-Figuren liegen als Alternativen daneben: bei ihnen hängen die Waffen als Meshes an `handslot.r` und werden über `weapons`/`weaponHide` ein- und ausgeblendet. Arena ist ein mittelalterliches Dorf aus dem „Medieval Village MegaKit" (CC0), gepackt als ein Bausatz `dorf.glb`; Effekte per Code.
 - Look: zwei Stile in `render.js`, umschaltbar über `?stil=real`. Standard ist Cel-Shading mit
   Lichtstufen-Rampe und Outline; `real` nutzt physikalische Materialien, Himmelslicht und
   Umgebungsverdeckung. ACES-Tone-Mapping passiert im Composite-Shader, nicht im Renderer –
@@ -17,7 +17,8 @@ Class-based Cartoon-Arena-Shooter im Browser, seit dem Figurentausch im Fantasy-
 ```
 src/
   main.js      Bootstrap, Game-Loop, Zustand (Menü → Match → Ende)
-  world.js     Arena aus Props: zwei Ebenen (Boden + begehbare Dächer), Rampen, Kollisionsquader, Licht
+  world.js     Dorf aus einem modularen Bausatz: Häuser aufs 2-m-Raster, Gassen,
+               zwei Ebenen (Boden + begehbare Holzgalerien), Treppen, Kollisionsquader, Licht
   player.js    FPS-Controller (PointerLock, WASD, Sprung, Kollision grob)
   classes.js   Klassendefinitionen (HP, Speed, Waffe, Farbe, Spezial)
   weapons.js   Waffenlogik (Raycast-Hitscan, Cooldown, Spread, Schaden)
@@ -139,7 +140,10 @@ tools/
   Methoden auf (`schuss`, `treffer`, `schritt` …) und kennen keine Frequenzen.
   Klänge in der Welt bekommen eine Position mit, eigene nicht – daraus ergibt sich
   Lautstärke und Seite. Die Schleife meldet dafür jeden Frame `sound.listener()`.
-- Bewegung ist dreidimensional: `groundHeightAt()` liefert die Bodenhöhe, `resolveCollisions()` übergeht Quader unterhalb der Schrittweite (STEP_UP) und über Kopfhöhe. Rampen sind unsichtbare Stufen unter einer geneigten Platte.
+- Bewegung ist dreidimensional: `groundHeightAt()` liefert die Bodenhöhe, `resolveCollisions()` übergeht Quader unterhalb der Schrittweite (STEP_UP) und über Kopfhöhe. Treppen sind unsichtbare Stufen unter den sichtbaren Treppenmodulen – die Geometrie einer echten Treppe als Kollision zu nehmen, ließe jeden an der Stufenkante hängen.
+- Häuser sind massive Quader, keine betretbare Kulisse: ein Kollisionsquader je Haus statt einer je Wandstück, sonst bleibt man in den Fugen hängen.
+- Nichts darf eine Lücke von unter zwei Metern zur Spielfeldgrenze lassen. Bots fahren sich in solchen Ritzen fest und laufen bis zum Rundenende gegen die Wand; Häuser am Rand stehen deshalb bündig.
+- Treppen zeigen nach innen. Liegt ihr Fuß außerhalb von `bounds`, ist der Wegpunkt für die Bots unerreichbar – sie drücken dann ewig gegen die Grenze, statt hochzusteigen.
 - Nach Änderungen `npm run build` laufen lassen; muss ohne Fehler durchgehen.
 
 ## Roadmap

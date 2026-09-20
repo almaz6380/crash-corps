@@ -5,6 +5,22 @@ nötig). Zwei Quellen: Quaternius (quaternius.com) für die drei Spielfiguren, d
 Dorf und die Arena-Props, Kay Lousberg (kaylousberg.com) für die Figuren auf der
 Reserve.
 
+## props/dorf.glb — „Medieval Village MegaKit" (im Spiel aktiv)
+
+Die Arena. 31 Bauteile aus einem Bausatz von 176, gepackt mit
+`tools/kit-packen.mjs` in **eine** Datei mit geteilten Texturen – einzeln
+gewandelt läge dieselbe Putztextur in einem Dutzend Dateien.
+
+Raster: Wände 2 m breit und 3,12 m hoch, Böden 2×2 m, Treppenmodule 2 m breit
+mit 1 m Steigung (im Spiel auf 1,2 m gestreckt, zwei übereinander ergeben die
+Galeriehöhe von 2,4 m). Dächer sind auf Grundflächen zugeschnitten: `6x8` deckt
+ein Haus von 6×8 m mit anderthalb Metern Überstand. Ein zu großes Dach auf einem
+kleinen Haus ragt meterweit in die Gasse – `world.js` wählt deshalb nach der
+tatsächlichen Grundfläche und dreht notfalls um 90°.
+
+Mit `--textur=512 --nur-farbe` sind es 1,33 MB statt 6,82 MB.
+Quelle: https://quaternius.itch.io/medieval-village-megakit
+
 ## characters/qua_barbar|schurke|magier.glb — selbst zusammengesetzt (im Spiel aktiv)
 
 Diese drei Figuren liegen in keinem Paket fertig herum; sie werden aus drei

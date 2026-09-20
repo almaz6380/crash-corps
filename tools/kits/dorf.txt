@@ -20,6 +20,8 @@ Floor_UnevenBrick
 
 # Dächer
 Roof_RoundTiles_6x8
+Roof_RoundTiles_6x6
+Roof_RoundTiles_6x4
 Roof_RoundTiles_4x6
 Roof_Tower_RoundTiles
 

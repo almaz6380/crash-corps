@@ -9,7 +9,9 @@ export function runtimeAssets() {
   const classes = fs.readFileSync('src/classes.js', 'utf8');
   const models = [...classes.matchAll(/model:\s*'([^']+)'/g)].map((m) => m[1]);
   const world = fs.readFileSync('src/world.js', 'utf8');
-  const props = [...world.matchAll(/'([A-Za-z0-9_]+)'/g)]
+  // Einzel-Props stehen als 'Name', Bausatzteile als 'bausatz:Teil' – vom
+  // Bausatz wird die eine Sammeldatei gebraucht, nicht das einzelne Teil.
+  const props = [...world.matchAll(/'([A-Za-z0-9_]+)(?::[A-Za-z0-9_.]+)?'/g)]
     .map((m) => m[1])
     .filter((n) => fs.existsSync(`public/assets/props/${n}.glb`));
   const texSets = fs.existsSync('public/assets/textures')
