@@ -67,6 +67,7 @@ html, body { overscroll-behavior: none; -webkit-user-select: none; user-select: 
 #t-buttons button { pointer-events: auto; touch-action: none; font-family: inherit; font-weight: bold; color: var(--ink);
   background: var(--paper); border: 4px solid var(--ink); border-radius: 50%; box-shadow: 4px 4px 0 var(--ink); }
 #t-special, #t-reload, #t-jump { width: 68px; height: 68px; font-size: 22px; }
+#t-sicht { width: 60px; height: 60px; font-size: 24px; }
 #t-fire { width: 108px; height: 108px; font-size: 17px; background: var(--red); color: var(--paper); grid-row: span 2; }
 #t-buttons button.on { transform: translate(3px, 3px); box-shadow: 1px 1px 0 var(--ink); }
 

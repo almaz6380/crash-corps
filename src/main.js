@@ -322,6 +322,7 @@ function loop(now) {
   requestAnimationFrame(loop);
   const dt = Math.min(0.05, (now - last) / 1000); last = now;
   if (input.takeMute()) hud.tonStand(sound.schalten());
+  if (input.takeSicht() && player) { sound.klick(); player.sichtUmschalten(); }
   if (input.takeMenu() && running) { running = false; input.showTouch(false); hud.showMenu(true); hud.hint(false); }
   // Im Menü sammelt sich sonst Drehung an, die beim Start den Blick wegreißt –
   // außer während der Kalibrierung, da liest der Prüfschritt den Puffer selbst.

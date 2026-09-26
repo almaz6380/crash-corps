@@ -93,7 +93,18 @@ bei 250 ist Schluss. Der Wimpel über jeder Figur zeigt die Mannschaft.
 ## Steuerung am Rechner
 
 WASD laufen · Shift sprinten · Leertaste springen · Klick schießen ·
-R nachladen · Q Spezial · M Ton an/aus · Esc Menü
+R nachladen · Q Spezial · V Ansicht · M Ton an/aus · Esc Menü
+
+## Ansicht
+
+Das Match startet so, dass man die eigene Figur sieht: Kamera über der Schulter,
+Fadenkreuz in der Mitte. **V** (am Handy der Knopf mit dem Auge) schaltet zur
+Ich-Perspektive und zurück; die Wahl wird gemerkt.
+
+Geschossen wird immer dorthin, wo das Fadenkreuz steht – auch in der
+Verfolgersicht, in der Kamera und Waffe nicht am selben Punkt sitzen. Wird es
+eng, rückt die Kamera näher heran und blendet die Figur aus, statt im Hinterkopf
+zu stecken.
 
 ## Gyroskop
 

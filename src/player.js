@@ -2,12 +2,25 @@ import * as THREE from 'three';
 import { resolveCollisions, groundHeightAt, STEP_UP } from './world.js';
 import { Weapon } from './weapons.js';
 import { SPECIALS } from './classes.js';
-import { buildViewmodel } from './characters.js';
-import { ViewmodelAnimator } from './animation.js';
+import { buildViewmodel, buildCharacter } from './characters.js';
+import { ViewmodelAnimator, CharacterAnimator } from './animation.js';
 import { AIM_ASSIST } from './device.js';
 import { bestTarget, pullToward, ASSIST } from './aimassist.js';
 
 const EYE = 1.6, GRAVITY = 22, JUMP = 8;
+
+/**
+ * Schulterkamera. Die Figur steht etwas links im Bild, die Kamera dahinter und
+ * leicht darüber. `polster` hält sie von Wänden weg – ohne das steckt sie in
+ * jeder Gasse in der Hauswand und man sieht das Innere der Geometrie.
+ */
+const SCHULTER = { abstand: 2.7, hoehe: 0.3, seite: 0.6, polster: 0.3, nah: 0.5, zeigen: 1.35 };
+const SICHT_KEY = 'crashcorps.sicht';
+
+/** Zuletzt gewählte Ansicht. Ab Werk die Verfolgersicht – die Figuren will man sehen. */
+function sichtLaden() {
+  try { return localStorage.getItem(SICHT_KEY) === 'ego'; } catch { return false; }
+}
 
 export class Player {
   constructor(camera, cls, world, scene, input, sound) {
@@ -29,20 +42,46 @@ export class Player {
     );
     this.mesh.userData.target = this;
     scene.add(this.mesh);
+    // Eigene Figur. In der Ego-Sicht unsichtbar, sonst sieht man sich von innen.
+    this.figur = buildCharacter(cls);
+    this.figurAnim = new CharacterAnimator(this.figur);
+    scene.add(this.figur);
+    this.egoSicht = sichtLaden();
+    this.kamRay = new THREE.Raycaster();
+    this.zielRay = new THREE.Raycaster();
+    this.zielPunkt = new THREE.Vector3();
+    this.sichtAnwenden();
     this.kills = 0; this.deaths = 0;
     this.schrittWeg = 0;      // gelaufene Strecke seit dem letzten Schritt
     this.warLaden = false;    // für die Flanke am Ende des Nachladens
   }
-  /** Abräumen beim Klassenwechsel: Viewmodel und Trefferkörper lösen. */
+  /** Abräumen beim Klassenwechsel: Viewmodel, Figur und Trefferkörper lösen. */
   dispose() {
     this.camera.remove(this.viewmodel);
     this.scene.remove(this.mesh);
+    this.scene.remove(this.figur);
     this.mesh.geometry.dispose(); this.mesh.material.dispose();
+  }
+
+  /** Ego- und Verfolgersicht wechseln; die Wahl bleibt über Matches hinweg. */
+  sichtUmschalten() {
+    this.egoSicht = !this.egoSicht;
+    try { localStorage.setItem(SICHT_KEY, this.egoSicht ? 'ego' : 'figur'); } catch { /* egal */ }
+    this.sichtAnwenden();
+    return this.egoSicht;
+  }
+
+  /** Immer genau eins von beidem zeigen: Ego-Waffe oder ganze Figur. */
+  sichtAnwenden() {
+    this.viewmodel.visible = this.egoSicht;
+    this.figur.visible = !this.egoSicht;
   }
   spawn(at) {
     this.pos.copy(at); this.pos.y = 0; this.vel.set(0, 0, 0);
     this.hp = this.cls.hp; this.dead = false; this.weapon = new Weapon(this.cls.weapon);
     this.warLaden = false; this.schrittWeg = 0;
+    this.figurAnim.reset();
+    this.sichtAnwenden();
   }
   useSpecial() {
     if (this.special.cool > 0 || this.dead) return;
@@ -52,8 +91,11 @@ export class Player {
   onHit(dmg) {
     if (this.dead) return;
     this.hp -= dmg; this.flash = 0.25;
-    if (this.hp <= 0) { this.hp = 0; this.dead = true; this.deaths++; this.respawnIn = 3; this.sound?.tod(); }
-    else this.sound?.schmerz();
+    this.figurAnim.hit();
+    if (this.hp <= 0) {
+      this.hp = 0; this.dead = true; this.deaths++; this.respawnIn = 3;
+      this.figurAnim.die(); this.sound?.tod();
+    } else this.sound?.schmerz();
   }
 
   get forward() { return new THREE.Vector3(-Math.sin(this.yaw), 0, -Math.cos(this.yaw)); }
@@ -126,21 +168,29 @@ export class Player {
     } else this.schrittWeg = 1.6;   // beim Loslaufen kommt der erste Schritt früh
     this.mesh.position.set(this.pos.x, this.pos.y + this.cls.body.height / 2, this.pos.z);
 
+    // Figur: steht auf den Füßen, schaut dorthin, wohin gezielt wird. Das Modell
+    // blickt nach +z, der Spieler nach -z – daher die halbe Drehung.
+    this.figur.position.copy(this.pos);
+    this.figur.rotation.y = this.yaw + Math.PI;
+
     // Kamera
-    this.camera.position.copy(this.eye);
-    // Dash: Kamera kippt kurz zur Seite, sonst fühlt sich der Sprint nach nichts an
     const dashTilt = sp.active > 0 && sp.def.speedMul ? -Math.sign(inp.moveX) * 0.09 * (sp.active / sp.def.duration) : 0;
+    this.kameraSetzen();
     this.camera.rotation.set(this.pitch, this.yaw, dashTilt, 'YXZ');
     const zoom = sp.active > 0 && sp.def.fovZoom ? sp.def.fovZoom : 1;
     this.camera.fov += (this.baseFov * zoom - this.camera.fov) * Math.min(1, dt * 10);
     this.camera.updateProjectionMatrix();
 
     // Feuern
+    const ziel = this.zielen(targets);
     if (inp.fire) {
       const dmgMul = sp.active > 0 && sp.def.damageMul ? sp.def.damageMul : 1;
-      const hits = this.weapon.fire(this.eye, this.aim, targets, this.world, dmgMul);
+      const von = this.schussStart(ziel);
+      const richtung = ziel.clone().sub(von).normalize();
+      const hits = this.weapon.fire(von, richtung, targets, this.world, dmgMul);
       if (hits) {
-        this.vmAnim.fire(); fx.tracers(this.eye, hits, this.cls.accent);
+        this.vmAnim.fire(); this.figurAnim.fire();
+        fx.tracers(this.eye, hits, this.cls.accent);
         this.sound?.schuss(this.cls.weapon);
         if (this.weapon.hitCount > 0) this.sound?.treffer();
       }
@@ -153,5 +203,94 @@ export class Player {
       moving, speed, grounded: this.grounded, yaw: this.yaw, pitch: this.pitch,
       reload: w.reloading > 0 ? 1 - w.reloading / w.def.reload : 0,
     });
+    // Figurenanimation. `advance`/`strafe` kommen direkt aus der Eingabe – sie
+    // stehen schon im Bezugssystem der Figur, weil die mit dem Blick dreht.
+    this.figurAnim.update(dt, {
+      moving, speed, aiming: !!inp.fire,
+      advance: inp.moveY, strafe: inp.moveX,
+      lookAt: ziel,
+    });
+  }
+
+  /**
+   * Kamera setzen. In der Ego-Sicht sitzt sie im Auge, sonst über der Schulter.
+   *
+   * Der Strahl von der Schulter zur Wunschposition verhindert, dass sie durch
+   * Wände rutscht: steht etwas dazwischen, rückt sie davor. `nah` als Untergrenze,
+   * damit sie in der engsten Gasse nicht im Hinterkopf der Figur landet.
+   */
+  kameraSetzen() {
+    if (this.egoSicht) { this.camera.position.copy(this.eye); return; }
+    const f = this.forward;
+    const rechts = new THREE.Vector3(-f.z, 0, f.x);
+    const hoch = new THREE.Vector3(0, 1, 0);
+
+    // Zwei Schritte statt einem: erst gerade nach hinten, dann zur Seite. In
+    // einem Zug gerechnet würde eine Hauswand seitlich auch den Abstand nach
+    // hinten fressen – die Kamera säße mitten in der Figur, obwohl hinter ihr
+    // Platz ist. Der Strahl startet im Auge; das steckt nie in einer Wand.
+    const rueck = this.aim.clone().negate();
+    this.kamRay.set(this.eye, rueck);
+    this.kamRay.far = SCHULTER.abstand;
+    const hinderniss = this.kamRay.intersectObjects(this.world.colliders, false)[0];
+    const hinten = hinderniss
+      ? Math.max(SCHULTER.nah, hinderniss.distance - SCHULTER.polster)
+      : SCHULTER.abstand;
+    const anteil = hinten / SCHULTER.abstand;
+    const basis = this.eye.clone()
+      .addScaledVector(rueck, hinten)
+      .addScaledVector(hoch, SCHULTER.hoehe * anteil);
+
+    this.kamRay.set(basis, rechts);
+    this.kamRay.far = SCHULTER.seite;
+    const seitlich = this.kamRay.intersectObjects(this.world.colliders, false)[0];
+    const seite = seitlich
+      ? Math.max(0, seitlich.distance - SCHULTER.polster)
+      : SCHULTER.seite * anteil;
+    this.camera.position.copy(basis).addScaledVector(rechts, seite);
+
+    // Ist kaum Platz nach hinten, steckt die Kamera im Kopf der Figur und
+    // nimmt das halbe Bild. Dann verschwindet die Figur lieber.
+    this.figur.visible = hinten > SCHULTER.zeigen;
+  }
+
+  /**
+   * Woher der Schuss kommt.
+   *
+   * Normal aus dem Auge der Figur – das ist ehrlich: was die Figur deckt,
+   * deckt auch den Schuss. Steht sie aber dicht vor einer Kante, die der
+   * Spieler von der Kamera aus gar nicht sieht, frisst diese Kante jeden
+   * Schuss, und es sieht nach einem Fehler aus. In dem Fall wird von der
+   * Kamera gefeuert, damit trifft, was im Fadenkreuz steht.
+   */
+  schussStart(ziel) {
+    if (this.egoSicht) return this.eye;
+    const richtung = ziel.clone().sub(this.eye).normalize();
+    this.zielRay.set(this.eye, richtung);
+    this.zielRay.far = SCHULTER.abstand;
+    const nah = this.zielRay.intersectObjects(this.world.colliders, false)[0];
+    if (!nah) return this.eye;
+    return this.camera.position.clone().addScaledVector(this.aim, 0.5);
+  }
+
+  /**
+   * Der Punkt, auf den das Fadenkreuz zeigt.
+   *
+   * In der Verfolgersicht steht die Kamera neben der Figur – schösse man weiter
+   * vom Auge entlang der Blickrichtung, träfe man neben das, was in der
+   * Bildmitte steht. Deshalb erst von der Kamera aus suchen, worauf gezielt
+   * wird, und dann von der Figur dorthin feuern. In der Ego-Sicht fallen beide
+   * Punkte zusammen, dort ändert sich nichts.
+   */
+  zielen(targets) {
+    const von = this.camera.position;
+    this.zielRay.set(von, this.aim);
+    this.zielRay.far = 200;
+    const wand = this.zielRay.intersectObjects(this.world.colliders, false)[0];
+    const gegner = this.zielRay.intersectObjects(targets.map(t => t.mesh), true)[0];
+    const treffer = gegner && (!wand || gegner.distance < wand.distance) ? gegner : wand;
+    if (treffer) this.zielPunkt.copy(treffer.point);
+    else this.zielPunkt.copy(von).addScaledVector(this.aim, 120);
+    return this.zielPunkt;
   }
 }

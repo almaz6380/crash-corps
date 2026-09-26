@@ -112,6 +112,22 @@ tools/
   per CSS um 90°. Deshalb nie `innerWidth`/`innerHeight` oder `clientX`/`clientY`
   direkt benutzen: Maße kommen aus `bild()`, Zeigerpositionen aus `zuBild()`.
   `@media (max-height)` sähe das Hochformat-Fenster – dafür gibt es `body.klein`.
+- Zwei Ansichten: Ego und Verfolger, umgeschaltet mit **V** oder dem Auge-Knopf;
+  die Wahl liegt in `localStorage`, ab Werk die Verfolgersicht. Sichtbar ist immer
+  genau eins – Ego-Waffe **oder** ganze Figur (`sichtAnwenden()`), nie beides.
+  Der Spieler hat dafür eine eigene Figur aus `buildCharacter`, animiert wie die
+  Bots; der unsichtbare Trefferquader bleibt daneben bestehen, denn er ist das
+  Ziel der Bots. Die Figur bekommt **kein** `userData.target`, sonst zählt jeder
+  Treffer doppelt.
+- In der Verfolgersicht zeigt die Bildmitte woandershin als der Lauf. Deshalb
+  bestimmt `zielen()` erst von der Kamera aus den Punkt im Fadenkreuz, und
+  gefeuert wird von der Figur dorthin. Steht die Figur dicht an einer Deckung,
+  die der Spieler gar nicht sieht, käme kein Schuss durch – dann feuert
+  `schussStart()` von der Kamera. Gemessen: null Abweichung in beiden Ansichten.
+- Die Kamera rückt in zwei Schritten heran: erst gerade nach hinten, dann zur
+  Seite. In einem Zug gerechnet fräße eine seitliche Hauswand auch den Abstand
+  nach hinten. Bleibt weniger als `SCHULTER.zeigen` Platz, wird die Figur
+  ausgeblendet – sonst steckt die Kamera im Kopf und nimmt das halbe Bild.
 - Eingaben laufen nur über `input.js`. `player.js` kennt keine Tasten und keine Berührungen, sondern fragt `moveX/moveY`, `fire`, `jump` und die Flanken ab.
 - Blick kommt aus zwei Quellen: `takeLook()` in Pixeln (Maus, Wischen) und
   `takeGyro()` im Bogenmaß. Getrennt halten – das eine wird noch mit der
