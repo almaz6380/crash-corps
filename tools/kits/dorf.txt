@@ -39,5 +39,7 @@ Prop_WoodenFence_Single
 Prop_WoodenFence_Extension1
 Prop_MetalFence_Simple
 Prop_Vine1
+Prop_Vine2
+Prop_Vine5
 Prop_Brick1
 Prop_Support

@@ -562,7 +562,14 @@ export function spawnProp(name, { ramp } = {}) {
       const conv = (mat) => {
         const key = mat.uuid;
         if (!toonCache.has(key)) {
-          const t = new THREE.MeshToonMaterial({ color: mat.color, map: mat.map || null, gradientMap: ramp, transparent: mat.transparent, opacity: mat.opacity, side: mat.side });
+          // `alphaTest` muss mit: Laub besteht aus Kärtchen, deren Blattform
+          // allein in der Alphastufe der Textur steckt (glTF `MASK`). Ohne den
+          // Test wird aus einem Busch ein dunkler Klotz.
+          const t = new THREE.MeshToonMaterial({
+            color: mat.color, map: mat.map || null, gradientMap: ramp,
+            transparent: mat.transparent, opacity: mat.opacity, side: mat.side,
+            alphaTest: mat.alphaTest || 0,
+          });
           toonCache.set(key, t);
         }
         return toonCache.get(key);

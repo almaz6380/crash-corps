@@ -23,7 +23,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Document, NodeIO } from '@gltf-transform/core';
 import { ALL_EXTENSIONS } from '@gltf-transform/extensions';
-import { mergeDocuments, dedup, prune, unpartition, textureCompress } from '@gltf-transform/functions';
+import { mergeDocuments, dedup, prune, unpartition, textureCompress, weld, simplify } from '@gltf-transform/functions';
 
 const mb = (n) => `${(n / 1048576).toFixed(2)} MB`;
 
@@ -114,6 +114,25 @@ if (args.includes('--nur-farbe')) {
 }
 
 const schritte = [dedup(), prune({ keepAttributes: false, keepLeaves: true })];
+
+// Dreiecke reduzieren. Kulisse braucht keine feine Auflösung: ein Baum am
+// Dorfrand steht auf dem Schirm so groß wie ein Daumennagel. `weld()` muss
+// davor laufen, sonst zerreißt das Vereinfachen die Oberfläche.
+const zielDreiecke = +opt('dreiecke', 0);
+if (zielDreiecke && dreiecke(doc.getRoot()) > zielDreiecke) {
+  const { MeshoptSimplifier } = await import('meshoptimizer');
+  await MeshoptSimplifier.ready;
+  schritte.push(weld());
+  schritte.push(simplify({
+    simplifier: MeshoptSimplifier,
+    ratio: zielDreiecke / dreiecke(doc.getRoot()),
+    error: +opt('fehler', 0.03),
+    // Laubbäume bestehen aus einzelnen Blattkarten. Hielte man deren Ränder
+    // fest, ließe sich nichts vereinfachen – bei Kulisse ist das zu verschmerzen.
+    lockBorder: !args.includes('--kanten-frei'),
+  }));
+}
+
 if (textur) {
   const sharp = (await import('sharp')).default;
   schritte.push(textureCompress({

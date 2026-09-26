@@ -82,6 +82,61 @@ export class Sound {
     this.hall.connect(this.hallGain).connect(this.master);
 
     this.rauschen = this._rauschband(2);
+    this._umgebung();
+  }
+
+  /**
+   * Wind und Vogelrufe. Ein Dorf ohne Grundgeräusch klingt wie ein leeres
+   * Zimmer; sobald etwas trägt, wirkt es draußen.
+   *
+   * Der Wind ist eine einzige Rauschquelle in Schleife, durch ein Bandpass
+   * geschickt, dessen Frequenz langsam wandert – daraus entsteht das An- und
+   * Abschwellen von selbst. Leise gehalten: Schritte sind im Spiel die
+   * wichtigste Information und dürfen nicht zugedeckt werden.
+   */
+  _umgebung() {
+    const ctx = this.ctx;
+    const wind = ctx.createBufferSource();
+    wind.buffer = this._rauschband(4);
+    wind.loop = true;
+    const bp = ctx.createBiquadFilter();
+    bp.type = 'bandpass'; bp.frequency.value = 480; bp.Q.value = 0.7;
+    const g = ctx.createGain(); g.gain.value = 0.035;
+    // Langsame Schwebung: zwei Oszillatoren auf Frequenz und Lautstärke, beide
+    // mit krummen Perioden, damit sich das Muster nicht hörbar wiederholt
+    const lfo1 = ctx.createOscillator(); lfo1.frequency.value = 0.07;
+    const lfoG1 = ctx.createGain(); lfoG1.gain.value = 260;
+    lfo1.connect(lfoG1).connect(bp.frequency);
+    const lfo2 = ctx.createOscillator(); lfo2.frequency.value = 0.031;
+    const lfoG2 = ctx.createGain(); lfoG2.gain.value = 0.02;
+    lfo2.connect(lfoG2).connect(g.gain);
+    wind.connect(bp).connect(g).connect(this.master);
+    wind.start(); lfo1.start(); lfo2.start();
+    this.windGain = g;
+
+    // Vogelrufe: zwei kurze, aufsteigende Pfiffe, in unregelmäßigen Abständen.
+    const ruf = () => {
+      if (!this.ctx || this.ctx.state !== 'running') return planen();
+      const t = ctx.currentTime;
+      const laut = 0.045 + Math.random() * 0.03;
+      for (let i = 0; i < 2 + Math.floor(Math.random() * 2); i++) {
+        const o = ctx.createOscillator(); o.type = 'sine';
+        const gg = ctx.createGain();
+        const start = t + i * (0.12 + Math.random() * 0.08);
+        const hoch = 2100 + Math.random() * 1400;
+        o.frequency.setValueAtTime(hoch * 0.75, start);
+        o.frequency.exponentialRampToValueAtTime(hoch, start + 0.05);
+        o.frequency.exponentialRampToValueAtTime(hoch * 0.8, start + 0.1);
+        gg.gain.setValueAtTime(0.0001, start);
+        gg.gain.exponentialRampToValueAtTime(laut, start + 0.02);
+        gg.gain.exponentialRampToValueAtTime(0.0001, start + 0.11);
+        o.connect(gg).connect(this.master);
+        o.start(start); o.stop(start + 0.14);
+      }
+      planen();
+    };
+    const planen = () => { this._vogelZeit = setTimeout(ruf, 6000 + Math.random() * 11000); };
+    planen();
   }
 
   /** Zwei Sekunden weißes Rauschen als Vorrat für alle Rauschklänge. */

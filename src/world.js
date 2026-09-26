@@ -4,8 +4,12 @@ import { REAL } from './style.js';
 import { QUALITY } from './device.js';
 import { realisticMaterial, uvSurface, setImage } from './surface.js';
 import { spawnProp } from './assets.js';
+import { OHNE_UMRISS } from './render.js';
+import { Leben } from './leben.js';
 
 const RAMP = celRamp(4);
+/** Props, die aus Blattkärtchen bestehen – siehe `place()`. */
+const LAUB = /Tree|Bush|Grass|Fern|Vine/;
 const SIZE = 60;                 // Kantenlänge der Arena
 export const STEP_UP = 0.55;     // maximale Stufenhöhe, die Figuren erklimmen
 const PLATFORM_H = 2.4;          // Höhe der Galerien – zwei Treppenmodule à 1,2 m
@@ -40,8 +44,12 @@ export const WORLD_PROPS = [
   // Ausstattung
   'dorf:Prop_Wagon', 'dorf:Prop_Crate', 'dorf:Prop_Chimney', 'dorf:Prop_Support',
   'dorf:Prop_WoodenFence_Single', 'dorf:Prop_WoodenFence_Extension1',
-  'dorf:Prop_MetalFence_Simple', 'dorf:Prop_Vine1', 'dorf:Prop_Brick1',
-  'Tree_1', 'Tree_2',
+  'dorf:Prop_MetalFence_Simple', 'dorf:Prop_Vine1', 'dorf:Prop_Vine2', 'dorf:Prop_Vine5',
+  'dorf:Prop_Brick1',
+  // Natur aus dem „Stylized Nature MegaKit" (CC0), eigener Bausatz
+  'natur:CommonTree_3', 'natur:Pine_4', 'natur:TwistedTree_2',
+  'natur:Bush_Common', 'natur:Bush_Common_Flowers', 'natur:Grass_Common_Tall',
+  'natur:Fern_1', 'natur:Rock_Medium_1', 'natur:Pebble_Round_4',
 ];
 
 /** Bemalter Arenaboden: Asphalt in der Mitte, Schotterwege, Gras außen. */
@@ -186,6 +194,10 @@ export function buildWorld(scene, renderer) {
   const place = (name, x, z, ry = 0, { solid = true, scale = 1, y = 0, pad = 0 } = {}) => {
     const p = spawnProp(name, { ramp: RAMP });
     p.position.set(x, y, z); p.rotation.y = ry; p.scale.setScalar(scale);
+    // Pflanzen bestehen aus Blattkärtchen, deren Form nur in der Alphastufe
+    // steckt. Der Normalen-Durchgang kennt keinen Alphatest – die Kanten-
+    // erkennung zöge dort Rahmen um die Rechtecke. Also außen vorbei.
+    if (LAUB.test(name)) p.traverse(o => o.layers.set(OHNE_UMRISS));
     group.add(p); p.updateMatrixWorld(true);
     if (solid) {
       const box = new THREE.Box3().setFromObject(p);
@@ -226,13 +238,13 @@ export function buildWorld(scene, renderer) {
    * Geländer aus Bausatzteilen entlang einer Kante. `dir` ist die Richtung, in
    * die das Geländer zeigt (0 = +z), `laenge` in Metern.
    */
-  const gelaender = (x, z, dir, laenge) => {
+  const gelaender = (x, z, dir, laenge, y = PLATFORM_H) => {
     const n = Math.max(1, Math.round(laenge / ZELLE));
     for (let i = 0; i < n; i++) {
       const t = -laenge / 2 + ZELLE / 2 + i * ZELLE;
       const ry = dir * Math.PI / 2;
       const ox = Math.cos(ry) * t, oz = -Math.sin(ry) * t;
-      place('dorf:Balcony_Simple_Straight', x + ox, z + oz, ry, { solid: false, y: PLATFORM_H });
+      place('dorf:Balcony_Simple_Straight', x + ox, z + oz, ry, { solid: false, y });
     }
   };
 
@@ -259,7 +271,10 @@ export function buildWorld(scene, renderer) {
       const h = base + (height * (i + 1)) / steps;
       const lz0 = -length / 2 + (length * i) / steps, lz1 = -length / 2 + (length * (i + 1)) / steps;
       const a = toWorld(-width / 2, lz0), b = toWorld(width / 2, lz1);
-      box3(Math.min(a[0], b[0]), 0, Math.min(a[1], b[1]), Math.max(a[0], b[0]), h, Math.max(a[1], b[1]));
+      // Ab `base` nach oben, nicht ab dem Boden: eine Treppe, die auf einer
+      // Galerie beginnt, wäre sonst ein Pfeiler bis zum Erdgeschoss und
+      // versperrte den Durchgang darunter.
+      box3(Math.min(a[0], b[0]), base, Math.min(a[1], b[1]), Math.max(a[0], b[0]), h, Math.max(a[1], b[1]));
     }
     const fuss = toWorld(0, -length / 2 - 1.2), kopf = toWorld(0, length / 2 + 0.8);
     ramps.push({
@@ -276,15 +291,31 @@ export function buildWorld(scene, renderer) {
    * Ein Modul steigt 1 m auf 2,08 m Tiefe; auf 1,2 m gestreckt ergeben zwei
    * Module genau die Galeriehöhe.
    */
-  const treppe = (x, z, dir) => {
+  const treppe = (x, z, dir, { von = 0, bis = PLATFORM_H, kopf = null } = {}) => {
     const ry = dir * Math.PI / 2;
-    for (const [i, y] of [[0, 0], [1, 1.2]]) {
-      const t = -2.08 + i * 2.08;
+    const hoehe = bis - von;
+    // Ein Treppenmodul steigt einen Meter auf 2,08 m Tiefe. Für größere Höhen
+    // werden mehrere gestapelt und in der Höhe gestreckt; für kleine reicht
+    // eins, entsprechend gestaucht.
+    const stufen = Math.max(1, Math.round(hoehe / 1.2));
+    const proStufe = hoehe / stufen;
+    const tiefe = 2.08 * Math.max(0.6, proStufe / 1.2);
+    for (let i = 0; i < stufen; i++) {
+      const t = -(stufen * tiefe) / 2 + tiefe / 2 + i * tiefe;
       const ox = Math.cos(ry) * t, oz = -Math.sin(ry) * t;
-      const s = place('dorf:Stairs_Exterior_Straight', x + ox, z + oz, ry + Math.PI, { solid: false, y });
-      s.scale.set(1, 1.2, 1);
+      const st = place('dorf:Stairs_Exterior_Straight', x + ox, z + oz, ry + Math.PI,
+        { solid: false, y: von + i * proStufe });
+      st.scale.set(1, proStufe, tiefe / 2.08);
     }
-    rampUp(x, z, dir, { length: 4.16, width: 2, height: PLATFORM_H, steps: 6 });
+    rampUp(x, z, dir, { length: stufen * tiefe, width: 2, height: hoehe, steps: Math.max(3, stufen * 3), base: von });
+    // Manche Treppen enden nicht dort, wo man hinwill: die Aufgänge zu den
+    // Dachterrassen steigen an der Galeriekante hoch, und erst der Schritt zur
+    // Seite bringt einen aufs Dach. Ohne diesen Zielpunkt liefen die Bots oben
+    // an der Treppenkante auf der Stelle.
+    if (kopf) {
+      const letzte = ramps[ramps.length - 1];
+      letzte.top.set(kopf[0], bis, kopf[1]);
+    }
   };
 
   /**
@@ -295,7 +326,7 @@ export function buildWorld(scene, renderer) {
    * `nx`/`nz` sind Zellen à 2 m. Fenster und Türen werden über die Position
    * verteilt, damit nicht jede Wand gleich aussieht.
    */
-  const haus = (x, z, nx, nz, { stein = false, dach = true, tuer = 0 } = {}) => {
+  const haus = (x, z, nx, nz, { stein = false, dach = true, tuer = 0, durchgang = null, terrasse = false } = {}) => {
     const w = nx * ZELLE, d = nz * ZELLE;
     const art = stein ? 'UnevenBrick' : 'Plaster';
     const wand = `dorf:Wall_${art}_Straight`;
@@ -313,7 +344,12 @@ export function buildWorld(scene, renderer) {
         const pos = [
           [x + t, z + quer], [x + quer, z - t], [x - t, z - quer], [x - quer, z + t],
         ][dir];
-        const teil = (n === tuer) ? tuerWand : (n % 3 === 1 ? fenster : wand);
+        // Durchgang: auf der genannten Seite bleibt die mittlere Zelle offen und
+        // bekommt einen Torbogen statt einer Wand. Das ergibt eine Abkürzung
+        // durch das Haus, statt immer außen herumzulaufen.
+        const mitte = Math.floor(anzahl / 2);
+        const istTor = durchgang !== null && (dir === durchgang || dir === (durchgang + 2) % 4) && i === mitte;
+        const teil = istTor ? 'dorf:Wall_Arch' : (n === tuer ? tuerWand : (n % 3 === 1 ? fenster : wand));
         place(teil, pos[0], pos[1], ry, { solid: false });
         n++;
       }
@@ -329,7 +365,17 @@ export function buildWorld(scene, renderer) {
       place(stein ? 'dorf:Corner_Exterior_Brick' : 'dorf:Corner_Exterior_Wood', x + ex, z + ez, ry, { solid: false });
     }
 
-    if (dach) {
+    if (terrasse) {
+      // Begehbares Flachdach: Bretterboden, Geländer ringsum, ein Kollisions-
+      // quader nur unter der Oberkante – so ist es eine Ebene, keine Kiste.
+      const boden = new THREE.Mesh(new THREE.BoxGeometry(w + 0.3, 0.26, d + 0.3), holz);
+      boden.position.set(x, WAND_H + 0.13, z);
+      boden.castShadow = boden.receiveShadow = true; group.add(boden);
+      box3(x - w / 2 - 0.15, WAND_H, z - d / 2 - 0.15, x + w / 2 + 0.15, WAND_H + 0.26, z + d / 2 + 0.15);
+      const oben = WAND_H + 0.26;
+      gelaender(x, z - d / 2 - 0.1, 2, w, oben); gelaender(x, z + d / 2 + 0.1, 0, w, oben);
+      gelaender(x - w / 2 - 0.1, z, 3, d, oben); gelaender(x + w / 2 + 0.1, z, 1, d, oben);
+    } else if (dach) {
       // Die Dächer sind auf Grundflächen in Metern zugeschnitten und stehen
       // rund anderthalb Meter über. Ein zu großes Dach auf einem kleinen Haus
       // ragt meterweit in die Gasse und nimmt die Sicht – deshalb wird nach der
@@ -346,7 +392,24 @@ export function buildWorld(scene, renderer) {
     }
     // Ein Quader für das ganze Haus statt einer pro Wand: weniger Kollider,
     // und niemand bleibt in einer Fuge zwischen zwei Wandstücken hängen.
-    box3(x - w / 2 - 0.15, 0, z - d / 2 - 0.15, x + w / 2 + 0.15, WAND_H, z + d / 2 + 0.15);
+    // Beim Torhaus zwei Quader links und rechts der Durchfahrt, dazu einer
+    // darüber – sonst liefe man durch das Obergeschoss hindurch.
+    const a = [x - w / 2 - 0.15, z - d / 2 - 0.15], b = [x + w / 2 + 0.15, z + d / 2 + 0.15];
+    if (durchgang === null) {
+      box3(a[0], 0, a[1], b[0], WAND_H, b[1]);
+    } else {
+      const laengs = durchgang % 2 === 0;        // Durchfahrt in z- oder x-Richtung
+      const tor = ZELLE / 2 + 0.1;               // halbe Breite der Durchfahrt
+      if (laengs) {
+        box3(a[0], 0, a[1], x - tor, WAND_H, b[1]);
+        box3(x + tor, 0, a[1], b[0], WAND_H, b[1]);
+      } else {
+        box3(a[0], 0, a[1], b[0], WAND_H, z - tor);
+        box3(a[0], 0, z + tor, b[0], WAND_H, b[1]);
+      }
+      // Decke über der Durchfahrt: Kopfhöhe 3 m, darüber ist das Haus wieder dicht
+      box3(a[0], 3, a[1], b[0], WAND_H, b[1]);
+    }
     return { x, z, w, d };
   };
 
@@ -368,24 +431,95 @@ export function buildWorld(scene, renderer) {
   for (const [tz, ry] of [[-SIZE / 2, 0], [SIZE / 2, Math.PI]]) {
     place('dorf:Wall_Arch', 0, tz, ry, { solid: false });
   }
-  for (let i = 0; i < 30; i++) {
-    const a = (i / 30) * Math.PI * 2 + (i % 2) * 0.12, r = 37 + (i % 3) * 4;
-    place(i % 2 ? 'Tree_1' : 'Tree_2', Math.cos(a) * r, Math.sin(a) * r, a, { solid: false, scale: 0.9 + (i % 4) * 0.12 });
+  // Waldrand: drei Arten, unregelmäßig gesetzt und gedreht. Gleichmäßig verteilte
+  // Bäume derselben Art sehen aus wie eine Plantage – die Unregelmäßigkeit macht
+  // den Unterschied, nicht die Anzahl.
+  // Der Blattbaum trägt Herbstlaub – jeder dritte Baum in Rot wäre ein
+  // Feuerwerk. Jeder fünfte reicht als Farbtupfer.
+  const baeume = ['natur:CommonTree_3', 'natur:Pine_4', 'natur:CommonTree_3',
+    'natur:TwistedTree_2', 'natur:Pine_4'];
+  for (let i = 0; i < 24; i++) {
+    const a = (i / 24) * Math.PI * 2 + Math.sin(i * 2.7) * 0.16;
+    const r = 38 + (i % 3) * 5 + Math.sin(i * 1.3) * 2.5;
+    const art = baeume[i % baeume.length];
+    const gr = art === 'natur:TwistedTree_2' ? 0.5 : 0.85 + (i % 4) * 0.1;
+    place(art, Math.cos(a) * r, Math.sin(a) * r, i * 1.7, { solid: false, scale: gr });
   }
 
   // ---- Marktplatz in der Mitte: offen, mit Galerie darüber (Punkt B) ----
   // Zwei Häuser rahmen den Platz, dazwischen spannt sich ein Steg. Wer den
   // Punkt hält, steht oben und ist von drei Seiten sichtbar.
-  haus(-7, 0, 3, 4, { tuer: 6 });
-  haus(7, 0, 3, 4, { tuer: 2 });
+  // Die beiden Häuser am Platz tragen Dachterrassen. Sie liegen 3,4 m hoch und
+  // sind nur über die Galerie erreichbar – wer die Mitte hält, hält auch den
+  // höchsten Punkt der Karte.
+  haus(-7, 0, 3, 4, { tuer: 6, terrasse: true });
+  haus(7, 0, 3, 4, { tuer: 2, terrasse: true });
   deck(0, 0, 8, 7.4);
   for (const [px, pz] of [[-3.6, -3.4], [3.6, -3.4], [-3.6, 3.4], [3.6, 3.4]]) pfosten(px, pz);
   gelaender(0, -3.7, 2, 8); gelaender(0, 3.7, 0, 8);
   treppe(0, 6.4, 2); treppe(0, -6.4, 0);
+  // Kurze Aufgänge von der Galerie auf die beiden Dachterrassen. Sie steigen
+  // an der Galeriekante entlang, nicht auf das Haus zu – der Hauskörper ist bis
+  // 3,12 m massiv, eine Treppe hinein wäre eine Treppe in die Wand.
+  treppe(-3.2, -1, 0, { von: PLATFORM_H, bis: WAND_H + 0.26, kopf: [-6, 0] });
+  treppe(3.2, 1, 2, { von: PLATFORM_H, bis: WAND_H + 0.26, kopf: [6, 0] });
   place('dorf:Prop_Crate', -2.4, 0, 0.3, { y: PLATFORM_H });
   place('dorf:Prop_Crate', 2.4, 0.6, -0.2, { y: PLATFORM_H });
   place('dorf:Prop_Wagon', -4.4, -8.6, 0.4);
   place('dorf:Prop_Wagon', 4.4, 8.6, Math.PI + 0.3);
+
+  // Marktstände: vier Pfosten, ein Tisch, darüber ein schräges Segeldach.
+  // Selbst gebaut, nicht aus dem Bausatz – dessen Vordächer sind Wandteile und
+  // liegen auf dem Platz wie abgestürzte Hausdächer. Der Platz war offenes
+  // Schussfeld; die Stände sind Deckung, ohne die Sicht ganz zu nehmen.
+  const tuch = build(0xb8443a, 'Tuch', 'brown_planks_05');
+  const stand = (x, z, ry) => {
+    const g = new THREE.Group();
+    g.position.set(x, 0, z); g.rotation.y = ry; group.add(g);
+    for (const sx2 of [-1, 1]) for (const sz2 of [-1, 1]) {
+      const pf = new THREE.Mesh(new THREE.BoxGeometry(0.12, 2.05, 0.12), holzDunkel);
+      pf.position.set(sx2 * 1.05, 1.02, sz2 * 0.6); pf.castShadow = true; g.add(pf);
+    }
+    const tisch = new THREE.Mesh(new THREE.BoxGeometry(2.3, 0.14, 1.4), holz);
+    tisch.position.y = 0.95; tisch.castShadow = tisch.receiveShadow = true; g.add(tisch);
+    const dach = new THREE.Mesh(new THREE.BoxGeometry(2.7, 0.09, 1.9), tuch);
+    dach.position.y = 2.16; dach.rotation.x = 0.17; dach.castShadow = true; g.add(dach);
+    // Kollision nur für den Tisch: unter das Dach soll man treten können.
+    // Der Quader ist achsenparallel, die Stände stehen deshalb in Vielfachen
+    // von 90° – sonst deckte der Quader mehr ab als der Stand.
+    const c = Math.abs(Math.cos(ry)), si = Math.abs(Math.sin(ry));
+    const bw = (2.3 * c + 1.4 * si) / 2, bd = (2.3 * si + 1.4 * c) / 2;
+    box3(x - bw, 0, z - bd, x + bw, 1.02, z + bd);
+    // Ware davor: zwei Kisten, hoch genug, um dahinter zu verschwinden
+    place('dorf:Prop_Crate', x - Math.sin(ry) * 1.5, z - Math.cos(ry) * 1.5, ry + 0.3);
+    place('dorf:Prop_Crate', x - Math.sin(ry) * 1.5 + Math.cos(ry), z - Math.cos(ry) * 1.5 - Math.sin(ry), ry - 0.2);
+  };
+  stand(-8.5, -6.5, 0); stand(8.5, 6.5, Math.PI); stand(-2.5, 9.5, Math.PI / 2);
+
+  // Kistenstapel als schneller Aufstieg: jede Stufe unter STEP_UP, oben endet
+  // er auf Galeriehöhe. Wer die Treppe meidet, kommt hier hoch.
+  const kistenTreppe = (x, z, ry) => {
+    // 40 cm je Kiste, nicht 52: STEP_UP liegt bei 55 cm, aber zwischen zwei
+    // Bildern fällt die Figur ein Stück, und dann fehlen die letzten Zentimeter.
+    // Die Stufe muss spürbar unter der Grenze bleiben, sonst klemmt der Stapel.
+    const stufen = 6, schritt = 0.8, hoch = 0.4;
+    for (let i = 0; i < stufen; i++) {
+      const h = i * hoch;
+      const ox = Math.cos(ry) * i * schritt, oz = -Math.sin(ry) * i * schritt;
+      place('dorf:Prop_Crate', x + ox, z + oz, ry + i * 0.2, { y: h, solid: false });
+      box3(x + ox - 0.55, 0, z + oz - 0.55, x + ox + 0.55, h + hoch, z + oz + 0.55);
+    }
+    // Die oberste Kiste muss die Galerie überragen, sonst steht man davor und
+    // kommt die letzten zwanzig Zentimeter nicht hoch.
+    const fuss = [x - Math.cos(ry) * 1.2, z + Math.sin(ry) * 1.2];
+    const kopf = [x + Math.cos(ry) * (stufen * schritt), z - Math.sin(ry) * (stufen * schritt)];
+    ramps.push({
+      bottom: new THREE.Vector3(fuss[0], 0, fuss[1]),
+      top: new THREE.Vector3(kopf[0], PLATFORM_H, kopf[1]),
+    });
+  };
+  // Enden jeweils an der Kante der Marktgalerie (z = ∓3,7)
+  kistenTreppe(-3, -7.2, -Math.PI / 2); kistenTreppe(3, 7.2, Math.PI / 2);
 
   // ---- Zwei Höfe mit Galerie (Punkte A und C) ----
   // Die Häuser stehen hinter der Galerie, zur Ecke hin. Die Treppe muss nach
@@ -408,8 +542,8 @@ export function buildWorld(scene, renderer) {
   }
 
   // ---- Wohnhäuser, die die Gassen bilden ----
-  haus(-18, -4, 3, 3);
-  haus(18, 4, 3, 3, { tuer: 4 });
+  haus(-18, -4, 3, 3, { durchgang: 1 });      // Torhaus: Abkürzung nach Osten
+  haus(18, 4, 3, 3, { tuer: 4, durchgang: 1 });
   haus(-6, -18, 3, 2, { stein: true, tuer: 3 });
   haus(6, 18, 3, 2, { stein: true });
   haus(-22, -18, 2, 2);
@@ -424,8 +558,10 @@ export function buildWorld(scene, renderer) {
   }
 
   // ---- Schornsteine, Zäune, Kisten ----
-  for (const [x, z] of [[-7, -2.4], [7, 2.4], [-18, -5.4], [18, 5.4], [-6, -18], [6, 18]]) {
+  const schlote = [];
+  for (const [x, z] of [[-9.4, -2.4], [9.4, 2.4], [-18, -5.4], [18, 5.4], [-6, -18], [6, 18]]) {
     place('dorf:Prop_Chimney', x, z, 0, { solid: false, y: WAND_H - 0.4 });
+    schlote.push(new THREE.Vector3(x, WAND_H + 2.7, z));
   }
   for (const [x, z, ry] of [[-12, 12, 0], [12, -12, 0], [-13.6, 10.2, Math.PI / 2], [13.6, -10.2, Math.PI / 2]]) {
     for (let i = -1; i <= 1; i++) {
@@ -440,6 +576,39 @@ export function buildWorld(scene, renderer) {
     place('dorf:Prop_Crate', x + Math.cos(r) * 1.2, z + Math.sin(r) * 1.2, r + 0.6);
     place('dorf:Prop_Brick1', x + 1.8, z - 1.1, r, { solid: false });
   }
+  // Grün im Dorf: Büsche an Hausecken, Gras in den Gassen, Kiesel am Weg.
+  // Nichts davon ist solide – man soll hindurchlaufen, nicht daran hängen.
+  // Paarweise gespiegelt: die Karte ist punktsymmetrisch, und was auf der einen
+  // Seite Deckung oder Sichtschutz ist, muss es auf der anderen auch sein.
+  // Der rote Busch (Herbstlaub) steht nur draußen am Rand.
+  for (const [x, z, art, gr] of [
+    [-15.5, -7.5, 'natur:Bush_Common_Flowers', 0.9], [15.5, 7.5, 'natur:Bush_Common_Flowers', 0.9],
+    [-11, 3, 'natur:Bush_Common_Flowers', 0.8], [11, -3, 'natur:Bush_Common_Flowers', 0.8],
+    [-24, -14, 'natur:Bush_Common', 1.0], [24, 14, 'natur:Bush_Common', 1.0],
+    [-21, 8, 'natur:Fern_1', 0.8], [21, -8, 'natur:Fern_1', 0.8],
+    [-5, 21, 'natur:Bush_Common_Flowers', 0.9], [5, -21, 'natur:Bush_Common_Flowers', 0.9],
+  ]) place(art, x, z, x * 0.7, { solid: false, scale: gr });
+
+  for (let i = 0; i < 16; i++) {
+    const a = i * 2.39, r = 9 + (i % 7) * 2.6;                 // goldener Winkel, streut gleichmäßig
+    const x = Math.cos(a) * r, z = Math.sin(a) * r;
+    if (Math.abs(x) < 11 && Math.abs(z) < 11) continue;        // nicht auf dem Pflaster
+    place('natur:Grass_Common_Tall', x, z, a, { solid: false, scale: 0.6 + (i % 3) * 0.2 });
+  }
+  for (const [x, z] of [[-13, -20], [13, 20], [-26, -8], [26, 8], [-8, 26], [8, -26]]) {
+    place('natur:Pebble_Round_4', x, z, x, { solid: false, scale: 1.2 });
+  }
+  for (const [x, z] of [[-27, -24], [27, 24]]) {
+    place('natur:Rock_Medium_1', x, z, x, { solid: false, scale: 0.7 });
+    box3(x - 1, 0, z - 1, x + 1, 1.4, z + 1);
+  }
+
+  // Weinranken an mehr Wänden – zwölf gleich aussehende Häuser fallen sonst auf
+  for (const [x, z, ry, art] of [
+    [-15, -1.2, Math.PI / 2, 'dorf:Prop_Vine2'], [15, 1.2, -Math.PI / 2, 'dorf:Prop_Vine5'],
+    [-4.2, 18, Math.PI, 'dorf:Prop_Vine5'], [4.2, -18, 0, 'dorf:Prop_Vine2'],
+  ]) place(art, x, z, ry, { solid: false, y: WAND_H - 0.2 });
+
   // Gitterzäune trennen zwei Hinterhöfe ab, ohne die Sicht zu nehmen
   for (const [x, z, ry] of [[-14, -14, 0], [14, 14, 0]]) {
     for (let i = -1; i <= 1; i++) place('dorf:Prop_MetalFence_Simple', x + i * 2, z, ry, { solid: false });
@@ -449,8 +618,10 @@ export function buildWorld(scene, renderer) {
 
 
   // Licht: Sonne + Himmel
-  const sunDir = new THREE.Vector3(25, 40, 15);
-  const sun = new THREE.DirectionalLight(0xfff2d6, REAL ? 3.0 : 2.6);
+  // Nachmittagssonne: tiefer und wärmer als Mittagslicht. Lange Schatten geben
+  // den Gassen Tiefe, und die Ziegeldächer bekommen Farbe statt Grelle.
+  const sunDir = new THREE.Vector3(26, 24, 16);
+  const sun = new THREE.DirectionalLight(0xffe6b8, REAL ? 3.0 : 2.7);
   sun.position.copy(sunDir); sun.castShadow = true;
   const sm = REAL ? QUALITY.shadowSize * 2 : QUALITY.shadowSize;
   sun.shadow.mapSize.set(sm, sm);
@@ -466,7 +637,7 @@ export function buildWorld(scene, renderer) {
     const rim = new THREE.DirectionalLight(0xbcd8ff, 0.8); rim.position.set(-20, 14, -25);
     group.add(rim, new THREE.HemisphereLight(0xbfe6ff, 0x6b8f3a, 1.1));
     group.add(buildSky());
-    scene.fog = new THREE.Fog(0xa9d3ea, 55, 170);
+    scene.fog = new THREE.Fog(0xc3d6e0, 60, 180);
   }
 
   scene.add(group);
@@ -482,7 +653,8 @@ export function buildWorld(scene, renderer) {
     { id: 'B', pos: new THREE.Vector3(0, PLATFORM_H, 0) },
     { id: 'C', pos: new THREE.Vector3(20, PLATFORM_H, -20) },
   ];
-  return { group, colliders, ramps, spawns, punkte, bounds: SIZE / 2 - 1.5 };
+  const leben = new Leben(group, schlote, punkte);
+  return { group, colliders, ramps, spawns, punkte, leben, bounds: SIZE / 2 - 1.5 };
 }
 
 /**
