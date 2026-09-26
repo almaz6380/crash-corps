@@ -34,7 +34,7 @@ export class Hud {
         <p id="stand">Stand ${typeof __BUILD__ !== 'undefined' ? __BUILD__ : '?'}</p>
         <p class="help">${TOUCH
           ? 'Links ziehen zum Laufen · rechts wischen zum Umsehen · FEUER halten · ⤒ springen · R nachladen · Q Spezial'
-          : 'WASD laufen · Shift sprinten · Leertaste springen · Klick schießen · R nachladen · Q Spezial · M Ton · Esc Menü'}</p>
+          : 'WASD laufen · Shift sprinten · Leertaste springen · Klick schießen · R nachladen · Q Spezial · V Ansicht · M Ton · Esc Menü'}</p>
       </div>
       <div id="play" hidden>
         <div id="cross"></div>

@@ -37,6 +37,7 @@ export class Input {
       if (e.code === 'KeyQ') this._special = true;
       if (e.code === 'Escape') this._menu = true;
       if (e.code === 'KeyM') this._mute = true;
+      if (e.code === 'KeyV') this._sicht = true;
     };
     this._onKeyUp = (e) => { this.keys[e.code] = false; };
     this._onMouseMove = (e) => {
@@ -77,6 +78,8 @@ export class Input {
   takeSpecial() { const v = this._special; this._special = false; return v; }
   takeMenu() { const v = this._menu; this._menu = false; return v; }
   takeMute() { const v = this._mute; this._mute = false; return v; }
+  /** Umschalten zwischen Ego- und Verfolgersicht (Taste V oder Knopf). */
+  takeSicht() { const v = this._sicht; this._sicht = false; return v; }
 
   /** Touch-Bedienung ein-/ausblenden (nur während des Matches sichtbar). */
   showTouch(on) { this.touch?.show(on); }
@@ -90,6 +93,7 @@ const DEFAULT_LAYOUT = {
   jump:    { x: 0.775, y: 0.815, size: 68 },
   reload:  { x: 0.935, y: 0.545, size: 68 },
   special: { x: 0.805, y: 0.545, size: 68 },
+  sicht:   { x: 0.935, y: 0.345, size: 60 },
   stick:   { x: 0.16, y: 0.72, size: 148 },
 };
 
@@ -120,6 +124,7 @@ class TouchControls {
       <div id="t-move"><div id="t-stick" hidden><div id="t-knob"></div></div></div>
       <div id="t-look"></div>
       <div id="t-buttons">
+        <button id="t-sicht" type="button" data-key="sicht" title="Ansicht wechseln">👁</button>
         <button id="t-special" type="button" data-key="special">Q</button>
         <button id="t-reload" type="button" data-key="reload">R</button>
         <button id="t-jump" type="button" data-key="jump">⤒</button>
@@ -224,6 +229,7 @@ class TouchControls {
     });
     tap('#t-reload', () => { this.input._reload = true; });
     tap('#t-special', () => { this.input._special = true; });
+    tap('#t-sicht', () => { this.input._sicht = true; });
   }
 
   /** Anordnung auf die Schaltflächen schreiben. */
@@ -260,7 +266,7 @@ class TouchControls {
     this.selected = key;
     for (const b of this.buttons) b.classList.toggle('sel', b.dataset.key === key);
     this.el.querySelector('#t-ghost')?.classList.toggle('sel', key === 'stick');
-    const name = { fire: 'Feuer', jump: 'Springen', reload: 'Nachladen', special: 'Spezial', stick: 'Stick' }[key];
+    const name = { fire: 'Feuer', jump: 'Springen', reload: 'Nachladen', special: 'Spezial', sicht: 'Ansicht', stick: 'Stick' }[key];
     this.el.querySelector('#t-edit-name').textContent = name || 'Knopf antippen';
     const slider = this.el.querySelector('#t-edit-size');
     slider.disabled = !key;
