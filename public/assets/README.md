@@ -7,7 +7,7 @@ Reserve.
 
 ## props/dorf.glb — „Medieval Village MegaKit" (im Spiel aktiv)
 
-Die Arena. 31 Bauteile aus einem Bausatz von 176, gepackt mit
+Die Arena. 33 Bauteile aus einem Bausatz von 176, gepackt mit
 `tools/kit-packen.mjs` in **eine** Datei mit geteilten Texturen – einzeln
 gewandelt läge dieselbe Putztextur in einem Dutzend Dateien.
 
@@ -18,8 +18,39 @@ ein Haus von 6×8 m mit anderthalb Metern Überstand. Ein zu großes Dach auf ei
 kleinen Haus ragt meterweit in die Gasse – `world.js` wählt deshalb nach der
 tatsächlichen Grundfläche und dreht notfalls um 90°.
 
-Mit `--textur=512 --nur-farbe` sind es 1,33 MB statt 6,82 MB.
+Mit `--textur=512 --nur-farbe` sind es 1,35 MB statt 6,82 MB.
 Quelle: https://quaternius.itch.io/medieval-village-megakit
+
+Einen Marktstand hat der Bausatz nicht. Die Vordächer darin (`Overhang_*`) sind
+Wandteile und liegen frei auf dem Platz wie abgestürzte Hausdächer; die Stände
+baut `world.js` deshalb selbst aus vier Pfosten, einem Tisch und einem Segeldach.
+
+## props/natur.glb — „Stylized Nature MegaKit“ (im Spiel aktiv)
+
+Waldrand und Grün im Dorf: neun Teile (drei Bäume, zwei Büsche, Farn, Gras,
+Fels, Kiesel) aus einem Bausatz von 68, gepackt wie das Dorf.
+
+Gepackt mit `--textur=256 --nur-farbe --dreiecke=5000 --fehler=0.12
+--kanten-frei`: 1,11 MB und 13 457 Dreiecke statt 3,05 MB und 40 000. Laub
+besteht aus einzelnen Blattkärtchen – hält man beim Vereinfachen deren Ränder
+fest (der Normalfall), lässt sich nichts wegnehmen; bei Kulisse ist
+`--kanten-frei` dafür zu verschmerzen.
+
+Zwei Dinge, die man dabei wissen muss:
+
+- **Die Blattform steckt allein in der Alphastufe** (`alphaMode: MASK`). Die
+  Toon-Umwandlung in `assets.js` muss `alphaTest` mitübernehmen, sonst wird aus
+  einem Busch ein dunkler Klotz.
+- **Der Outline-Pass tauscht alle Materialien gegen eines aus** und kennt den
+  Alphatest nicht. Ohne Gegenmaßnahme zieht er weiße Rahmen um jedes
+  Blattkärtchen. Pflanzen laufen deshalb auf der Ebene `OHNE_UMRISS` aus
+  `render.js`: gezeichnet werden sie normal, nur die Kantenerkennung sieht sie
+  nicht.
+- **`Leaves_TwistedTree` ist Herbstlaub**, kein Sommergrün. Der Busch
+  `Bush_Common` ist damit rot – im Dorf steht deshalb `Bush_Common_Flowers`
+  (grün, mit Blüten), rot nur als Farbtupfer draußen am Rand.
+
+Quelle: https://quaternius.itch.io/stylized-nature-megakit
 
 ## characters/qua_barbar|schurke|magier.glb — selbst zusammengesetzt (im Spiel aktiv)
 
@@ -133,7 +164,12 @@ Waffen über `weapons`/`weaponHide` angesprochen werden. Das Paket enthält auß
 Sandsäcke, Kisten, Fässer, Zäune, Bäume) – noch nicht eingebunden.
 Quelle: https://quaternius.com/packs/toonshootergamekit.html
 
-## props/*.glb — Arena-Ausstattung aus dem „Toon Shooter Game Kit" (CC0)
+## props/*.glb — Arena-Ausstattung aus dem „Toon Shooter Game Kit" (nicht aktiv)
+
+Die Ausstattung der alten Containerhalde. Seit dem Dorf setzt `world.js` nur
+noch Teile aus `dorf.glb` und `natur.glb`; die Dateien hier bleiben als
+Alternative liegen und landen weder im Offline-Paket noch in der Einzeldatei –
+`tools/assets-liste.mjs` folgt `world.js`, nicht dem Ordner.
 
 30 statische Props (Container, Structures, Sandsäcke, Zaun, Bäume, Panzer,
 Autowrack, Fässer, Kisten, Straßenlaterne, …), nach GLB gepackt. Geladen

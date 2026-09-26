@@ -1,0 +1,18 @@
+# Auswahl aus dem Stylized Nature MegaKit (Quaternius, CC0).
+# Wenig Arten, mehrfach gesetzt: ein Dorfrand braucht Wiedererkennbarkeit,
+# keine Botanik. Gras und Kiesel stehen nur in Gassen und an Wegrändern.
+
+# Bäume – drei Arten reichen für einen Waldrand, mehr sieht man nicht
+CommonTree_3
+Pine_4
+TwistedTree_2
+
+# Büsche und Kraut
+Bush_Common
+Bush_Common_Flowers
+Grass_Common_Tall
+Fern_1
+
+# Steine
+Rock_Medium_1
+Pebble_Round_4

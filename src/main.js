@@ -328,6 +328,7 @@ function loop(now) {
   // außer während der Kalibrierung, da liest der Prüfschritt den Puffer selbst.
   if (!running) { if (!kalibLaeuft) input.gyro.leeren(); pipeline.render(scene, camera); return; }
   time += dt;
+  world.leben?.update(dt, dom);
   const alle = [player, ...bots];
   const wasDead = player.dead;
   // Der Spieler schießt nur auf die andere Mannschaft

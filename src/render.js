@@ -134,6 +134,15 @@ const COMPOSITE_SHADER = {
 };
 
 /**
+ * Ebene für alles, was keinen Umriss bekommen soll. Der Normalen-Durchgang
+ * tauscht alle Materialien gegen eines aus – damit fällt der Alphatest weg, und
+ * aus einem Busch aus Blattkärtchen wird für die Kantenerkennung ein Stapel
+ * Rechtecke mit weißem Rahmen. Laub und Rauch laufen deshalb außen vorbei:
+ * gezeichnet werden sie normal, nur die Kantenerkennung sieht sie nicht.
+ */
+export const OHNE_UMRISS = 1;
+
+/**
  * Kapselt die drei Durchgänge pro Bild: Normalen+Tiefe, Farbe, Zusammensetzen.
  * `render(scene, camera)` ersetzt renderer.render().
  */
@@ -191,7 +200,9 @@ export class Pipeline {
     this.mat.uniforms.proj.value.copy(camera.projectionMatrix);
     this.mat.uniforms.invProj.value.copy(camera.projectionMatrixInverse);
     scene.overrideMaterial = this.normalMat;
+    camera.layers.disable(OHNE_UMRISS);
     r.setRenderTarget(this.normal); r.render(scene, camera);
+    camera.layers.enable(OHNE_UMRISS);
     scene.overrideMaterial = null;
     r.setRenderTarget(this.color); r.render(scene, camera);
     r.setRenderTarget(null); r.render(this.quadScene, this.quadCam);

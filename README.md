@@ -3,8 +3,10 @@
 Class-based Cartoon-Arena-Shooter im Browser, im Fantasy-Gewand. Vite + Three.js,
 kein Framework.
 
-Drei Klassen treten in einem mittelalterlichen Dorf gegeneinander an – Marktplatz,
-Gassen, Holzgalerien über den Höfen:
+Drei Klassen treten in einem mittelalterlichen Dorf gegeneinander an – Marktplatz
+mit Ständen, Gassen und Torhäuser, Holzgalerien über den Höfen und Dachterrassen
+darüber. Aus den Schornsteinen zieht Rauch, an den Kontrollpunkten wehen Banner
+in der Farbe des Besitzers, am Dorfrand steht Wald:
 
 | Klasse | Rolle | Waffe | Spezial |
 |---|---|---|---|
@@ -89,6 +91,16 @@ zieht ihn zu seiner Mannschaft; stehen beide Mannschaften drauf, bewegt sich nic
 Ein gegnerischer Punkt muss erst neutralisiert und dann erobert werden – das dauert
 doppelt so lange wie ein freier. Jeder gehaltene Punkt bringt zwei Zähler pro Sekunde,
 bei 250 ist Schluss. Der Wimpel über jeder Figur zeigt die Mannschaft.
+
+## Die Karte
+
+Drei Ebenen: Gassen und Plätze am Boden, Holzgalerien auf 2,4 m, Dachterrassen
+auf 3,4 m. Hoch kommt man über Außentreppen oder über gestapelte Kisten – die
+sind schneller, aber man steht dabei frei. Zwei Häuser haben eine Durchfahrt
+statt einer Wand; wer die Abkürzung nimmt, spart den Weg außen herum.
+
+Die Karte ist punktsymmetrisch: jede Deckung, jeder Aufstieg und jeder
+Sichtschutz steht gespiegelt auch auf der anderen Seite.
 
 ## Steuerung am Rechner
 

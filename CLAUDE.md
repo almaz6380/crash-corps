@@ -4,7 +4,8 @@ Class-based Cartoon-Arena-Shooter im Browser, seit dem Figurentausch im Fantasy-
 
 ## Stack
 - Vite + Three.js (ES-Module, kein Framework)
-- Figuren als glTF-Modelle aus `public/assets/characters/`, geladen über `assets.js`. Die drei Spielfiguren sind aus drei CC0-Paketen von Quaternius selbst zusammengebaut (Körper, Kleidung, Bewegungen – `tools/figur-bauen.mjs`) und tragen prozedurale Waffen aus `gear.js` am Handknochen; welche Form, sagt `waffenform`. Die KayKit-Figuren liegen als Alternativen daneben: bei ihnen hängen die Waffen als Meshes an `handslot.r` und werden über `weapons`/`weaponHide` ein- und ausgeblendet. Arena ist ein mittelalterliches Dorf aus dem „Medieval Village MegaKit" (CC0), gepackt als ein Bausatz `dorf.glb`; Effekte per Code.
+- Figuren als glTF-Modelle aus `public/assets/characters/`, geladen über `assets.js`. Die drei Spielfiguren sind aus drei CC0-Paketen von Quaternius selbst zusammengebaut (Körper, Kleidung, Bewegungen – `tools/figur-bauen.mjs`) und tragen prozedurale Waffen aus `gear.js` am Handknochen; welche Form, sagt `waffenform`. Die KayKit-Figuren liegen als Alternativen daneben: bei ihnen hängen die Waffen als Meshes an `handslot.r` und werden über `weapons`/`weaponHide` ein- und ausgeblendet. Arena ist ein mittelalterliches Dorf aus dem „Medieval Village MegaKit" (CC0), gepackt als ein Bausatz `dorf.glb`, dazu Bäume, Büsche und Gras aus dem
+  „Stylized Nature MegaKit“ als `natur.glb`; Effekte per Code.
 - Look: zwei Stile in `render.js`, umschaltbar über `?stil=real`. Standard ist Cel-Shading mit
   Lichtstufen-Rampe und Outline; `real` nutzt physikalische Materialien, Himmelslicht und
   Umgebungsverdeckung. ACES-Tone-Mapping passiert im Composite-Shader, nicht im Renderer –
@@ -18,7 +19,8 @@ Class-based Cartoon-Arena-Shooter im Browser, seit dem Figurentausch im Fantasy-
 src/
   main.js      Bootstrap, Game-Loop, Zustand (Menü → Match → Ende)
   world.js     Dorf aus einem modularen Bausatz: Häuser aufs 2-m-Raster, Gassen,
-               zwei Ebenen (Boden + begehbare Holzgalerien), Treppen, Kollisionsquader, Licht
+               drei Ebenen (Boden, Holzgalerien, Dachterrassen), Treppen und
+               Kistenstapel, Torhäuser, Marktstände, Waldrand, Kollisionsquader, Licht
   player.js    FPS-Controller (PointerLock, WASD, Sprung, Kollision grob)
   classes.js   Klassendefinitionen (HP, Speed, Waffe, Farbe, Spezial)
   weapons.js   Waffenlogik (Raycast-Hitscan, Cooldown, Spread, Schaden)
@@ -28,6 +30,9 @@ src/
   gear.js      Ego-Waffe (Klon aus dem Modell) + prozedurale Ersatzwaffen für Modelle ohne eigene
   render.js    Zwei Stile: Cel-Shading mit Outline oder physikalisch (Himmel, Umgebungslicht,
                Umgebungsverdeckung). Tone-Mapping liegt im Composite-Shader.
+               Ebene `OHNE_UMRISS` für alles, was die Kantenerkennung nicht sehen soll
+  leben.js     Was sich bewegt, ohne mitzuspielen: Schornsteinrauch, Banner in
+               Mannschaftsfarbe an den Kontrollpunkten, Vögel über dem Dorf
   style.js     Stilumschalter (?stil=real)
   device.js    Touch-Erkennung, Leistungsstufe (Auflösung, Schatten, Verdeckung) und die
                Bühne: Bildmaße, bei hochkant gehaltenem Handy um 90° gedreht
@@ -160,6 +165,23 @@ tools/
 - Häuser sind massive Quader, keine betretbare Kulisse: ein Kollisionsquader je Haus statt einer je Wandstück, sonst bleibt man in den Fugen hängen.
 - Nichts darf eine Lücke von unter zwei Metern zur Spielfeldgrenze lassen. Bots fahren sich in solchen Ritzen fest und laufen bis zum Rundenende gegen die Wand; Häuser am Rand stehen deshalb bündig.
 - Treppen zeigen nach innen. Liegt ihr Fuß außerhalb von `bounds`, ist der Wegpunkt für die Bots unerreichbar – sie drücken dann ewig gegen die Grenze, statt hochzusteigen.
+- Pflanzen bestehen aus Blattkärtchen, deren Form allein in der Alphastufe der
+  Textur steckt (`alphaMode: MASK`). Zwei Stellen müssen mitspielen: die
+  Toon-Umwandlung in `assets.js` übernimmt `alphaTest`, sonst wird aus dem Busch
+  ein dunkler Klotz – und der Normalen-Durchgang in `render.js` tauscht alle
+  Materialien gegen eines aus und kennt den Alphatest nicht, zöge also Rahmen um
+  jedes Kärtchen. Laub und Rauch laufen deshalb auf der Ebene `OHNE_UMRISS`;
+  `place()` erkennt sie am Prop-Namen (`LAUB`).
+- Was sich von allein bewegt, steht in `leben.js` und bekommt vom Modus nur den
+  Zustand gereicht (`world.leben.update(dt, dom)` in der Schleife). Die
+  Bannerfarbe kommt aus `TEAMS`, der Besitzer aus `dom.punkte` – `world.punkte`
+  sind reine Ortsangaben.
+- Marktstände und Dachterrassen baut `world.js` selbst aus Quadern. Der Bausatz
+  hat keinen Stand, und seine Vordächer sind Wandteile: frei auf dem Platz
+  liegen sie da wie abgestürzte Hausdächer.
+- Die Karte ist punktsymmetrisch. Was auf der einen Seite Deckung, Aufstieg oder
+  Sichtschutz ist, gehört gespiegelt auch auf die andere – sonst hat eine
+  Mannschaft die bessere Hälfte.
 - Nach Änderungen `npm run build` laufen lassen; muss ohne Fehler durchgehen.
 
 ## Roadmap
