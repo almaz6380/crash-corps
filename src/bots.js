@@ -9,6 +9,9 @@ import { TEAMS } from './domination.js';
 const NAMES = ['Brösel', 'Knacki', 'Zündel', 'Rumpel', 'Fiete', 'Gustl', 'Wuschel', 'Pumpf'];
 let nameIdx = 0;
 
+/** Zielhöhe als Anteil der Körperhöhe: Brust, wie bei der Zielhilfe. */
+const ZIELHOEHE = 0.62;
+
 /**
  * Bot: patrol → chase → shoot. Sieht Gegner nur mit Sichtlinie.
  *
@@ -259,7 +262,12 @@ export class Bot {
     // Schießen mit Reaktionszeit + Streuung
     const aiming = sees && this.reaction > 0.35;
     if (sees && this.reaction > 0.6 && this.weapon.canFire()) {
-      const aim = feind.eye.clone().sub(this.eye);
+      // Bots zielen auf die Brust, nicht auf die Augen. Augenhöhe ist seit den
+      // Trefferzonen Kopfhöhe: gemessen war fast jeder zweite Botreffer ein
+      // Kopftreffer, und das hat mit Zielen nichts zu tun.
+      const brust = feind.pos.clone();
+      brust.y += feind.cls.body.height * ZIELHOEHE;
+      const aim = brust.sub(this.eye);
       aim.x += (Math.random() - 0.5) * 0.6; aim.y += (Math.random() - 0.5) * 0.4; aim.z += (Math.random() - 0.5) * 0.6;
       const hits = this.weapon.fire(this.eye, aim.normalize(), [feind], this.world, 1, this);
       if (hits) {

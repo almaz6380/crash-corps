@@ -69,6 +69,8 @@ tools/
                     --dreiecke und --textur für Figuren aus Bild-zu-3D-Diensten
   glb-nach-obj.mjs  GLB nach OBJ+MTL+Textur als ZIP – so nimmt Mixamo eine Figur an
   fbx-nach-glb.mjs  Mixamo-FBX zurück nach GLB und alle Clips in eine Datei
+  balance.mjs       Rechnet Duelldauern aus Klassen- und Waffenwerten aus und
+                    meldet Ausreißer – ohne das Spiel zu starten
   assets-liste.mjs  Welche Assets das Spiel zur Laufzeit wirklich holt
   sw-liste.mjs      Trägt Liste und Version in den Service Worker ein
   einzeldatei.mjs   Packt den Build in eine einzelne HTML-Datei
@@ -76,6 +78,21 @@ tools/
 
 ## Regeln für Änderungen
 - Gameplay-Werte (HP, Schaden, Cooldowns) leben nur in `classes.js` / `weapons.js`, nirgends hartcodiert.
+- Auf Figuren wird nie direkt geschossen: jede trägt einen unsichtbaren
+  Trefferquader aus `trefferQuader()` (`characters.js`), und der ist das Ziel
+  der Strahlen. Ein Strahl gegen eine animierte Figur verfehlt sie verlässlich
+  unzuverlässig – three prüft zuerst die Hülle aus der Bindepose, und die passt
+  zur Laufpose nicht. Der Kopf ist die oberste Zone des Quaders
+  (`TREFFERZONEN.hoehe`), Kopftreffer zählen doppelt, und Zone mal Spezial ist
+  auf `MAX_FAKTOR` gedeckelt.
+- Jede Waffe hat ihre eigene Abfallkurve (`abfall` in `weapons.js`), keine
+  gemeinsame Formel: die Kurve entscheidet, welche Klasse auf welcher
+  Entfernung gewinnt. Nach jeder Änderung an Klassen- oder Waffenwerten
+  `node tools/balance.mjs` laufen lassen – es rechnet Duelldauern aus und
+  meldet Ausreißer (Abschuss mit einem Körpertreffer, Revier vertauscht).
+- Bots zielen auf die Brust (`ZIELHOEHE` in `bots.js`), nie auf die Augen: auf
+  Augenhöhe liegt der Kopf, und dann wäre fast jeder zweite Treffer ein
+  Kopftreffer, ohne dass jemand gezielt hätte.
 - Kein Server-Code in diesem Repo, bis der Single-Player-Loop sauber ist. Multiplayer kommt als separater Schritt (autoritativer Server, Colyseus oder eigenes WS-Protokoll).
 - Neue Klasse = Eintrag in `classes.js` (inkl. `model`) + ggf. Modell-Eintrag in `assets.js`. Sonst nichts anfassen.
 - Neue Figur: **erst `node tools/glb-info.mjs <datei.glb>`**, dann den Eintrag schreiben.

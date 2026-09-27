@@ -87,7 +87,31 @@ export class Player {
   useSpecial() {
     if (this.special.cool > 0 || this.dead) return;
     this.special.active = this.special.def.duration; this.special.cool = this.special.def.cooldown;
+    this.gerammt = new Set();          // wer diesen Angriff schon abbekommen hat
     this.sound?.spezial(this.cls.special);
+  }
+
+  /**
+   * Sturmangriff: wen ich im Lauf erwische, den wirft es weg. Jeder Gegner
+   * zählt je Angriff nur einmal – sonst frisst ein halbsekündiger Lauf durch
+   * eine Gruppe jeden einzeln auf.
+   */
+  rammen(targets) {
+    const sp = this.special;
+    if (sp.active <= 0 || !sp.def.schaden) return;
+    for (const t of targets) {
+      if (!t || t.dead || this.gerammt?.has(t)) continue;
+      const d = t.pos.clone().sub(this.pos); d.y = 0;
+      if (d.length() > sp.def.reichweite) continue;
+      this.gerammt.add(t);
+      t.onHit(sp.def.schaden, { kopf: false, von: this });
+      // Rückstoß: in Laufrichtung weg, mit etwas Aufwärtsdrall
+      const weg = d.normalize().multiplyScalar(sp.def.stoss);
+      t.pos.addScaledVector(weg, 0.12);
+      if (t.vy !== undefined) t.vy = Math.max(t.vy, 3.2);
+      this.sound?.treffer();
+      this.marker('körper');
+    }
   }
   /**
    * @param {number} dmg
@@ -195,6 +219,9 @@ export class Player {
     const zoom = sp.active > 0 && sp.def.fovZoom ? sp.def.fovZoom : 1;
     this.camera.fov += (this.baseFov * zoom - this.camera.fov) * Math.min(1, dt * 10);
     this.camera.updateProjectionMatrix();
+
+    // Sturmangriff trifft, wen er unterwegs erwischt
+    this.rammen(targets);
 
     // Feuern
     const ziel = this.zielen(targets);

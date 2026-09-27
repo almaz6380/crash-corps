@@ -21,8 +21,20 @@ export const CLASSES = {
   },
 };
 
+/**
+ * Spezialfähigkeiten.
+ *
+ * Der Sturmangriff hat lange nur schnell gemacht – ein Angriff, bei dem nichts
+ * passierte. `schaden` und `stoss` geben ihm Wirkung: wer im Lauf getroffen
+ * wird, verliert Leben und fliegt zur Seite. `reichweite` ist der Abstand, in
+ * dem das zählt, und jeder Gegner wird je Angriff nur einmal erwischt.
+ *
+ * `focus` verdoppelte den Schaden. Zusammen mit Kopftreffern wären das 4× –
+ * ein Schuss, jede Klasse tot, aus jeder Entfernung. 1,6× bleibt spürbar, und
+ * die Obergrenze aus Zone × Spezial liegt bei `MAX_FAKTOR` in weapons.js.
+ */
 export const SPECIALS = {
-  charge: { cooldown: 8, duration: 0.6, speedMul: 3.2 },
-  dash:   { cooldown: 5, duration: 0.25, speedMul: 4.5 },
-  focus:  { cooldown: 10, duration: 3, damageMul: 2, fovZoom: 0.55 },
+  charge: { cooldown: 8, duration: 0.6, speedMul: 3.2, schaden: 45, stoss: 7, reichweite: 1.6 },
+  dash:   { cooldown: 4.5, duration: 0.25, speedMul: 4.5 },
+  focus:  { cooldown: 10, duration: 3, damageMul: 1.6, fovZoom: 0.55 },
 };

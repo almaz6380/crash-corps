@@ -1,10 +1,31 @@
 import * as THREE from 'three';
 
+/**
+ * Die drei Waffen. `abfall` ist der Schadensabfall über die Entfernung: voller
+ * Schaden bis `ab`, dann linear fallend bis `bis`, danach bleibt `rest`.
+ *
+ * Vorher galt eine Formel für alle (`1 - Entfernung / Reichweite`, mindestens
+ * 0,35). Das traf genau die Falschen: die Schrotflinte trug damit noch auf
+ * 15 m, und der Runenstab – eine Fernkampfwaffe – verlor, je weiter er schoss.
+ * Jede Waffe hat jetzt ihre eigene Kurve, und die entscheidet, auf welcher
+ * Entfernung welche Klasse gewinnt.
+ */
 export const WEAPONS = {
-  shotgun: { name: 'Spalterklinge', damage: 14, pellets: 7, spread: 0.09, cooldown: 0.9, mag: 6, reload: 1.8, range: 22, auto: false },
-  smg:     { name: 'Bolzenwerfer', damage: 9,  pellets: 1, spread: 0.035, cooldown: 0.08, mag: 32, reload: 1.4, range: 45, auto: true },
-  rifle:   { name: 'Runenstab',    damage: 70, pellets: 1, spread: 0.002, cooldown: 1.3, mag: 5, reload: 2.2, range: 120, auto: false },
+  shotgun: { name: 'Spalterklinge', damage: 11, pellets: 8, spread: 0.09, cooldown: 0.85, mag: 6, reload: 1.8, range: 26, auto: false,
+    abfall: { ab: 4, bis: 16, rest: 0.25 } },
+  smg:     { name: 'Bolzenwerfer', damage: 9,  pellets: 1, spread: 0.035, cooldown: 0.09, mag: 32, reload: 1.4, range: 45, auto: true,
+    abfall: { ab: 12, bis: 30, rest: 0.4 } },
+  rifle:   { name: 'Runenstab',    damage: 70, pellets: 1, spread: 0.002, cooldown: 1.3, mag: 5, reload: 2.2, range: 120, auto: false,
+    abfall: null },
 };
+
+/** Schadensanteil einer Waffe auf eine Entfernung. */
+export function abfallFaktor(def, entfernung) {
+  const a = def.abfall;
+  if (!a || entfernung <= a.ab) return 1;
+  if (entfernung >= a.bis) return a.rest;
+  return 1 - (1 - a.rest) * (entfernung - a.ab) / (a.bis - a.ab);
+}
 
 /**
  * Trefferzonen. Der Kopf zählt doppelt – für Bots wie für den Spieler, sonst
@@ -68,7 +89,7 @@ export class Weapon {
       const hit = ray.intersectObjects(meshes, false)[0];
       if (hit && (!wall || hit.distance < wall.distance)) {
         let o = hit.object; while (o && !o.userData.target) o = o.parent;
-        const falloff = Math.max(0.35, 1 - hit.distance / this.def.range);
+        const falloff = abfallFaktor(this.def, hit.distance);
         if (o) {
           const ziel = o.userData.target;
           // Kopfzone: Höhe des Treffers über den Füßen der Figur. Der

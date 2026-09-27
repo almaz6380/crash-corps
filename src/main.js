@@ -322,16 +322,19 @@ if (!TOUCH) {
   document.addEventListener('pointerlockchange', () => hud.hint(running && document.pointerLockElement !== canvas));
 }
 
-let last = performance.now();
-function loop(now) {
-  requestAnimationFrame(loop);
-  const dt = Math.min(0.05, (now - last) / 1000); last = now;
-  if (input.takeMute()) hud.tonStand(sound.schalten());
-  if (input.takeSicht() && player) { sound.klick(); player.sichtUmschalten(); }
-  if (input.takeMenu() && running) { running = false; input.showTouch(false); hud.showMenu(true); hud.hint(false); }
-  // Im Menü sammelt sich sonst Drehung an, die beim Start den Blick wegreißt –
-  // außer während der Kalibrierung, da liest der Prüfschritt den Puffer selbst.
-  if (!running) { if (!kalibLaeuft) input.gyro.leeren(); pipeline.render(scene, camera); return; }
+/**
+ * Testschalter `?tempo=N`: N Rechenschritte je Bild statt einem.
+ *
+ * Im kopflosen Browser zeichnet die Software-Grafik etwa ein Bild je Sekunde,
+ * und weil ein Schritt auf 50 ms gedeckelt ist, vergeht dort im Spiel nur ein
+ * Zwanzigstel der Zeit: eine Messung über drei Minuten wäre neun Sekunden
+ * Spiel. Mit `tempo` laufen Bots, Waffen und Modus schneller, gezeichnet wird
+ * weiter einmal je Bild. Am normalen Spiel (ohne Schalter) ändert sich nichts.
+ */
+const TEMPO = Math.max(1, Math.min(20, +new URLSearchParams(location.search).get('tempo') || 1));
+
+/** Ein Rechenschritt: alles, was sich um dt weiterbewegt. */
+function simulieren(dt) {
   time += dt;
   world.leben?.update(dt, dom);
   const alle = [player, ...bots];
@@ -348,6 +351,19 @@ function loop(now) {
   if (!wasDead && player.dead) hud.kill(`${player.letzterSchuetze?.name ?? 'Ein Gegner'} → Du`);
   dom?.update(dt, alle);
   fx.update(dt);
+}
+
+let last = performance.now();
+function loop(now) {
+  requestAnimationFrame(loop);
+  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  if (input.takeMute()) hud.tonStand(sound.schalten());
+  if (input.takeSicht() && player) { sound.klick(); player.sichtUmschalten(); }
+  if (input.takeMenu() && running) { running = false; input.showTouch(false); hud.showMenu(true); hud.hint(false); }
+  // Im Menü sammelt sich sonst Drehung an, die beim Start den Blick wegreißt –
+  // außer während der Kalibrierung, da liest der Prüfschritt den Puffer selbst.
+  if (!running) { if (!kalibLaeuft) input.gyro.leeren(); pipeline.render(scene, camera); return; }
+  for (let i = 0; i < TEMPO && running; i++) simulieren(dt);
   hud.update(player, bots, time);
   pipeline.render(scene, camera);
 }

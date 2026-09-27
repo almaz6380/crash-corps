@@ -80,6 +80,7 @@ der Workflow bei jedem Push auf `main`.
 | `?touch=1` | Touch-Bedienung erzwingen (zum Testen am Rechner) |
 | `?leistung=niedrig` | Kleinere Auflösung und Schattenkarte, keine Umgebungsverdeckung |
 | `?zielhilfe=an` / `=aus` | Zielhilfe erzwingen (Standard: an auf Touch, aus am Rechner) |
+| `?tempo=N` | N Rechenschritte je Bild (1–20). Zum Messen: Bots und Modus laufen schneller, gezeichnet wird wie gehabt |
 
 ## Modi
 
