@@ -76,7 +76,7 @@ der Workflow bei jedem Push auf `main`.
 
 | Parameter | Wirkung |
 |---|---|
-| `?stil=real` | Physikalische Materialien, Himmelslicht, Umgebungsverdeckung statt Cel-Shading |
+| `?stil=real` / `=toon` | Grafikstil erzwingen (Standard: fotoreal am Rechner, Comic auf Touch) |
 | `?touch=1` | Touch-Bedienung erzwingen (zum Testen am Rechner) |
 | `?leistung=niedrig` | Kleinere Auflösung und Schattenkarte, keine Umgebungsverdeckung |
 | `?zielhilfe=an` / `=aus` | Zielhilfe erzwingen (Standard: an auf Touch, aus am Rechner) |
@@ -102,6 +102,25 @@ statt einer Wand; wer die Abkürzung nimmt, spart den Weg außen herum.
 
 Die Karte ist punktsymmetrisch: jede Deckung, jeder Aufstieg und jeder
 Sichtschutz steht gespiegelt auch auf der anderen Seite.
+
+## Grafik
+
+Zwei Stile, umschaltbar im Menü (📷 / ✎):
+
+- **Fotoreal** – Standard am Rechner. Das Licht kommt aus einer echten
+  Himmelsaufnahme (HDRI), die Oberflächen sind Fotografien: Putz, Bruchstein,
+  Dachziegel, Holz, Kopfsteinpflaster. Dazu Streulicht, Filmkorn und eine
+  AgX-Tonwertkurve, wie sie Filmleute benutzen.
+- **Comic** – Cel-Shading mit schwarzer Kontur, die alte Optik. Standard auf
+  Handys, weil die fotorealistische Fassung dort zu viel kostet.
+
+Der Umschalter lädt die Seite neu; die halbe Szene hängt am Stil. Läuft die
+fotorealistische Fassung zu langsam, schaltet das Spiel selbständig erst
+Streulicht und Umgebungsverdeckung ab und beim nächsten Start auf Comic –
+es sei denn, man hat den Stil selbst gewählt.
+
+Himmel und Fotooberflächen (rund 5 MB) werden **nachgeladen**, nicht
+vorgehalten: offline startet das Spiel im Comic-Stil, bis sie einmal da waren.
 
 ## Treffen und getroffen werden
 

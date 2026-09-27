@@ -166,6 +166,7 @@ body.touch #feed { right: 74px; font-size: 13px; }
 #menuknoepfe { display: flex; gap: 12px; justify-content: center; align-items: center; }
 
 /* Offline-Bereitschaft im Menü */
+#hinweis { margin: 0 auto; max-width: 46ch; font-size: 13px; color: var(--sun); opacity: .95; }
 #offline { margin: 0; font-size: 13px; font-weight: bold; color: var(--paper); opacity: .75; }
 #offline.fertig { color: var(--sun); opacity: 1; }
 

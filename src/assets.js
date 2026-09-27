@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { clone as skinClone } from 'three/addons/utils/SkeletonUtils.js';
 import { REAL } from './style.js';
-import { realisticMaterial, SURFACE_FOR_PROP } from './surface.js';
+import { realisticMaterial, uvSurface, SURFACE_FOR_PROP, SURFACE_FOR_MATERIAL } from './surface.js';
 import { figurMaterial } from './figurlook.js';
 import { embeddedBytes } from './embed.js';
 
@@ -413,15 +413,26 @@ export function instantiate(id, { height, tint, weapon } = {}) {
     const mats = Array.isArray(o.material) ? o.material : [o.material];
     const cloned = mats.map(m => {
       const c = m.clone();
-      if (REAL) realisticMaterial(c);   // Figuren ohne Weltraum-Projektion, die würde beim Animieren wandern
-      // Saum und Bodenverdunkelung: gibt der Figur Form und trennt sie vom
-      // Hintergrund. Ohne das steht sie flach in einer Helligkeitsstufe.
-      figurMaterial(c, entry.height);
+      if (REAL) {
+        // Figuren ohne Weltraum-Projektion, die würde beim Animieren wandern.
+        // Und ohne die Cel-Hilfsmittel aus figurlook.js: Saum, gedämpftes
+        // Fülllicht und Bodenverdunkelung sind Ersatz für Licht, das es im
+        // realen Stil wirklich gibt – zusammen sähe die Figur aus, als klebte
+        // ein Aufkleber auf dem Bild.
+        realisticMaterial(c);
+      } else {
+        // Saum und Bodenverdunkelung: gibt der Figur Form und trennt sie vom
+        // Hintergrund. Ohne das steht sie flach in einer Helligkeitsstufe.
+        figurMaterial(c, entry.height);
+      }
       if (tint && (!def.tintMaterials || def.tintMaterials.includes(m.name))) {
         // Modelle mit Textur werden überblendet, flache Toon-Modelle bekommen die Farbe direkt
         // Mit Textur wird nur hineingemischt, sonst überdeckt die Klassenfarbe die
       // Zeichnung. Wie stark, sagt `tintMix`.
-      if (c.map) c.color.lerp(new THREE.Color(tint), def.tintMix ?? 0.8); else c.color.set(tint);
+      // Im realen Stil nur andeuten: eine komplett eingefärbte Figur ist ein
+      // Comic-Mittel. Wer zu wem gehört, sagt ohnehin der Wimpel über dem Kopf.
+      const mischung = (def.tintMix ?? 0.8) * (REAL ? 0.45 : 1);
+      if (c.map) c.color.lerp(new THREE.Color(tint), mischung); else c.color.set(tint);
       }
       materials.push(c); return c;
     });
@@ -542,14 +553,26 @@ export function spawnProp(name, { ramp } = {}) {
   if (!src) throw new Error(`Prop "${name}" ist nicht geladen`);
   const m = src.clone(true);
   if (REAL) {
-    // Physikalische Materialien behalten, nur Rauheit/Metall setzen und
-    // prozedurale Struktur einhängen. Pro Ausgangsmaterial einmal.
+    // Physikalische Materialien behalten und ihnen eine echte Oberfläche geben.
+    // Zwei Wege, je nachdem, was das Modell mitbringt:
+    //  - Teile aus dem Dorfbausatz haben UV-Koordinaten und einen bekannten
+    //    Materialnamen (MI_Plaster, MI_RoundTiles …): dort werden die Karten
+    //    direkt zugewiesen, das sitzt genau.
+    //  - alles andere bekommt die Struktur im Weltraum projiziert.
+    // Pro Ausgangsmaterial einmal, das Ergebnis wird gemerkt.
     m.traverse(o => {
       if (!o.isMesh) return;
       const set = SURFACE_FOR_PROP[name] || null;
       const conv = (mat) => {
-        const key = mat.uuid + '|' + set;
-        if (!realCache.has(key)) realCache.set(key, realisticMaterial(mat.clone(), { set, scale: 0.4 }));
+        const fuerMaterial = SURFACE_FOR_MATERIAL[mat.name];
+        const key = mat.uuid + '|' + (fuerMaterial ? `m:${fuerMaterial.set}` : set);
+        if (!realCache.has(key)) {
+          const neu = mat.clone();
+          realCache.set(key, fuerMaterial
+            ? uvSurface(realisticMaterial(neu), fuerMaterial.set,
+              { repeat: fuerMaterial.wiederholung, farbe: fuerMaterial.farbe })
+            : realisticMaterial(neu, { set, scale: 0.4 }));
+        }
         return realCache.get(key);
       };
       o.material = Array.isArray(o.material) ? o.material.map(conv) : conv(o.material);

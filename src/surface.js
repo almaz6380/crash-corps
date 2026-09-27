@@ -14,8 +14,31 @@ import { embeddedBytes } from './embed.js';
  */
 
 export const TEXTURE_SETS = [
+  // Dorf: fotografische Oberflächen für die Materialien des Bausatzes
+  'dorf_putz', 'dorf_stein', 'dorf_dach', 'dorf_holz', 'dorf_pflaster', 'dorf_wiese',
+  // Reste der alten Containerhalde, noch für die Props auf der Reserve
   'container_side', 'rust_coarse_01', 'asphalt_03', 'concrete_floor_02', 'brown_planks_05', 'leafy_grass',
 ];
+
+/**
+ * Welche Oberfläche zu welchem **Material** des Dorfbausatzes gehört.
+ *
+ * Das ist der Weg, der wirklich trägt: die Kit-Modelle haben UV-Koordinaten,
+ * also lassen sich echte Karten direkt zuweisen, statt sie wie bei den alten
+ * Props im Weltraum zu projizieren. Ohne diese Tabelle bekam das ganze Dorf im
+ * realen Stil überhaupt keine Struktur – `SURFACE_FOR_PROP` kannte nur die
+ * Container von früher.
+ */
+export const SURFACE_FOR_MATERIAL = {
+  MI_Plaster: { set: 'dorf_putz', wiederholung: 1.6, farbe: 0.7 },
+  MI_UnevenBrick: { set: 'dorf_stein', wiederholung: 1.4, farbe: 0.75 },
+  MI_Brick: { set: 'dorf_stein', wiederholung: 1.4, farbe: 0.6 },
+  MI_RockTrim: { set: 'dorf_stein', wiederholung: 1.2, farbe: 0.6 },
+  MI_RoundTiles: { set: 'dorf_dach', wiederholung: 1.5, farbe: 0.8 },
+  MI_WoodTrim: { set: 'dorf_holz', wiederholung: 1.8, farbe: 0.7 },
+  // Laub und Metallbeschläge bleiben, wie das Modell sie mitbringt: das eine
+  // lebt von seiner Alphakante, das andere ist zu klein, um Struktur zu zeigen.
+};
 
 /** Welches Material welche Oberfläche bekommt, nach Prop-Name. */
 export const SURFACE_FOR_PROP = {
@@ -84,6 +107,13 @@ export function setImage(name, which = 'diff') { return sets.get(name)?.[which]?
 
 /** Rauheit und Metallanteil nach Materialnamen – Blech spiegelt, Sandsack nicht. */
 const LOOK = [
+  // Figuren zuerst: ihre Materialien heißen nach dem Kleidungsstück, nicht nach
+  // dem Stoff. Ohne diese Zeilen landet Haut bei 0,1 Metallanteil – das sieht
+  // im echten Licht aus wie lackiert.
+  [/Superhero_Male|Regular_Male|skin|haut/i, { roughness: 0.68, metalness: 0.0 }],
+  [/Hair|Beard|haar/i, { roughness: 0.55, metalness: 0.0 }],
+  [/Eyes|auge/i, { roughness: 0.18, metalness: 0.0 }],
+  [/Peasant|Ranger|cloth|stoff|leather|leder/i, { roughness: 0.92, metalness: 0.0 }],
   [/metal|grey2|steel|tank|pipe/i, { roughness: 0.42, metalness: 0.75 }],
   [/grey|silver|chrome/i, { roughness: 0.5, metalness: 0.55 }],
   [/red|blue|green|yellow|cyan|orange|enemy|main/i, { roughness: 0.62, metalness: 0.35 }],
@@ -165,15 +195,69 @@ export function realisticMaterial(mat, { set = null, scale = 0.5, amount = 1.0 }
   return mat;
 }
 
-/** Für Flächen mit UVs (Boden, Arenaplatte): Karten direkt zuweisen. */
-export function uvSurface(mat, setName, { repeat = 10, keepMap = false } = {}) {
+/**
+ * Für Flächen mit UVs (Boden, Arenaplatte, Bausatzteile): Karten direkt
+ * zuweisen.
+ *
+ * `farbe` mischt die Fototextur über die mitgelieferte Farbe, statt sie zu
+ * ersetzen: das Dorf behält so seine Farbgebung – rote Dächer, heller Putz –,
+ * bekommt aber die Struktur des Fotos. Ganz ersetzt sähen zwei Wandstücke
+ * nebeneinander unterschiedlich aus, weil ihre UV-Inseln verschieden groß sind.
+ */
+export function uvSurface(mat, setName, { repeat = 10, keepMap = false, farbe = 1, normale = 0.8, makro = 0 } = {}) {
   const tex = sets.get(setName);
   if (!tex || !mat.isMeshStandardMaterial) return mat;
-  const clone = (t) => { const c = t.clone(); c.repeat.set(repeat, repeat); c.needsUpdate = true; return c; };
-  if (!keepMap) mat.map = clone(tex.diff);
+  const clone = (t, r = repeat) => { const c = t.clone(); c.repeat.set(r, r); c.needsUpdate = true; return c; };
+  if (!keepMap && farbe >= 1) mat.map = clone(tex.diff);
   mat.normalMap = clone(tex.nor);
   mat.roughnessMap = clone(tex.rough);
-  mat.normalScale = new THREE.Vector2(0.8, 0.8);
+  mat.normalScale = new THREE.Vector2(normale, normale);
+
+  // Große Flächen verraten sich durch das Raster ihrer Kachel. Dagegen hilft
+  // eine zweite, achtfach größere Abtastung derselben Textur als langsame
+  // Helligkeitsschwankung: das Auge sieht Flecken statt Fliesen.
+  if (makro > 0) {
+    const gross = clone(tex.diff, Math.max(1, repeat / 9));
+    const alterHook = mat.onBeforeCompile;
+    mat.onBeforeCompile = (shader) => {
+      alterHook?.(shader);
+      shader.uniforms.tMakro = { value: gross };
+      shader.uniforms.makroStaerke = { value: makro };
+      shader.uniforms.makroRef = { value: tex.ref };
+      shader.fragmentShader = shader.fragmentShader
+        .replace('#include <common>', `#include <common>
+          uniform sampler2D tMakro; uniform float makroStaerke, makroRef;`)
+        .replace('#include <color_fragment>', `#include <color_fragment>
+          {
+            vec3 gr = texture2D(tMakro, vMapUv).rgb;
+            float grL = dot(gr, vec3(0.299, 0.587, 0.114)) / makroRef;
+            diffuseColor.rgb *= mix(1.0, clamp(grL, 0.7, 1.35), makroStaerke);
+          }`);
+    };
+  }
+
+  if (farbe > 0 && farbe < 1) {
+    // Teilweise mischen geht nur im Shader: die Fotofarbe kommt als zweite
+    // Textur dazu und wird über die vorhandene gelegt.
+    const foto = clone(tex.diff);
+    const vorher = mat.onBeforeCompile;
+    mat.onBeforeCompile = (shader) => {
+      vorher?.(shader);
+      shader.uniforms.tFoto = { value: foto };
+      shader.uniforms.fotoAnteil = { value: farbe };
+      shader.uniforms.fotoRef = { value: tex.ref };
+      shader.fragmentShader = shader.fragmentShader
+        .replace('#include <common>', `#include <common>
+          uniform sampler2D tFoto; uniform float fotoAnteil, fotoRef;`)
+        .replace('#include <color_fragment>', `#include <color_fragment>
+          {
+            vec3 foto = texture2D(tFoto, vMapUv).rgb;
+            // Auf die mittlere Helligkeit der Fototextur normiert, damit sie
+            // strukturiert statt abdunkelt, und dann eingemischt.
+            diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * foto / fotoRef, fotoAnteil);
+          }`);
+    };
+  }
   mat.needsUpdate = true;
   return mat;
 }

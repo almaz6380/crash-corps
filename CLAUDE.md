@@ -6,10 +6,12 @@ Class-based Cartoon-Arena-Shooter im Browser, seit dem Figurentausch im Fantasy-
 - Vite + Three.js (ES-Module, kein Framework)
 - Figuren als glTF-Modelle aus `public/assets/characters/`, geladen über `assets.js`. Die drei Spielfiguren sind aus drei CC0-Paketen von Quaternius selbst zusammengebaut (Körper, Kleidung, Bewegungen – `tools/figur-bauen.mjs`) und tragen prozedurale Waffen aus `gear.js` am Handknochen; welche Form, sagt `waffenform`. Die KayKit-Figuren liegen als Alternativen daneben: bei ihnen hängen die Waffen als Meshes an `handslot.r` und werden über `weapons`/`weaponHide` ein- und ausgeblendet. Arena ist ein mittelalterliches Dorf aus dem „Medieval Village MegaKit" (CC0), gepackt als ein Bausatz `dorf.glb`, dazu Bäume, Büsche und Gras aus dem
   „Stylized Nature MegaKit“ als `natur.glb`; Effekte per Code.
-- Look: zwei Stile in `render.js`, umschaltbar über `?stil=real`. Standard ist Cel-Shading mit
-  Lichtstufen-Rampe und Outline; `real` nutzt physikalische Materialien, Himmelslicht und
-  Umgebungsverdeckung. ACES-Tone-Mapping passiert im Composite-Shader, nicht im Renderer –
-  three wendet es beim Rendern in ein Render-Target nicht an.
+- Look: zwei Stile in `render.js`. **Standard ist `real`**: fotografische Oberflächen,
+  Himmelslicht aus einer HDRI, AgX-Kurve, Streulicht. `toon` ist das alte Cel-Shading mit
+  Lichtstufen-Rampe und Outline und die Vorgabe auf Touch-Geräten. Umschalten über den
+  Knopf im Menü (`stilSetzen`, wirkt nach dem Neuladen) oder `?stil=real|toon`.
+  Tone-Mapping passiert im Composite-Shader, nicht im Renderer – three wendet es beim
+  Rendern in ein Render-Target nicht an.
 - Klang wird synthetisiert, nicht geladen (`sound.js`): gefiltertes Rauschen plus
   Oszillatoren, dazu ein kurzer Faltungshall. Das kostet keine Bytes im Offline-Speicher.
 - Kein TypeScript im Prototyp, JSDoc wo sinnvoll.
@@ -28,8 +30,8 @@ src/
   characters.js Prozedurale Low-Poly-Figur pro Klasse
   assets.js    Modell-Manifest, Laden, Klonen pro Figur (Knochen, Clips, Materialien)
   gear.js      Ego-Waffe (Klon aus dem Modell) + prozedurale Ersatzwaffen für Modelle ohne eigene
-  render.js    Zwei Stile: Cel-Shading mit Outline oder physikalisch (Himmel, Umgebungslicht,
-               Umgebungsverdeckung). Tone-Mapping liegt im Composite-Shader.
+  render.js    Zwei Stile: fotoreal (HDRI-Himmel, AgX, Streulicht) oder Cel-Shading mit
+               Outline. HDR-Zwischenbild, Tone-Mapping im Composite-Shader.
                Ebene `OHNE_UMRISS` für alles, was die Kantenerkennung nicht sehen soll
   leben.js     Was sich bewegt, ohne mitzuspielen: Schornsteinrauch, Banner in
                Mannschaftsfarbe an den Kontrollpunkten, Vögel über dem Dorf
@@ -71,6 +73,12 @@ tools/
   fbx-nach-glb.mjs  Mixamo-FBX zurück nach GLB und alle Clips in eine Datei
   balance.mjs       Rechnet Duelldauern aus Klassen- und Waffenwerten aus und
                     meldet Ausreißer – ohne das Spiel zu starten
+  hdri-holen.mjs    Holt eine HDRI von Poly Haven (CC0) als Lichtquelle des
+                    realen Stils, samt Herkunftsvermerk
+  textur-holen.mjs  Holt einen Fotooberflächen-Satz von Poly Haven, verkleinert
+                    ihn und legt ihn für `surface.js` ab
+  bild-messen.mjs   Vergleicht Bilder über Tonwertumfang und ausgebrannte
+                    Flächen – „sieht besser aus“ ist kein Befund
   assets-liste.mjs  Welche Assets das Spiel zur Laufzeit wirklich holt
   sw-liste.mjs      Trägt Liste und Version in den Service Worker ein
   einzeldatei.mjs   Packt den Build in eine einzelne HTML-Datei
@@ -216,6 +224,32 @@ tools/
 - Die Karte ist punktsymmetrisch. Was auf der einen Seite Deckung, Aufstieg oder
   Sichtschutz ist, gehört gespiegelt auch auf die andere – sonst hat eine
   Mannschaft die bessere Hälfte.
+- Das Farbbild wird in ein **Halbgleitkomma**-Target gerendert. Mit acht Bit
+  wurde alles über Weiß abgeschnitten, bevor Belichtung und Kurve rechneten –
+  daher der ausgebrannte Himmel im realen Stil. Gemessen stehen dort mit Sonne
+  im Bild Werte bis 44 000.
+- Das Licht des realen Stils kommt aus einer HDRI (`assets/hdri/himmel.hdr`),
+  nicht aus gerechnetem Himmel: der liefert nur Werte bis knapp über 1, und aus
+  so einem flachen Signal macht keine Belichtung ein Foto. Die Sonnenrichtung
+  liest `sonneAusHdri()` aus dem hellsten Fleck – nie von Hand eintragen, sonst
+  steht der Schatten woanders als die Sonne. Ohne Netz bleibt `buildRealSky()`
+  als Rückfallebene.
+- Oberflächen im realen Stil: `SURFACE_FOR_MATERIAL` in `surface.js` ordnet
+  jedem Material des Bausatzes (MI_Plaster, MI_RoundTiles …) einen Fotosatz zu.
+  Die Kit-Teile haben UVs, also `uvSurface()` statt Weltraum-Projektion. Die
+  Fotofarbe wird **eingemischt, nicht ersetzt** – sonst sehen zwei Wandstücke
+  verschieden aus, weil ihre UV-Inseln verschieden groß sind. Große Flächen
+  brauchen `makro`, sonst sieht man das Kachelraster.
+- Die Vorlade-Liste ist zweigeteilt (`assetGruppen()` in `tools/assets-liste.mjs`):
+  Grundpaket (Figuren, Bausatz) unter 8 MB und offline, Realismus-Satz (HDRI,
+  Fotooberflächen) nur nachgeladen. Neue Realismus-Assets gehören in die zweite
+  Gruppe, sonst wächst das Offline-Paket unbemerkt.
+- `figurlook.js` greift **nur** im Cel-Stil. Saum, gedämpftes Fülllicht und
+  Bodenverdunkelung sind Ersatz für Licht, das es im realen Stil wirklich gibt.
+- Läuft der reale Stil zu langsam, schaltet `leistungPruefen()` in `main.js`
+  stufenweise Effekte ab (erst Streulicht, dann Umgebungsverdeckung) und merkt
+  sich erst danach den Rückfall auf Cel. Wer den Stil selbst gewählt hat, wird
+  nicht überstimmt.
 - Nach Änderungen `npm run build` laufen lassen; muss ohne Fehler durchgehen.
 
 ## Roadmap
