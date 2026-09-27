@@ -231,12 +231,12 @@ hud.onGrafik = () => {
 // Einschalten heißt immer kalibrieren: zwei Bewegungen, aus denen die Achsen
 // gemessen werden. Ohne gültige Achsen bleibt der Gyro aus.
 let kalibLaeuft = false;   // solange wahr, darf die Schleife den Gyro-Puffer nicht leeren
-async function gyroKalibrieren() {
+async function gyroKalibrieren(opt) {
   kalibLaeuft = true;
-  try { return await _gyroKalibrieren(input.gyro); }
+  try { return await _gyroKalibrieren(input.gyro, opt); }
   finally { kalibLaeuft = false; }
 }
-async function _gyroKalibrieren(g) {
+async function _gyroKalibrieren(g, { nurPruefen = true } = {}) {
   let fehler = null, gewarnt = false;
   // Anzeige der Rohwerte in jedem Schritt: so lässt sich aus einem Bildschirm-
   // foto ablesen, was das Gerät bei welcher Bewegung meldet.
@@ -251,7 +251,42 @@ async function _gyroKalibrieren(g) {
     requestAnimationFrame(zeigen);
   };
   zeigen();
+
+  /**
+   * Der Prüfschritt: ein Punkt bewegt sich genau so, wie das Spiel den Blick
+   * bewegen würde. „Stimmt“ gibt es erst, wenn er rechts **und** oben war –
+   * eine Kalibrierung, bei der eine Richtung tot ist oder verkehrt herum
+   * läuft, kommt so nicht ins Spiel.
+   */
+  const pruefen = async () => {
+    let px = 0, py = 0, warRechts = false, warOben = false;
+    punkt = () => {
+      const [dyaw, dpitch] = g.take();
+      // yaw+ = Blick nach links → Punkt nach links; pitch+ = nach oben
+      px = Math.max(-1, Math.min(1, px - dyaw * 1.4));
+      py = Math.max(-1, Math.min(1, py + dpitch * 1.4));
+      px *= 0.94; py *= 0.94;              // zieht zur Mitte zurück, wie ein Fadenkreuz-Test
+      hud.kalibPunkt(px, py);
+      if (px > 0.4) warRechts = true;
+      if (py > 0.4) warOben = true;
+      hud.kalibStimmtFrei(warRechts && warOben);
+    };
+    g.take();
+    const stimmt = await hud.kalibSchritt(3, 'Prüfen',
+      'Dreh nach rechts – der Punkt muss nach rechts. Kipp nach oben – der Punkt muss nach oben. „Stimmt“ wird frei, sobald er beides gemacht hat. Geht er in die falsche Richtung oder gar nicht: Nochmal.', null, { pruefen: true });
+    punkt = null;
+    return stimmt;
+  };
+
   try {
+    // Liegen Achsen vor, die nie bestätigt wurden – aus einer älteren Fassung
+    // oder aus einer abgebrochenen Kalibrierung –, wird **nicht neu gemessen**,
+    // sondern erst geprüft. Stimmt die Richtung, bleibt alles, wie es war.
+    if (nurPruefen && g.hatAchsen && !g.kalibriert) {
+      if (await pruefen()) { g.kalibBestaetigen(); return true; }
+      g.kalibVerwerfen();
+      fehler = 'Dann messen wir die Achsen neu.';
+    }
     for (let versuch = 0; versuch < 5; versuch++) {
       g.kalibStart();
       let weiter = await hud.kalibSchritt(1, 'Nach links schwenken',
@@ -281,26 +316,11 @@ async function _gyroKalibrieren(g) {
         continue;
       }
 
-      // Prüfen: ein Punkt bewegt sich genau so, wie das Spiel den Blick bewegen
-      // würde. „Stimmt“ gibt es erst, wenn er rechts und oben war – eine
-      // Kalibrierung, bei der eine Richtung tot ist, kommt so nicht ins Spiel.
-      let px = 0, py = 0, warRechts = false, warOben = false;
-      punkt = () => {
-        const [dyaw, dpitch] = g.take();
-        // yaw+ = Blick nach links → Punkt nach links; pitch+ = nach oben
-        px = Math.max(-1, Math.min(1, px - dyaw * 1.4));
-        py = Math.max(-1, Math.min(1, py + dpitch * 1.4));
-        px *= 0.94; py *= 0.94;              // zieht zur Mitte zurück, wie ein Fadenkreuz-Test
-        hud.kalibPunkt(px, py);
-        if (px > 0.4) warRechts = true;
-        if (py > 0.4) warOben = true;
-        hud.kalibStimmtFrei(warRechts && warOben);
-      };
-      g.take();
-      const stimmt = await hud.kalibSchritt(3, 'Prüfen',
-        'Dreh nach rechts – der Punkt muss nach rechts. Kipp nach oben – der Punkt muss nach oben. „Stimmt“ wird frei, sobald er beides gemacht hat. Geht er in die falsche Richtung oder gar nicht: Nochmal.', null, { pruefen: true });
-      punkt = null;
-      if (stimmt) return true;
+      if (await pruefen()) { g.kalibBestaetigen(); return true; }
+      // Nicht bestanden heißt: die gemessenen Achsen sind nichts wert. Sie
+      // stehen gar nicht erst im Speicher und werden hier auch aus dem
+      // laufenden Zustand geworfen.
+      g.kalibVerwerfen();
       fehler = null;   // „Nochmal“ ist kein Fehler – einfach von vorn
     }
     return false;
@@ -314,8 +334,9 @@ hud.onGyro = async () => {
   const g = input.gyro;
   if (g.einst.an && g.laeuft) { g.ausschalten(); hud.gyroStand(false); return false; }
   if (!(await g.einschalten())) { hud.gyroStand(false); return false; }     // keine Erlaubnis
-  // Einmal kalibriert bleibt kalibriert. Neu messen nur auf Wunsch
-  // („Neu kalibrieren“ unter Bedienung anpassen) oder wenn nichts gespeichert ist.
+  // Einmal **bestätigt** bleibt bestätigt. Sind Achsen da, aber ungeprüft,
+  // kommt zuerst der Prüfschritt; neu gemessen wird nur, wenn er nicht besteht
+  // oder nichts gespeichert ist.
   const ok = g.kalibriert || await gyroKalibrieren();
   if (!ok) g.ausschalten();
   hud.gyroStand(ok, g.einst);
@@ -335,7 +356,8 @@ hud.onGyroKalib = async () => {
   sound.klick();
   const g = input.gyro;
   if (!(await g.einschalten())) return;
-  const ok = await gyroKalibrieren();
+  // „Neu kalibrieren“ heißt neu messen, nicht nur nachprüfen.
+  const ok = await gyroKalibrieren({ nurPruefen: false });
   if (!ok && !g.kalibriert) g.ausschalten();
   hud.gyroStand(g.einst.an && g.laeuft, g.einst);
 };
