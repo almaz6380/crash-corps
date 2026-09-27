@@ -190,7 +190,7 @@ function start(clsId) {
     };
   }
   hud.domAufbauen(dom);
-  hud.ende(null);
+  hud.ende(null); hud.pause(false);   // neue Runde: nichts mehr zum Fortsetzen
   time = 0; running = true;
   hud.showMenu(false);
   if (TOUCH) {
@@ -240,48 +240,20 @@ async function _gyroKalibrieren(g) {
   let fehler = null, gewarnt = false;
   // Anzeige der Rohwerte in jedem Schritt: so lässt sich aus einem Bildschirm-
   // foto ablesen, was das Gerät bei welcher Bewegung meldet.
-  let lauf = true, punkt = null;
+  let lauf = true;
   const zeigen = () => {
     if (!lauf) return;
     const [b, ga, a] = g.roh, s = g.schwere;
     hud.kalibMess(`Drehung β ${b} γ ${ga} α ${a} °/s` + (s
       ? `   Lage x ${s[0].toFixed(1)} y ${s[1].toFixed(1)} z ${s[2].toFixed(1)}`
       : '   Lage –') + (g.laeuft ? '' : '   (kein Sensor)'));
-    punkt?.();
     requestAnimationFrame(zeigen);
   };
   zeigen();
 
-  /**
-   * Der Prüfschritt: ein Punkt bewegt sich genau so, wie das Spiel den Blick
-   * bewegen würde. „Stimmt“ gibt es erst, wenn er rechts **und** oben war –
-   * eine Kalibrierung, bei der eine Richtung tot ist oder verkehrt herum
-   * läuft, kommt so nicht ins Spiel.
-   */
-  const pruefen = async () => {
-    let px = 0, py = 0, warRechts = false, warOben = false;
-    punkt = () => {
-      const [dyaw, dpitch] = g.take();
-      // yaw+ = Blick nach links → Punkt nach links; pitch+ = nach oben
-      px = Math.max(-1, Math.min(1, px - dyaw * 1.4));
-      py = Math.max(-1, Math.min(1, py + dpitch * 1.4));
-      px *= 0.94; py *= 0.94;              // zieht zur Mitte zurück, wie ein Fadenkreuz-Test
-      hud.kalibPunkt(px, py);
-      if (px > 0.4) warRechts = true;
-      if (py > 0.4) warOben = true;
-      hud.kalibStimmtFrei(warRechts && warOben);
-    };
-    g.take();
-    const stimmt = await hud.kalibSchritt(3, 'Prüfen',
-      'Dreh nach rechts – der Punkt muss nach rechts. Kipp nach oben – der Punkt muss nach oben. „Stimmt“ wird frei, sobald er beides gemacht hat. Geht er in die falsche Richtung oder gar nicht: Nochmal.', null, { pruefen: true });
-    punkt = null;
-    return stimmt;
-  };
-
   try {
     // Hierher kommt nur, wer **keine** Achsen hat oder ausdrücklich „Neu
-    // kalibrieren“ getippt hat. Niemand sonst sieht diesen Bildschirm – ein
-    // Prüfschritt bei jedem Einschalten ist eine Zumutung, kein Schutz.
+    // kalibrieren“ getippt hat. Zwei Bewegungen, dann ist Schluss.
     for (let versuch = 0; versuch < 5; versuch++) {
       g.kalibStart();
       let weiter = await hud.kalibSchritt(1, 'Nach links schwenken',
@@ -301,7 +273,7 @@ async function _gyroKalibrieren(g) {
 
       g.kalibStart();
       weiter = await hud.kalibSchritt(2, 'Nach oben kippen',
-        'Jetzt richte die Kamera auf die Decke: Oberkante des Handys von dir weg kippen. Dann Weiter.', null);
+        'Jetzt richte die Kamera auf die Decke: Oberkante des Handys von dir weg kippen. Dann Weiter – das war\'s.', null);
       if (!weiter) return false;
       const oben = g.kalibEnde();
       if (!oben) { fehler = 'Zu wenig Bewegung beim Kippen. Beide Bewegungen bitte nochmal.'; continue; }
@@ -311,12 +283,12 @@ async function _gyroKalibrieren(g) {
         continue;
       }
 
-      if (await pruefen()) { g.kalibBestaetigen(); return true; }
-      // Nicht bestanden heißt: die gemessenen Achsen sind nichts wert. Sie
-      // stehen gar nicht erst im Speicher und werden hier auch aus dem
-      // laufenden Zustand geworfen.
-      g.kalibVerwerfen();
-      fehler = null;   // „Nochmal“ ist kein Fehler – einfach von vorn
+      // Zwei Bewegungen, gespeichert, fertig. Hier stand einmal ein dritter
+      // Bildschirm, auf dem ein Punkt im Raster die Richtung bestätigen
+      // sollte. Wer ihn nicht bestand, bekam beim **nächsten** Einschalten
+      // wieder alles von vorn und nie einen laufenden Gyro. Stimmt die
+      // Richtung nicht, drehen die Pfeile ↔ und ↕ neben dem Kompass sie um.
+      return true;
     }
     return false;
   } finally {
@@ -361,7 +333,15 @@ if (input.touch) input.touch.onKalib = () => hud.onGyroKalib();
 hud.onGyroStaerke = (v) => input.gyro.staerke(v);
 hud.onGyroUmkehr = (achse, an) => input.gyro.umkehren(achse, an);
 hud.gyroStand(input.gyro.einst.an && input.gyro.laeuft, input.gyro.einst);
-hud.onWeiter = () => { sound.klick(); hud.ende(null); hud.showMenu(true); };
+hud.onWeiter = () => { sound.klick(); hud.ende(null); hud.showMenu(true); hud.pause(false); };
+// Zurück in die angehaltene Runde. Sie steht noch komplett da – Figuren,
+// Punktestand, Munition –, es lief nur die Schleife nicht weiter.
+hud.onFortsetzen = () => {
+  sound.klick(); sound.resume();
+  hud.pause(false); hud.showMenu(false);
+  running = true;
+  if (TOUCH) { input.showTouch(true); hud.hint(false); }
+};
 
 // Figuren und Arena-Props laden, dann Arena bauen, dann Menü freigeben
 hud.showMenu(false); hud.loading('Wird geladen …');
@@ -478,7 +458,10 @@ function loop(now) {
   const dt = Math.min(0.05, roh); last = now;
   if (input.takeMute()) hud.tonStand(sound.schalten());
   if (input.takeSicht() && player) { sound.klick(); player.sichtUmschalten(); }
-  if (input.takeMenu() && running) { running = false; input.showTouch(false); hud.showMenu(true); hud.hint(false); }
+  // Menüknopf (☰ auf dem Handy, Esc am Rechner): die Runde hält an und wartet.
+  if (input.takeMenu() && running) {
+    running = false; input.showTouch(false); hud.showMenu(true); hud.hint(false); hud.pause(true);
+  }
   // Im Menü sammelt sich sonst Drehung an, die beim Start den Blick wegreißt –
   // außer während der Kalibrierung, da liest der Prüfschritt den Puffer selbst.
   if (!running) { if (!kalibLaeuft) input.gyro.leeren(); pipeline.render(scene, camera); return; }

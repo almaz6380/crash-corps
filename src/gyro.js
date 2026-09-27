@@ -24,7 +24,7 @@ const KEY = 'crashcorps.gyro';
 const RAD = Math.PI / 180;
 
 /** Voreinstellung. `staerke` 1 heißt: eine Handdrehung dreht den Blick genauso weit. */
-const WERKS = { an: false, staerke: 1.0, invertX: false, invertY: false, achsen: null, geprueft: false };
+const WERKS = { an: false, staerke: 1.0, invertX: false, invertY: false, achsen: null };
 
 /** So viel Drehung muss eine Kalibrierbewegung mindestens haben, in Bogenmaß. */
 const MINDEST = 15 * Math.PI / 180;
@@ -55,18 +55,15 @@ export class Gyro {
   }
 
   /**
-   * Sind Achsen bekannt **und bestätigt**? Ohne bestätigte Kalibrierung zielt
-   * der Gyro nicht.
+   * Sind Achsen bekannt? Ohne sie kann der Gyro nicht zielen.
    *
-   * Die Bestätigung ist der Prüfschritt: der Punkt muss nach rechts gehen, wenn
-   * man nach rechts dreht. Vorher wurden die Achsen sofort beim Messen
-   * gespeichert – wer den Prüfschritt abbrach, behielt eine ungeprüfte
-   * Kalibrierung für immer, und die zielte dann womöglich verkehrt herum, ohne
-   * dass je wieder jemand nachgefragt hätte.
+   * Es gab hier einmal eine zweite Stufe („gemessen, aber noch nicht im
+   * Prüfschritt bestätigt"). Sie hat mehr kaputt gemacht als geholfen: wessen
+   * Prüfschritt nicht durchging, bekam **bei jedem Einschalten** wieder den
+   * Kalibrierbildschirm und nie einen laufenden Gyro. Gemessen ist gemessen;
+   * stimmt die Richtung nicht, drehen die Pfeile ↔ und ↕ sie um.
    */
-  get kalibriert() { return !!this.einst.achsen && this.einst.geprueft === true; }
-
-  /** Achsen vorhanden, aber (noch) nicht bestätigt. */
+  get kalibriert() { return !!this.einst.achsen; }
   get hatAchsen() { return !!this.einst.achsen; }
 
   /**
@@ -121,31 +118,16 @@ export class Gyro {
     if (Math.abs(d) > 0.8) return false;     // fast dieselbe Bewegung – so nicht
     const n = [oben[0] - d * links[0], oben[1] - d * links[1], oben[2] - d * links[2]];
     const l = Math.hypot(n[0], n[1], n[2]) || 1;
-    // Noch nicht speichern: erst der Prüfschritt macht daraus eine Kalibrierung,
-    // der man glauben darf.
+    // Sofort speichern. Zwei Bewegungen, fertig – wer hier steht, wollte den
+    // Gyro benutzen, nicht eine Prüfung bestehen.
     this.einst.achsen = { gier: links, nick: [n[0] / l, n[1] / l, n[2] / l] };
-    this.einst.geprueft = false;
-    return true;
-  }
-
-  /** Der Prüfschritt ist bestanden: ab jetzt gilt die Kalibrierung. */
-  kalibBestaetigen() {
-    if (!this.einst.achsen) return false;
-    this.einst.geprueft = true;
     this._speichern();
     return true;
   }
 
-  /** Ungeprüfte Achsen wegwerfen und auf den gespeicherten Stand zurück. */
-  kalibVerwerfen() {
-    const alt = this._laden();
-    this.einst.achsen = alt.geprueft ? alt.achsen : null;
-    this.einst.geprueft = !!alt.geprueft && !!alt.achsen;
-  }
-
   /** Kalibrierung verwerfen – der Gyro ist dann aus, bis neu kalibriert wird. */
   kalibLoeschen() {
-    this.einst.achsen = null; this.einst.geprueft = false;
+    this.einst.achsen = null;
     this.ausschalten();
   }
 

@@ -14,6 +14,7 @@ export class Hud {
       <div id="menu">
         <h1>Crash Corps</h1>
         <p class="sub">Wähl Modus und Klasse. Dann rein.</p>
+        <button id="fortsetzen" type="button" hidden>Weiter spielen</button>
         <div id="modi">
           <button type="button" data-modus="deathmatch">Deathmatch<small>Sechs im Tal</small></button>
           <button type="button" data-modus="domination">Domination<small>5 Punkte, 6 gegen 6</small></button>
@@ -38,7 +39,7 @@ export class Hud {
         <p id="offline" hidden></p>
         <p id="stand">Stand ${typeof __BUILD__ !== 'undefined' ? __BUILD__ : '?'}</p>
         <p class="help">${TOUCH
-          ? 'Links ziehen zum Laufen · rechts wischen zum Umsehen · FEUER halten · ⤒ springen · R nachladen · Q Spezial'
+          ? 'Links ziehen zum Laufen · rechts wischen zum Umsehen · FEUER halten · ⤒ springen · R nachladen · Q Spezial · ☰ Pause'
           : 'WASD laufen · Shift sprinten · Leertaste springen · Klick schießen · R nachladen · Q Spezial · V Ansicht · M Ton · Esc Menü'}</p>
       </div>
       <div id="play" hidden>
@@ -166,6 +167,11 @@ export class Hud {
       }
     };
     this.gyroKnopf = knopf;
+    // Pause: aus der Runde ins Menü und zurück. Ohne den Rückweg wäre der
+    // Menüknopf im Spiel ein Ausknopf – wer nur den Ton umstellen will,
+    // verlöre die Runde.
+    this.fortsetzenKnopf = root.querySelector('#fortsetzen');
+    this.fortsetzenKnopf.onclick = () => this.onFortsetzen?.();
     this.hilfeZeile = root.querySelector('#menu .help');
     this.hilfeText = this.hilfeZeile.textContent;
   }
@@ -176,7 +182,7 @@ export class Hud {
    */
   kalibSchritt(nummer, titel, text, fehler = null, { pruefen = false } = {}) {
     const q = (s) => this.kalibEl.querySelector(s);
-    q('#kalib-schritt').textContent = `Gyroskop kalibrieren · Schritt ${nummer} von 3`;
+    q('#kalib-schritt').textContent = `Gyroskop einrichten · Schritt ${nummer} von 2`;
     q('#kalib-titel').textContent = titel;
     q('#kalib-text').textContent = text;
     q('#kalib-fehler').hidden = !fehler;
@@ -344,6 +350,9 @@ export class Hud {
   }
 
   showMenu(on) { this.root.querySelector('#menu').hidden = !on; this.root.querySelector('#play').hidden = on; }
+
+  /** Läuft im Hintergrund eine angehaltene Runde? Dann gibt es den Rückweg. */
+  pause(on) { if (this.fortsetzenKnopf) this.fortsetzenKnopf.hidden = !on; }
   hint(on) { this.root.querySelector('#hint').hidden = !on; }
   kill(text) {
     const el = document.createElement('div'); el.textContent = text; this.feed.prepend(el);

@@ -89,6 +89,9 @@ const LAYOUT_KEY = 'crashcorps.touchLayout';
 
 /** Anordnung ab Werk. x/y sind Anteile der Bildschirmgröße (Mittelpunkt). */
 const DEFAULT_LAYOUT = {
+  // Oben links, weit weg von Stick und Feuerknopf: von hier kommt man aus der
+  // Runde heraus, ohne die App zu schließen. Am Rechner macht das Esc.
+  menu:    { x: 0.045, y: 0.085, size: 52 },
   fire:    { x: 0.905, y: 0.775, size: 108 },
   jump:    { x: 0.775, y: 0.815, size: 68 },
   reload:  { x: 0.935, y: 0.545, size: 68 },
@@ -124,6 +127,7 @@ class TouchControls {
       <div id="t-move"><div id="t-stick" hidden><div id="t-knob"></div></div></div>
       <div id="t-look"></div>
       <div id="t-buttons">
+        <button id="t-menu" type="button" data-key="menu" title="Pause und Einstellungen">☰</button>
         <button id="t-sicht" type="button" data-key="sicht" title="Ansicht wechseln">👁</button>
         <button id="t-special" type="button" data-key="special">Q</button>
         <button id="t-reload" type="button" data-key="reload">R</button>
@@ -230,6 +234,7 @@ class TouchControls {
     tap('#t-reload', () => { this.input._reload = true; });
     tap('#t-special', () => { this.input._special = true; });
     tap('#t-sicht', () => { this.input._sicht = true; });
+    tap('#t-menu', () => { this.input._menu = true; });
   }
 
   /** Anordnung auf die Schaltflächen schreiben. */
@@ -266,7 +271,7 @@ class TouchControls {
     this.selected = key;
     for (const b of this.buttons) b.classList.toggle('sel', b.dataset.key === key);
     this.el.querySelector('#t-ghost')?.classList.toggle('sel', key === 'stick');
-    const name = { fire: 'Feuer', jump: 'Springen', reload: 'Nachladen', special: 'Spezial', sicht: 'Ansicht', stick: 'Stick' }[key];
+    const name = { fire: 'Feuer', jump: 'Springen', reload: 'Nachladen', special: 'Spezial', sicht: 'Ansicht', menu: 'Menü', stick: 'Stick' }[key];
     this.el.querySelector('#t-edit-name').textContent = name || 'Knopf antippen';
     const slider = this.el.querySelector('#t-edit-size');
     slider.disabled = !key;
