@@ -20,9 +20,14 @@ Class-based Cartoon-Arena-Shooter im Browser, seit dem Figurentausch im Fantasy-
 ```
 src/
   main.js      Bootstrap, Game-Loop, Zustand (Menü → Match → Ende)
-  world.js     Dorf aus einem modularen Bausatz: Häuser aufs 2-m-Raster, Gassen,
-               drei Ebenen (Boden, Holzgalerien, Dachterrassen), Treppen und
-               Kistenstapel, Torhäuser, Marktstände, Waldrand, Kollisionsquader, Licht
+  terrain.js   Das Höhenfeld unter allem: eine feste Funktion, abgetastet auf
+               2 m. Talstadt, zwei Böschungen, zwei Terrassen, Hochterrasse –
+               an z = 0 gespiegelt. Die Hohlwege sind Einschnitte darin
+  world.js     Die Stadt am Hang, 240 x 240 m, gebaut aus Mustern (gasse, hof,
+               bruestung, rampenstrasse, ruine), je Seite einmal. Drei Ebenen,
+               Stadtmauer, fuenf Kontrollpunkte, Kollisionsraster, Licht
+  navgitter.js Wegfindung: 2-m-Zellen ueber die Welt, A*, Glaettung ueber
+               Sichtlinien. Ebenen laufen weiter ueber world.ramps
   player.js    FPS-Controller (PointerLock, WASD, Sprung, Kollision grob)
   classes.js   Klassendefinitionen (HP, Speed, Waffe, Farbe, Spezial)
   weapons.js   Waffenlogik (Raycast-Hitscan, Cooldown, Spread, Schaden)
@@ -43,7 +48,7 @@ src/
   aimassist.js Zielhilfe für Touch: Reibung im Zielkegel und träges Nachführen
   gyro.js      Zielen mit dem Gyroskop: Drehrate statt Lage. Die Blickachsen werden
                beim Einschalten kalibriert (zwei Bewegungen), nicht hergeleitet
-  domination.js Modus mit drei Kontrollpunkten: Mannschaften, Eroberung, Punktestand,
+  domination.js Modus mit fuenf Kontrollpunkten: Mannschaften, Eroberung, Punktestand,
                Marker in der Arena und Marschziele für die Bots
   sound.js     Klang, vollständig zur Laufzeit erzeugt (WebAudio) – keine Audiodateien.
                Schüsse, Treffer, Schritte, Nachladen, Spezial, Menü. Weltklänge mit
@@ -250,6 +255,45 @@ tools/
   stufenweise Effekte ab (erst Streulicht, dann Umgebungsverdeckung) und merkt
   sich erst danach den Rückfall auf Cel. Wer den Stil selbst gewählt hat, wird
   nicht überstimmt.
+- Die Welt ist 240 x 240 m und hat ein **Höhenfeld** (`terrain.js`). Bild,
+  Kollision und Wegfindung fragen dieselbe Funktion `hoeheBei()`; wer
+  woanders rechnet, baut ein Loch im Boden. Alles in `world.js` rechnet in
+  Höhen **über Gelände** – die Hilfsfunktionen schlagen die Geländehöhe drauf.
+- **Gespiegelt an z = 0**, nicht punktsymmetrisch: die Mannschaften stehen im
+  Norden und im Süden, und `landschaft()` hängt nur von `|z|` ab. Jede Anlage
+  wird zweimal gebaut (`seiten()`); Drehungen spiegelt `mry()`, Richtungen
+  `mdir()`. Was auf der Spiegelachse steht (Markt, Handwerkerhöfe), wird
+  **einmal** gebaut – sonst stehen zwei Anlagen ineinander.
+- Steiler als `NEIGUNG_MAX` ist Wand, nicht Rampe: `resolveCollisions()` hält
+  an, wer bergauf in eine zu steile Neigung läuft. Höhe wird dadurch zur
+  Spielfeldgrenze. Hinauf geht es nur über die **Hohlwege**, die `terrain.js`
+  in die Böschungen schneidet – drei je Seite, damit nicht die ganze
+  Mannschaft in derselben Engstelle steht.
+- Treppen beginnen auf dem **Boden am Treppenfuß**, nicht auf der Bauhöhe des
+  Decks: am Hang stünde die unterste Stufe sonst in der Luft. Nach jeder
+  Änderung an Treppen oder Höfen jeden Aufstieg einmal zu Fuß ablaufen lassen.
+- Bauteile werden **gesammelt, nicht gesetzt**: `place()` merkt sich nur
+  Position, Drehung und Maßstab, `bauFertig()` baut daraus je Bauteil und
+  Bezirk eine `InstancedMesh`. Kollisionsquader kommen **nicht** in die Szene –
+  sie werden nie gezeichnet und würden nur je Bild durchlaufen.
+- Kollisionsquader liegen in einem Raster von 8 m. `inBereich()` liefert die
+  Quader unter einem Rechteck, `amStrahl()` die entlang eines Strahls. Beide
+  liefern **Kandidaten**, keine Treffer – wer die Überlappung nicht selbst
+  prüft, sperrt ganze Rasterzellen (so war einmal das halbe Tal unbegehbar).
+- Bots laufen über das Navigationsgitter, wenn die Luftlinie verstellt ist.
+  Der **Aufstieg ist der letzte Schritt**: erst über den Boden in die Nähe,
+  dann die Treppe. Andersherum schickt jedes höher liegende Ziel den Bot auf
+  die nächstbeste Treppe, und er steht auf einem Dach im Tal, während der
+  Punkt auf der Terrasse liegt. Zum Fuß einer Treppe läuft er ebenfalls über
+  das Gitter, nicht geradeaus.
+- Die Stufengrenze im Gitter ist die **Neigung**, nicht `STEP_UP`: auf einem
+  durchgehenden Hang läuft man bergauf, ohne zu steigen. Mit der Schrittweite
+  als Grenze ist jede Auffahrt gesperrt.
+- Jeder Modus hat seinen Ausschnitt (`world.zonen`), und `resolveCollisions()`
+  begrenzt **je Achse**: das Tal ist dreimal so lang wie breit. Deathmatch
+  spielt im Tal mit sechs Figuren, Domination auf der ganzen Karte mit zwölf.
+  Die Figurenzahl ist der letzte Regler in `leistungPruefen()`, paarweise
+  gekürzt, damit das Sparen den Spielstand nicht verschiebt.
 - Nach Änderungen `npm run build` laufen lassen; muss ohne Fehler durchgehen.
 
 ## Roadmap
@@ -260,7 +304,10 @@ tools/
 5. [x] Sounds – prozedural erzeugt, mit Richtungshören und Ton-Schalter (M)
 6. [x] Touch-Controls (Mobile) – Bildschirm-Stick, Wischen zum Umsehen, anpassbare Schaltflächen, Zielhilfe
 7. [x] Asset-Pipeline: Modelle in `public/assets/`, Loader in `assets.js` (Quaternius Ultimate Modular Men, CC0)
-8. [ ] Multiplayer-Server (eigenes Repo)
+8. [x] Fotorealistischer Stil als Standard (HDRI-Licht, AgX, Fotooberflächen)
+9. [x] Die Stadt am Hang: 240 x 240 m, Höhenfeld, drei Ebenen, Wegfindung
+       über ein Gitter, zwei Modi mit eigener Größe
+10. [ ] Multiplayer-Server (eigenes Repo)
 
 ## Auslieferung
 - Das Menü zeigt unten „Stand TT.MM., HH:MM“ – der Bauzeitpunkt aus `vite.config.js`
