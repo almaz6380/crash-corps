@@ -190,8 +190,9 @@ export class Player {
     this.vel.x = move.x; this.vel.z = move.z;
     if (inp.jump && this.grounded) { this.vel.y = JUMP; this.grounded = false; }
     this.vel.y -= GRAVITY * dt;
+    const vorher = { x: this.pos.x, z: this.pos.z };
     this.pos.addScaledVector(this.vel, dt);
-    resolveCollisions(this.pos, 0.45, this.world, { height: this.cls.body.height });
+    resolveCollisions(this.pos, 0.45, this.world, { height: this.cls.body.height, von: vorher });
     // Boden unter den Füßen: Rampenstufen und Plattformdächer zählen mit
     const support = groundHeightAt(this.pos, 0.32, this.world, this.pos.y + STEP_UP);
     const fallTempo = this.vel.y;

@@ -358,8 +358,9 @@ export class Bot {
     this.dodgeCool = Math.max(0, this.dodgeCool - dt);
     if (this.dodge > 0) {
       this.dodge -= dt;
+      const vorRolle = { x: this.pos.x, z: this.pos.z };
       this.pos.addScaledVector(this.dodgeDir, this.dodgeSpeed * dt);
-      resolveCollisions(this.pos, 0.5, this.world, { height: this.cls.body.height });
+      resolveCollisions(this.pos, 0.5, this.world, { height: this.cls.body.height, von: vorRolle });
       this.applyGravity(dt);
       this.anim.update(dt, { moving: false, speed: 0 });
       return;
@@ -421,8 +422,9 @@ export class Bot {
     const sturm = this.spezialAktiv > 0 && SPECIALS[this.cls.special].schaden;
     const speed = this.cls.speed * 0.8 * (sturm ? SPECIALS[this.cls.special].speedMul : 1);
     const walking = mv.lengthSq() > 0;
+    const vorSchritt = { x: this.pos.x, z: this.pos.z };
     if (walking) this.pos.addScaledVector(mv.normalize(), speed * dt);
-    resolveCollisions(this.pos, 0.5, this.world, { height: this.cls.body.height });
+    resolveCollisions(this.pos, 0.5, this.world, { height: this.cls.body.height, von: vorSchritt });
     this.applyGravity(dt);
     // Bots untereinander leicht auseinanderdrücken
     if (!climbing) for (const o of others) if (o !== this && !o.dead && Math.abs(o.pos.y - this.pos.y) < 1.2) {

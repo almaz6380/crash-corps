@@ -5,11 +5,20 @@ import { QUALITY } from './device.js';
 import { realisticMaterial, uvSurface, setImage } from './surface.js';
 import { spawnProp } from './assets.js';
 import { Leben } from './leben.js';
+import { WELT, hoeheBei, neigungBei, bodenGeometrie, bauhoehe, NEIGUNG_MAX } from './terrain.js';
 
 const RAMP = celRamp(4);
+/**
+ * Alles in diesem Modul rechnet in Höhen **über Gelände**. Die Hilfsfunktionen
+ * (`place`, `haus`, `deck`, `treppe` …) schlagen die Geländehöhe selbst drauf.
+ * Ein Bauteil mit `y: 2.4` liegt also 2,4 m über dem Boden an seiner Stelle,
+ * nicht 2,4 m über dem Meeresspiegel – sonst müsste jede Zeile des Stadtplans
+ * die Landschaft kennen.
+ */
 /** Props, die aus Blattkärtchen bestehen – siehe `place()`. */
 const LAUB = /Tree|Bush|Grass|Fern|Vine/;
-const SIZE = 60;                 // Kantenlänge der Arena
+const SIZE = WELT;               // Kantenlänge der Welt (terrain.js)
+const KERN = 76;                 // gepflasterter Stadtkern in der Mitte
 export const STEP_UP = 0.55;     // maximale Stufenhöhe, die Figuren erklimmen
 const PLATFORM_H = 2.4;          // Höhe der Galerien – zwei Treppenmodule à 1,2 m
 const ZELLE = 2;                 // Rastermaß des Bausatzes: Wände sind 2 m breit
@@ -56,15 +65,15 @@ function arenaFloorTexture() {
   const S = 2048, c = document.createElement('canvas');
   c.width = c.height = S;
   const x = c.getContext('2d');
-  const px = (v) => ((v + SIZE / 2) / SIZE) * S;      // Weltkoordinate → Pixel
-  const m = (v) => (v / SIZE) * S;                    // Länge → Pixel
+  const px = (v) => ((v + KERN / 2) / KERN) * S;      // Weltkoordinate → Pixel
+  const m = (v) => (v / KERN) * S;                    // Länge → Pixel
 
   // Im realistischen Stil wird der Boden mit den echten Texturen gemalt, sonst
   // prozedural. So passt die Arenafläche zu den texturierten Props.
   const pattern = (img, meters) => {
     if (!img) return null;
     const pat = x.createPattern(img, 'repeat');
-    const f = (meters / SIZE) * S / img.width;
+    const f = (meters / KERN) * S / img.width;
     pat.setTransform(new DOMMatrix([f, 0, 0, f, 0, 0]));
     return pat;
   };
@@ -166,8 +175,12 @@ export function buildWorld(scene, renderer) {
     // von oben eine Wiese statt einer Farbfläche.
     ? uvSurface(new THREE.MeshStandardMaterial({ name: 'Dirt', roughness: 1 }), 'dorf_wiese', { repeat: 80, makro: 0.8 })
     : new THREE.MeshToonMaterial({ map: otex, gradientMap: RAMP });
-  const ground = new THREE.Mesh(new THREE.PlaneGeometry(320, 320), groundMat);
-  ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; group.add(ground);
+  // Das Gelände selbst: ein Gitter, dessen Punkte auf Höhe gezogen sind.
+  // Es ist zugleich das, was `groundHeightAt()` unter den Füßen findet – Bild und
+  // Kollision fragen dieselbe Funktion, sonst läuft man neben dem sichtbaren
+  // Boden.
+  const ground = new THREE.Mesh(bodenGeometrie(), groundMat);
+  ground.receiveShadow = true; group.add(ground);
 
   // Bemalter Arenaboden darüber
   const floorMat = REAL
@@ -178,8 +191,18 @@ export function buildWorld(scene, renderer) {
         map: arenaFloorTexture(), name: 'Concrete', roughness: 1, polygonOffset: true, polygonOffsetFactor: -1 }),
         'dorf_pflaster', { repeat: 30, keepMap: true, farbe: 0.65, normale: 1.1 })
     : new THREE.MeshToonMaterial({ map: arenaFloorTexture(), gradientMap: RAMP, polygonOffset: true, polygonOffsetFactor: -1 });
-  const floor = new THREE.Mesh(new THREE.PlaneGeometry(SIZE, SIZE), floorMat);
-  floor.rotation.x = -Math.PI / 2; floor.position.y = 0.012; floor.receiveShadow = true; group.add(floor);
+  // Das Pflaster liegt nur über dem Stadtkern und folgt dem Gelände: eine ebene
+  // Platte stünde am Hang halb in der Luft. Zwei Zentimeter darüber, damit sich
+  // die beiden Flächen nicht ins Gehege kommen.
+  const kernGeo = new THREE.PlaneGeometry(KERN, KERN, KERN / 2, KERN / 2);
+  kernGeo.rotateX(-Math.PI / 2);
+  {
+    const pos = kernGeo.attributes.position;
+    for (let k = 0; k < pos.count; k++) pos.setY(k, hoeheBei(pos.getX(k), pos.getZ(k)) + 0.02);
+    kernGeo.computeVertexNormals();
+  }
+  const floor = new THREE.Mesh(kernGeo, floorMat);
+  floor.receiveShadow = true; group.add(floor);
 
   // ---- Kollisionsquader ----
   const box3 = (minX, minY, minZ, maxX, maxY, maxZ) => {
@@ -194,61 +217,128 @@ export function buildWorld(scene, renderer) {
   const solidBox = (box) => box3(box.min.x, box.min.y, box.min.z, box.max.x, box.max.y, box.max.z);
   const addBox = (x, y, z, w, h, d) => box3(x - w / 2, y - h / 2, z - d / 2, x + w / 2, y + h / 2, z + d / 2);
 
-  /** Prop setzen. solid: Kollisionsquader aus der Bounding-Box. */
-  const place = (name, x, z, ry = 0, { solid = true, scale = 1, y = 0, pad = 0 } = {}) => {
-    const p = spawnProp(name, { ramp: RAMP });
-    p.position.set(x, y, z); p.rotation.y = ry; p.scale.setScalar(scale);
-    // Pflanzen bestehen aus Blattkärtchen, deren Form nur in der Alphastufe
-    // steckt. Der Normalen-Durchgang kennt keinen Alphatest – die Kanten-
-    // erkennung zöge dort Rahmen um die Rechtecke. Also außen vorbei.
-    if (LAUB.test(name)) p.traverse(o => o.layers.set(OHNE_UMRISS));
-    group.add(p); p.updateMatrixWorld(true);
+  /**
+   * Bauteile werden **gesammelt, nicht einzeln gesetzt**.
+   *
+   * Eine Stadt dieser Größe hat einige tausend Wandstücke. Als eigene Objekte
+   * wäre jedes ein Zeichenaufruf; gesammelt wird daraus je Bauteil und Bezirk
+   * **eine** `InstancedMesh`. Aus Tausenden werden Dutzende.
+   *
+   * Je Bauteil hält `vorlagen` genau eine Kopie – sie liefert Geometrie,
+   * Material und die Maße für den Kollisionsquader, kommt aber nie in die Szene.
+   */
+  const vorlagen = new Map();
+  const sammlung = new Map();
+  const BEZIRK = 60;                     // Kantenlänge einer Sichtbarkeitskachel
+
+  const vorlage = (name) => {
+    if (!vorlagen.has(name)) {
+      const v = spawnProp(name, { ramp: RAMP });
+      v.updateMatrixWorld(true);
+      // Maße im Ruhezustand: daraus wird später jeder Kollisionsquader gerechnet
+      v.userData.mass = new THREE.Box3().setFromObject(v);
+      vorlagen.set(name, v);
+    }
+    return vorlagen.get(name);
+  };
+
+  const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _v = new THREE.Vector3();
+
+  /**
+   * Prop setzen. `solid`: Kollisionsquader aus den Maßen der Vorlage.
+   * `y` zählt über Gelände; `basis` überschreibt das, wo mehrere Teile auf
+   * **einer** Höhe stehen müssen – ein Haus am Hang zerfällt sonst in Stufen.
+   */
+  const place = (name, x, z, ry = 0, { solid = true, scale = 1, y = 0, pad = 0, basis = null, skala = null } = {}) => {
+    const v = vorlage(name);
+    const boden = basis ?? hoeheBei(x, z);
+    const s = skala ? new THREE.Vector3(...skala) : new THREE.Vector3(scale, scale, scale);
+    _q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), ry);
+    const matrix = new THREE.Matrix4().compose(_v.set(x, boden + y, z), _q, s);
+    const bezirk = `${Math.floor(x / BEZIRK)}_${Math.floor(z / BEZIRK)}`;
+    const schluessel = `${name}|${bezirk}`;
+    if (!sammlung.has(schluessel)) sammlung.set(schluessel, { name, eintraege: [] });
+    sammlung.get(schluessel).eintraege.push(matrix);
     if (solid) {
-      const box = new THREE.Box3().setFromObject(p);
+      const box = v.userData.mass.clone().applyMatrix4(matrix);
       box.min.x += pad; box.min.z += pad; box.max.x -= pad; box.max.z -= pad;
-      box.min.y = Math.min(box.min.y, 0);
+      // Bis zum Boden unter dem Teil, nicht bis zur Höhe null: auf einer
+      // Terrasse auf 17 m wäre eine Kiste sonst ein 17 m hoher Turm.
+      box.min.y = Math.min(box.min.y, boden);
       solidBox(box);
     }
-    return p;
+    return matrix;
+  };
+
+  /**
+   * Aus der Sammlung werden Instanzen. Je Bauteil, Bezirk und Teil-Mesh eine
+   * `InstancedMesh`: die Sichtbarkeitsprüfung wirft dann ganze Bezirke weg,
+   * statt eine Kiste um die halbe Stadt zu spannen.
+   */
+  const bauFertig = () => {
+    const mm = new THREE.Matrix4();
+    for (const { name, eintraege } of sammlung.values()) {
+      const v = vorlage(name);
+      v.traverse((o) => {
+        if (!o.isMesh) return;
+        const inst = new THREE.InstancedMesh(o.geometry, o.material, eintraege.length);
+        for (let i = 0; i < eintraege.length; i++) {
+          inst.setMatrixAt(i, mm.multiplyMatrices(eintraege[i], o.matrixWorld));
+        }
+        inst.instanceMatrix.needsUpdate = true;
+        inst.castShadow = true; inst.receiveShadow = true;
+        // Pflanzen bestehen aus Blattkärtchen, deren Form nur in der Alphastufe
+        // steckt. Der Normalen-Durchgang kennt keinen Alphatest – die Kanten-
+        // erkennung zöge dort Rahmen um die Rechtecke. Also außen vorbei.
+        if (LAUB.test(name)) inst.layers.set(OHNE_UMRISS);
+        inst.frustumCulled = true;
+        group.add(inst);
+      });
+    }
   };
 
   const holz = build(0x7a5a38, 'Wood', 'brown_planks_05');
+  // Sockel und Stützmauern am Hang: derselbe Bruchstein wie die Häuser
+  const steinMat = build(0x9a9287, 'RockTrim', 'dorf_stein');
   const holzDunkel = build(0x5b4128, 'Wood2', 'brown_planks_05');
 
   /**
    * Begehbare Galerie. Der Kollisionsquader sitzt nur unter der Oberkante,
    * darunter läuft man durch – so entsteht ein offener Gang unter dem Steg.
    */
-  const deck = (x, z, w, d, h = PLATFORM_H) => {
+  const deck = (x, z, w, d, h = PLATFORM_H, basis = null) => {
+    const b = basis ?? bauhoehe(x, z, w, d);
     const slab = new THREE.Mesh(new THREE.BoxGeometry(w, 0.3, d), holz);
-    slab.position.set(x, h - 0.15, z); slab.castShadow = slab.receiveShadow = true; group.add(slab);
+    slab.position.set(x, b + h - 0.15, z); slab.castShadow = slab.receiveShadow = true; group.add(slab);
     // Unterzug: von unten soll man Balken sehen, keine schwebende Platte
     for (const ox of [-w / 2 + 0.3, 0, w / 2 - 0.3]) {
       const balken = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.26, d), holzDunkel);
-      balken.position.set(x + ox, h - 0.42, z); balken.castShadow = true; group.add(balken);
+      balken.position.set(x + ox, b + h - 0.42, z); balken.castShadow = true; group.add(balken);
     }
-    box3(x - w / 2, h - 0.2, z - d / 2, x + w / 2, h, z + d / 2);
+    box3(x - w / 2, b + h - 0.2, z - d / 2, x + w / 2, b + h, z + d / 2);
     return slab;
   };
 
   /** Holzpfosten unter einer Galerie. */
-  const pfosten = (x, z, h = PLATFORM_H) => {
+  const pfosten = (x, z, h = PLATFORM_H, basis = null) => {
+    const b = basis ?? hoeheBei(x, z);
     const p = new THREE.Mesh(new THREE.BoxGeometry(0.22, h - 0.3, 0.22), holzDunkel);
-    p.position.set(x, (h - 0.3) / 2, z); p.castShadow = true; group.add(p);
-    box3(x - 0.14, 0, z - 0.14, x + 0.14, h - 0.3, z + 0.14);
+    p.position.set(x, b + (h - 0.3) / 2, z); p.castShadow = true; group.add(p);
+    box3(x - 0.14, b, z - 0.14, x + 0.14, b + h - 0.3, z + 0.14);
   };
 
   /**
    * Geländer aus Bausatzteilen entlang einer Kante. `dir` ist die Richtung, in
    * die das Geländer zeigt (0 = +z), `laenge` in Metern.
    */
-  const gelaender = (x, z, dir, laenge, y = PLATFORM_H) => {
+  const gelaender = (x, z, dir, laenge, y = PLATFORM_H, basis = null) => {
     const n = Math.max(1, Math.round(laenge / ZELLE));
+    const b = basis ?? hoeheBei(x, z);
     for (let i = 0; i < n; i++) {
       const t = -laenge / 2 + ZELLE / 2 + i * ZELLE;
       const ry = dir * Math.PI / 2;
       const ox = Math.cos(ry) * t, oz = -Math.sin(ry) * t;
-      place('dorf:Balcony_Simple_Straight', x + ox, z + oz, ry, { solid: false, y });
+      place('dorf:Balcony_Simple_Straight', x + ox, z + oz, ry, { solid: false, y, basis: b });
     }
   };
 
@@ -262,7 +352,8 @@ export function buildWorld(scene, renderer) {
    * am Kopf entsteht je ein Wegpunkt, damit die Bots den Aufstieg finden statt
    * gegen die Galerie zu laufen.
    */
-  const rampUp = (x, z, dir, { length = 4.16, width = 2, height = PLATFORM_H, steps = 6, base = 0 } = {}) => {
+  const rampUp = (x, z, dir, { length = 4.16, width = 2, height = PLATFORM_H, steps = 6, base = 0, basis = null } = {}) => {
+    const b0 = (basis ?? hoeheBei(x, z)) + base;      // Höhe, auf der die Treppe anfängt
     const toWorld = (lx, lz) => {
       switch (((dir % 4) + 4) % 4) {
         case 0: return [x + lx, z + lz];
@@ -272,18 +363,18 @@ export function buildWorld(scene, renderer) {
       }
     };
     for (let i = 0; i < steps; i++) {
-      const h = base + (height * (i + 1)) / steps;
+      const h = b0 + (height * (i + 1)) / steps;
       const lz0 = -length / 2 + (length * i) / steps, lz1 = -length / 2 + (length * (i + 1)) / steps;
       const a = toWorld(-width / 2, lz0), b = toWorld(width / 2, lz1);
       // Ab `base` nach oben, nicht ab dem Boden: eine Treppe, die auf einer
       // Galerie beginnt, wäre sonst ein Pfeiler bis zum Erdgeschoss und
       // versperrte den Durchgang darunter.
-      box3(Math.min(a[0], b[0]), base, Math.min(a[1], b[1]), Math.max(a[0], b[0]), h, Math.max(a[1], b[1]));
+      box3(Math.min(a[0], b[0]), b0, Math.min(a[1], b[1]), Math.max(a[0], b[0]), h, Math.max(a[1], b[1]));
     }
     const fuss = toWorld(0, -length / 2 - 1.2), kopf = toWorld(0, length / 2 + 0.8);
     ramps.push({
-      bottom: new THREE.Vector3(fuss[0], base, fuss[1]),
-      top: new THREE.Vector3(kopf[0], base + height, kopf[1]),
+      bottom: new THREE.Vector3(fuss[0], b0, fuss[1]),
+      top: new THREE.Vector3(kopf[0], b0 + height, kopf[1]),
     });
   };
 
@@ -295,8 +386,9 @@ export function buildWorld(scene, renderer) {
    * Ein Modul steigt 1 m auf 2,08 m Tiefe; auf 1,2 m gestreckt ergeben zwei
    * Module genau die Galeriehöhe.
    */
-  const treppe = (x, z, dir, { von = 0, bis = PLATFORM_H, kopf = null } = {}) => {
+  const treppe = (x, z, dir, { von = 0, bis = PLATFORM_H, kopf = null, basis = null } = {}) => {
     const ry = dir * Math.PI / 2;
+    const b = basis ?? hoeheBei(x, z);
     const hoehe = bis - von;
     // Ein Treppenmodul steigt einen Meter auf 2,08 m Tiefe. Für größere Höhen
     // werden mehrere gestapelt und in der Höhe gestreckt; für kleine reicht
@@ -307,18 +399,17 @@ export function buildWorld(scene, renderer) {
     for (let i = 0; i < stufen; i++) {
       const t = -(stufen * tiefe) / 2 + tiefe / 2 + i * tiefe;
       const ox = Math.cos(ry) * t, oz = -Math.sin(ry) * t;
-      const st = place('dorf:Stairs_Exterior_Straight', x + ox, z + oz, ry + Math.PI,
-        { solid: false, y: von + i * proStufe });
-      st.scale.set(1, proStufe, tiefe / 2.08);
+      place('dorf:Stairs_Exterior_Straight', x + ox, z + oz, ry + Math.PI,
+        { solid: false, y: von + i * proStufe, basis: b, skala: [1, proStufe, tiefe / 2.08] });
     }
-    rampUp(x, z, dir, { length: stufen * tiefe, width: 2, height: hoehe, steps: Math.max(3, stufen * 3), base: von });
+    rampUp(x, z, dir, { length: stufen * tiefe, width: 2, height: hoehe, steps: Math.max(3, stufen * 3), base: von, basis: b });
     // Manche Treppen enden nicht dort, wo man hinwill: die Aufgänge zu den
     // Dachterrassen steigen an der Galeriekante hoch, und erst der Schritt zur
     // Seite bringt einen aufs Dach. Ohne diesen Zielpunkt liefen die Bots oben
     // an der Treppenkante auf der Stelle.
     if (kopf) {
       const letzte = ramps[ramps.length - 1];
-      letzte.top.set(kopf[0], bis, kopf[1]);
+      letzte.top.set(kopf[0], b + bis, kopf[1]);
     }
   };
 
@@ -332,6 +423,10 @@ export function buildWorld(scene, renderer) {
    */
   const haus = (x, z, nx, nz, { stein = false, dach = true, tuer = 0, durchgang = null, terrasse = false } = {}) => {
     const w = nx * ZELLE, d = nz * ZELLE;
+    // Ein Haus steht auf **einer** Höhe, dem Mittel seiner vier Ecken. Würde
+    // jede Wand ihre eigene Geländehöhe nehmen, zerfiele das Haus am Hang in
+    // Stufen. Talwärts füllt ein Sockel die Lücke.
+    const h0 = bauhoehe(x, z, w, d);
     const art = stein ? 'UnevenBrick' : 'Plaster';
     const wand = `dorf:Wall_${art}_Straight`;
     const fenster = `dorf:Wall_${art}_Window_Wide_Round`;
@@ -354,7 +449,7 @@ export function buildWorld(scene, renderer) {
         const mitte = Math.floor(anzahl / 2);
         const istTor = durchgang !== null && (dir === durchgang || dir === (durchgang + 2) % 4) && i === mitte;
         const teil = istTor ? 'dorf:Wall_Arch' : (n === tuer ? tuerWand : (n % 3 === 1 ? fenster : wand));
-        place(teil, pos[0], pos[1], ry, { solid: false });
+        place(teil, pos[0], pos[1], ry, { solid: false, basis: h0 });
         n++;
       }
     };
@@ -366,19 +461,19 @@ export function buildWorld(scene, renderer) {
     // Ecken verdecken die Stoßkanten der Wandstücke
     for (const [ex, ez, ry] of [[-w / 2, -d / 2, 0], [w / 2, -d / 2, Math.PI / 2],
                                 [w / 2, d / 2, Math.PI], [-w / 2, d / 2, -Math.PI / 2]]) {
-      place(stein ? 'dorf:Corner_Exterior_Brick' : 'dorf:Corner_Exterior_Wood', x + ex, z + ez, ry, { solid: false });
+      place(stein ? 'dorf:Corner_Exterior_Brick' : 'dorf:Corner_Exterior_Wood', x + ex, z + ez, ry, { solid: false, basis: h0 });
     }
 
     if (terrasse) {
       // Begehbares Flachdach: Bretterboden, Geländer ringsum, ein Kollisions-
       // quader nur unter der Oberkante – so ist es eine Ebene, keine Kiste.
       const boden = new THREE.Mesh(new THREE.BoxGeometry(w + 0.3, 0.26, d + 0.3), holz);
-      boden.position.set(x, WAND_H + 0.13, z);
+      boden.position.set(x, h0 + WAND_H + 0.13, z);
       boden.castShadow = boden.receiveShadow = true; group.add(boden);
-      box3(x - w / 2 - 0.15, WAND_H, z - d / 2 - 0.15, x + w / 2 + 0.15, WAND_H + 0.26, z + d / 2 + 0.15);
+      box3(x - w / 2 - 0.15, h0 + WAND_H, z - d / 2 - 0.15, x + w / 2 + 0.15, h0 + WAND_H + 0.26, z + d / 2 + 0.15);
       const oben = WAND_H + 0.26;
-      gelaender(x, z - d / 2 - 0.1, 2, w, oben); gelaender(x, z + d / 2 + 0.1, 0, w, oben);
-      gelaender(x - w / 2 - 0.1, z, 3, d, oben); gelaender(x + w / 2 + 0.1, z, 1, d, oben);
+      gelaender(x, z - d / 2 - 0.1, 2, w, oben, h0); gelaender(x, z + d / 2 + 0.1, 0, w, oben, h0);
+      gelaender(x - w / 2 - 0.1, z, 3, d, oben, h0); gelaender(x + w / 2 + 0.1, z, 1, d, oben, h0);
     } else if (dach) {
       // Die Dächer sind auf Grundflächen in Metern zugeschnitten und stehen
       // rund anderthalb Meter über. Ein zu großes Dach auf einem kleinen Haus
@@ -392,47 +487,71 @@ export function buildWorld(scene, renderer) {
       }
       // Für Häuser ohne genauen Zuschnitt (4×4) das schmalste Dach nehmen.
       if (!teil) { teil = '4x6'; ry = w > d ? Math.PI / 2 : 0; }
-      place(`dorf:Roof_RoundTiles_${teil}`, x, z, ry, { solid: false, y: WAND_H });
+      place(`dorf:Roof_RoundTiles_${teil}`, x, z, ry, { solid: false, y: WAND_H, basis: h0 });
     }
     // Ein Quader für das ganze Haus statt einer pro Wand: weniger Kollider,
     // und niemand bleibt in einer Fuge zwischen zwei Wandstücken hängen.
     // Beim Torhaus zwei Quader links und rechts der Durchfahrt, dazu einer
     // darüber – sonst liefe man durch das Obergeschoss hindurch.
     const a = [x - w / 2 - 0.15, z - d / 2 - 0.15], b = [x + w / 2 + 0.15, z + d / 2 + 0.15];
+    // Sockel: talwärts steht das Haus sonst auf Stelzen. Der Quader reicht von
+    // der tiefsten Ecke bis zur Bauhöhe und ist zugleich Kollision.
+    const tiefste = Math.min(
+      hoeheBei(a[0], a[1]), hoeheBei(b[0], a[1]), hoeheBei(a[0], b[1]), hoeheBei(b[0], b[1]),
+    );
+    if (h0 - tiefste > 0.25) {
+      const sockel = new THREE.Mesh(
+        new THREE.BoxGeometry(w + 0.3, h0 - tiefste + 0.3, d + 0.3), steinMat);
+      sockel.position.set(x, (h0 + tiefste - 0.3) / 2 + 0.15, z);
+      sockel.castShadow = sockel.receiveShadow = true; group.add(sockel);
+    }
+    const unten = Math.min(tiefste, h0);
     if (durchgang === null) {
-      box3(a[0], 0, a[1], b[0], WAND_H, b[1]);
+      box3(a[0], unten, a[1], b[0], h0 + WAND_H, b[1]);
     } else {
       const laengs = durchgang % 2 === 0;        // Durchfahrt in z- oder x-Richtung
       const tor = ZELLE / 2 + 0.1;               // halbe Breite der Durchfahrt
       if (laengs) {
-        box3(a[0], 0, a[1], x - tor, WAND_H, b[1]);
-        box3(x + tor, 0, a[1], b[0], WAND_H, b[1]);
+        box3(a[0], unten, a[1], x - tor, h0 + WAND_H, b[1]);
+        box3(x + tor, unten, a[1], b[0], h0 + WAND_H, b[1]);
       } else {
-        box3(a[0], 0, a[1], b[0], WAND_H, z - tor);
-        box3(a[0], 0, z + tor, b[0], WAND_H, b[1]);
+        box3(a[0], unten, a[1], b[0], h0 + WAND_H, z - tor);
+        box3(a[0], unten, z + tor, b[0], h0 + WAND_H, b[1]);
       }
       // Decke über der Durchfahrt: Kopfhöhe 3 m, darüber ist das Haus wieder dicht
-      box3(a[0], 3, a[1], b[0], WAND_H, b[1]);
+      box3(a[0], h0 + 3, a[1], b[0], h0 + WAND_H, b[1]);
     }
-    return { x, z, w, d };
+    return { x, z, w, d, hoehe: h0 };
   };
 
-  // ---- Dorfmauer mit zwei Toren ----
-  const H = 5, T = 1;
-  addBox(0, H / 2, -SIZE / 2, SIZE, H, T); addBox(0, H / 2, SIZE / 2, SIZE, H, T);
-  addBox(-SIZE / 2, H / 2, 0, T, H, SIZE); addBox(SIZE / 2, H / 2, 0, T, H, SIZE);
-  for (let i = 0; i < 15; i++) {
-    const s = i * 4 - 28;
+  // ---- Stadtmauer mit zwei Toren ----
+  // Sie umschließt den Stadtkern, nicht die ganze Welt: draußen liegt das
+  // Gelände, und das begrenzt sich über seine Böschungen selbst.
+  const H = 5, T = 1, R = KERN / 2;
+  for (const [mx, mz, w, d] of [[0, -R, KERN, T], [0, R, KERN, T], [-R, 0, T, KERN], [R, 0, T, KERN]]) {
+    // Die Mauer folgt dem Hang: ein Quader je vier Meter statt eines langen,
+    // sonst schwebt sie an der einen und versinkt an der anderen Seite.
+    const laengs = w > d;
+    for (let t = -KERN / 2; t < KERN / 2; t += 4) {
+      const cx = laengs ? mx + t + 2 : mx, cz = laengs ? mz : mz + t + 2;
+      if (laengs && Math.abs(cx) < 2.5) continue;       // Torlücke
+      const b = hoeheBei(cx, cz);
+      box3(cx - (laengs ? 2 : T / 2), b - 1, cz - (laengs ? T / 2 : 2),
+        cx + (laengs ? 2 : T / 2), b + H, cz + (laengs ? T / 2 : 2));
+    }
+  }
+  for (let i = 0; i < Math.round(KERN / 4); i++) {
+    const s = i * 4 - KERN / 2 + 2;
     const tor = Math.abs(s) < 2.5;               // Lücke für die Torbögen
-    for (const [mx, mz, ry] of [[s, -SIZE / 2, 0], [s, SIZE / 2, Math.PI],
-                                [-SIZE / 2, s, Math.PI / 2], [SIZE / 2, s, -Math.PI / 2]]) {
-      if (tor && Math.abs(mz) === SIZE / 2) continue;
+    for (const [mx, mz, ry] of [[s, -R, 0], [s, R, Math.PI],
+                                [-R, s, Math.PI / 2], [R, s, -Math.PI / 2]]) {
+      if (tor && Math.abs(mz) === R) continue;
       for (const dx of [-1, 1]) {
         place('dorf:Wall_UnevenBrick_Straight', mx + (ry % Math.PI ? 0 : dx), mz + (ry % Math.PI ? dx : 0), ry, { solid: false });
       }
     }
   }
-  for (const [tz, ry] of [[-SIZE / 2, 0], [SIZE / 2, Math.PI]]) {
+  for (const [tz, ry] of [[-R, 0], [R, Math.PI]]) {
     place('dorf:Wall_Arch', 0, tz, ry, { solid: false });
   }
   // Waldrand: drei Arten, unregelmäßig gesetzt und gedreht. Gleichmäßig verteilte
@@ -657,18 +776,19 @@ export function buildWorld(scene, renderer) {
   }
 
   scene.add(group);
+  // Startplätze liegen auf dem Gelände, nicht auf Höhe null – sonst startet man
+  // acht Meter unter der Stadt und fällt erst einmal nach oben.
   const spawns = [
-    new THREE.Vector3(-25, 0, -25), new THREE.Vector3(25, 0, 25),
-    new THREE.Vector3(-26, 0, 10), new THREE.Vector3(26, 0, -10),
-    new THREE.Vector3(10, 0, -26), new THREE.Vector3(-10, 0, 26),
-  ];
+    [-25, -25], [25, 25], [-26, 10], [26, -10], [10, -26], [-10, 26],
+  ].map(([sx, sz]) => new THREE.Vector3(sx, hoeheBei(sx, sz), sz));
   // Kontrollpunkte für Domination. Sie liegen auf den Plattformdächern – wer sie
   // will, muss über eine Rampe hoch. Gezeichnet werden sie in domination.js.
   const punkte = [
-    { id: 'A', pos: new THREE.Vector3(-20, PLATFORM_H, 20) },
-    { id: 'B', pos: new THREE.Vector3(0, PLATFORM_H, 0) },
-    { id: 'C', pos: new THREE.Vector3(20, PLATFORM_H, -20) },
+    { id: 'A', pos: new THREE.Vector3(-20, bauhoehe(-20, 20, 7, 6) + PLATFORM_H, 20) },
+    { id: 'B', pos: new THREE.Vector3(0, bauhoehe(0, 0, 8, 7.4) + PLATFORM_H, 0) },
+    { id: 'C', pos: new THREE.Vector3(20, bauhoehe(20, -20, 7, 6) + PLATFORM_H, -20) },
   ];
+  bauFertig();
   const leben = new Leben(group, schlote, punkte);
   return { group, colliders, ramps, spawns, punkte, leben, bounds: SIZE / 2 - 1.5 };
 }
@@ -678,7 +798,9 @@ export function buildWorld(scene, renderer) {
  * höchstens `maxY` hoch liegen – dadurch zieht ein Dach über dem Kopf nicht nach oben.
  */
 export function groundHeightAt(pos, radius, world, maxY) {
-  let h = 0;
+  // Unter allem liegt das Gelände. Vorher begann diese Suche bei null – auf
+  // einer Terrasse auf 17 m wäre das ein Sturz ins Bodenlose.
+  let h = hoeheBei(pos.x, pos.z);
   for (const m of world.colliders) {
     const box = m.userData.box;
     if (box.max.y > maxY || box.max.y <= h) continue;
@@ -695,10 +817,17 @@ export function groundHeightAt(pos, radius, world, maxY) {
  * Quader, deren Oberkante innerhalb der Schrittweite liegt, werden übergangen –
  * man steigt auf sie. Quader über dem Kopf blockieren nicht, man läuft darunter durch.
  */
-export function resolveCollisions(pos, radius, world, { stepUp = STEP_UP, height = 1.8 } = {}) {
+export function resolveCollisions(pos, radius, world, { stepUp = STEP_UP, height = 1.8, von = null } = {}) {
   const b = world.bounds;
   pos.x = Math.min(b, Math.max(-b, pos.x));
   pos.z = Math.min(b, Math.max(-b, pos.z));
+  // Steile Böschungen sind Wand, nicht Rampe: wer bergauf in eine Neigung über
+  // `NEIGUNG_MAX` läuft, bleibt stehen. Ohne diese Regel liefe man jede Terrasse
+  // gerade hinauf, und die Höhe im Gelände wäre bedeutungslos.
+  if (von && neigungBei(pos.x, pos.z) > NEIGUNG_MAX
+    && hoeheBei(pos.x, pos.z) > hoeheBei(von.x, von.z) + 0.02) {
+    pos.x = von.x; pos.z = von.z;
+  }
   for (const m of world.colliders) {
     const box = m.userData.box;
     if (box.max.y <= pos.y + stepUp) continue;      // begehbar oder unter den Füßen
