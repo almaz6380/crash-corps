@@ -9,12 +9,30 @@ import { bestTarget, pullToward, ASSIST } from './aimassist.js';
 
 const EYE = 1.6, GRAVITY = 22, JUMP = 8;
 
+// Zwischenspeicher, damit die Schleife keine Vektoren je Bild erzeugt
+const _e2 = new THREE.Vector2();
+const _v3 = new THREE.Vector3(), _v4 = new THREE.Vector3();
+
 /**
  * Schulterkamera. Die Figur steht etwas links im Bild, die Kamera dahinter und
  * leicht darüber. `polster` hält sie von Wänden weg – ohne das steckt sie in
  * jeder Gasse in der Hauswand und man sieht das Innere der Geometrie.
  */
 const SCHULTER = { abstand: 2.7, hoehe: 0.3, seite: 0.6, polster: 0.3, nah: 0.5, zeigen: 1.35 };
+
+/**
+ * Der Blick folgt der Laufrichtung.
+ *
+ * Wer rückwärts läuft, lief bisher rückwärts auf die Kamera zu und sah dabei
+ * immer in die Richtung, aus der er kam. Jetzt dreht der Blick nach einem
+ * Moment dorthin, wo es hingeht.
+ *
+ * `tempo` ist die Nachführung je Sekunde, `pause` die Ruhezeit nach eigenem
+ * Umsehen oder nach einem Schuss – ohne sie kämpfte die Automatik gegen die
+ * Hand. `ab` ist, wie weit rückwärts es gehen muss: seitwärts laufen soll den
+ * Blick nicht mitziehen, sonst gäbe es kein Ausweichen mehr.
+ */
+const BLICK = { tempo: 2.4, pause: 0.7, ab: -0.3 };
 const SICHT_KEY = 'crashcorps.sicht';
 
 /** Zuletzt gewählte Ansicht. Ab Werk die Verfolgersicht – die Figuren will man sehen. */
@@ -29,6 +47,9 @@ export class Player {
     this.team = 0;                     // der Spieler steht immer in Mannschaft 0
     this.pos = new THREE.Vector3(); this.vel = new THREE.Vector3();
     this.yaw = 0; this.pitch = 0; this.grounded = true;
+    // Laufrichtung: die Eingabe wird gegen diesen festgehaltenen Blickwinkel
+    // gerechnet, nicht gegen den laufenden – siehe `BLICK`.
+    this.laufAnker = null; this.ankerEingabe = new THREE.Vector2(); this.blickPause = 0;
     this.hp = cls.hp; this.dead = false; this.respawnIn = 0;
     this.weapon = new Weapon(cls.weapon);
     this.special = { def: SPECIALS[cls.special], cool: 0, active: 0 };
@@ -81,6 +102,7 @@ export class Player {
     this.pos.copy(at); this.pos.y = 0; this.vel.set(0, 0, 0);
     this.hp = this.cls.hp; this.dead = false; this.weapon = new Weapon(this.cls.weapon);
     this.warLaden = false; this.schrittWeg = 0;
+    this.laufAnker = null; this.blickPause = 0;
     this.figurAnim.reset();
     this.sichtAnwenden();
   }
@@ -176,8 +198,26 @@ export class Player {
     this.schadenZeit = Math.max(0, (this.schadenZeit || 0) - dt);
     if (this.dead) { this.respawnIn -= dt; return; }
 
-    // Bewegung
-    const f = this.forward, r = new THREE.Vector3(-f.z, 0, f.x);
+    // ---- Bewegung ----
+    //
+    // Die Eingabe wird gegen einen **festgehaltenen** Blickwinkel gerechnet,
+    // nicht gegen den laufenden. Dreht die Kamera gleich der Laufrichtung nach
+    // (weiter unten), drehte sich sonst auch die Bedeutung von „rückwärts" mit:
+    // der Blick schwenkt, damit zeigt „zurück" woandershin, der Blick schwenkt
+    // wieder – die Figur liefe im Kreis.
+    //
+    // Neu festgehalten wird, wenn der Spieler stehen bleibt, sich selbst
+    // umsieht oder die Richtung am Stick um mehr als 20° ändert.
+    const eingabe = _e2.set(inp.moveX, inp.moveY);
+    const umgesehen = Math.abs(lx) + Math.abs(ly) + Math.abs(gx) + Math.abs(gy) > 0;
+    if (eingabe.lengthSq() === 0) this.laufAnker = null;
+    else if (this.laufAnker === null || umgesehen
+      || this.ankerEingabe.angleTo(eingabe) > 0.35) {
+      this.laufAnker = this.yaw; this.ankerEingabe.copy(eingabe).normalize();
+    }
+    const ankerYaw = this.laufAnker ?? this.yaw;
+    const f = new THREE.Vector3(-Math.sin(ankerYaw), 0, -Math.cos(ankerYaw));
+    const r = new THREE.Vector3(-f.z, 0, f.x);
     const move = new THREE.Vector3()
       .addScaledVector(f, inp.moveY)
       .addScaledVector(r, inp.moveX);
@@ -207,6 +247,17 @@ export class Player {
       if (this.schrittWeg > 2.1) { this.schrittWeg = 0; this.sound?.schritt(null, inp.sprint); }
     } else this.schrittWeg = 1.6;   // beim Loslaufen kommt der erste Schritt früh
     this.mesh.position.set(this.pos.x, this.pos.y + this.cls.body.height / 2, this.pos.z);
+
+    // Blick der Laufrichtung nachführen. Nur in der Verfolgersicht – in der
+    // Ich-Sicht wäre es eine Drehung ohne sichtbaren Anlass –, nicht beim
+    // Schießen und nicht, solange der Spieler sich selbst umsieht.
+    this.blickPause = Math.max(0, this.blickPause - dt);
+    if (umgesehen || inp.fire) this.blickPause = BLICK.pause;
+    if (!this.egoSicht && moving && inp.moveY < BLICK.ab && this.blickPause <= 0) {
+      const wunsch = Math.atan2(-this.vel.x, -this.vel.z);
+      const d = Math.atan2(Math.sin(wunsch - this.yaw), Math.cos(wunsch - this.yaw));
+      this.yaw += d * Math.min(1, dt * BLICK.tempo);
+    }
 
     // Figur: steht auf den Füßen, schaut dorthin, wohin gezielt wird. Das Modell
     // blickt nach +z, der Spieler nach -z – daher die halbe Drehung.
@@ -250,11 +301,18 @@ export class Player {
       moving, speed, grounded: this.grounded, yaw: this.yaw, pitch: this.pitch,
       reload: w.reloading > 0 ? 1 - w.reloading / w.def.reload : 0,
     });
-    // Figurenanimation. `advance`/`strafe` kommen direkt aus der Eingabe – sie
-    // stehen schon im Bezugssystem der Figur, weil die mit dem Blick dreht.
+    // Figurenanimation. Die Figur dreht mit dem **Blick**, gelaufen wird aber in
+    // Richtung des **Ankers**: solange der Blick nachdreht, fallen beide
+    // auseinander. Die Laufrichtung muss deshalb ins Bezugssystem der Figur
+    // gerechnet werden – nimmt man die Eingabe roh, moonwalkt sie, sobald der
+    // Blick der Laufrichtung gefolgt ist.
+    const blick = this.forward;
+    const quer = _v3.set(-blick.z, 0, blick.x);
+    const lauf = moving ? _v4.copy(this.vel).setY(0).normalize() : null;
     this.figurAnim.update(dt, {
       moving, speed, aiming: !!inp.fire,
-      advance: inp.moveY, strafe: inp.moveX,
+      advance: lauf ? lauf.dot(blick) : inp.moveY,
+      strafe: lauf ? lauf.dot(quer) : inp.moveX,
       lookAt: ziel,
     });
   }

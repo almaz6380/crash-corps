@@ -164,6 +164,18 @@ tools/
   per CSS um 90°. Deshalb nie `innerWidth`/`innerHeight` oder `clientX`/`clientY`
   direkt benutzen: Maße kommen aus `bild()`, Zeigerpositionen aus `zuBild()`.
   `@media (max-height)` sähe das Hochformat-Fenster – dafür gibt es `body.klein`.
+- **Der Blick folgt der Laufrichtung** (`BLICK` in `player.js`): wer rückwärts
+  läuft, schaut nach einem Moment dorthin, wo es hingeht, statt rückwärts auf
+  die Kamera zuzulaufen. Nur in der Verfolgersicht, nicht beim Schießen, nicht
+  während man sich selbst umsieht, und erst ab `BLICK.ab` rückwärts – seitwärts
+  soll den Blick nicht mitziehen, sonst gäbe es kein Ausweichen mehr.
+  Dazu gehört zwingend der **Laufanker**: die Eingabe wird gegen einen
+  festgehaltenen Blickwinkel gerechnet, nicht gegen den laufenden. Sonst dreht
+  sich mit dem Blick auch die Bedeutung von „rückwärts“, und die Figur läuft im
+  Kreis. Neu festgehalten wird beim Stehenbleiben, beim eigenen Umsehen und ab
+  20° Richtungsänderung am Stick. Die Animation bekommt deshalb die Laufrichtung
+  **im Bezugssystem der Figur**, nicht die rohe Eingabe – sonst moonwalkt sie,
+  sobald der Blick nachgedreht hat.
 - Zwei Ansichten: Ego und Verfolger, umgeschaltet mit **V** oder dem Auge-Knopf;
   die Wahl liegt in `localStorage`, ab Werk die Verfolgersicht. Sichtbar ist immer
   genau eins – Ego-Waffe **oder** ganze Figur (`sichtAnwenden()`), nie beides.
@@ -200,9 +212,15 @@ tools/
   – ein Bildschirmfoto davon ist die einzige Ferndiagnose. Nie wieder eine Annahme
   über x/y/z in diesen Code schreiben – wenn etwas falsch herum läuft, neu
   kalibrieren, nicht das Vorzeichen raten. Während der Kalibrierung darf die
-  Schleife den Gyro-Puffer nicht leeren (`kalibLaeuft` in `main.js`). Gespeicherte
-  Achsen bleiben: der Gyro-Knopf kalibriert nur, wenn keine da sind; neu messen
-  geht über „Neu kalibrieren“. iOS gibt den Sensor nur aus einer Geste frei,
+  Schleife den Gyro-Puffer nicht leeren (`kalibLaeuft` in `main.js`).
+- **Eine Kalibrierung gilt erst, wenn der Prüfschritt bestanden ist.** Gemessene
+  Achsen werden nicht gespeichert, `kalibBestaetigen()` speichert sie; `kalibriert`
+  ist nur mit der Marke `geprueft` wahr, `hatAchsen` sagt, ob überhaupt welche da
+  sind. Vorher wurden sie sofort beim Messen gespeichert – wer den Prüfschritt
+  abbrach, behielt eine ungeprüfte Kalibrierung für immer, und die zielte dann
+  womöglich verkehrt herum, ohne dass je wieder jemand nachgefragt hätte. Sind
+  Achsen da, aber ungeprüft, prüft der Gyro-Knopf zuerst und misst nur neu, wenn
+  die Prüfung durchfällt; „Neu kalibrieren“ misst immer neu. iOS gibt den Sensor nur aus einer Geste frei,
   deshalb holt `main.js` das Einschalten bei der ersten Berührung nach.
 - Klangfarben stehen nur in `sound.js` (Tabelle `SCHUSS`). Spieler und Bots rufen
   Methoden auf (`schuss`, `treffer`, `schritt` …) und kennen keine Frequenzen.
