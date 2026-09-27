@@ -349,7 +349,11 @@ export function buildWorld(scene, renderer) {
     const proxy = new THREE.Mesh(new THREE.BoxGeometry(size.x, size.y, size.z), new THREE.MeshBasicMaterial({ visible: false }));
     proxy.position.copy(center); proxy.updateMatrixWorld(true);
     proxy.userData.box = box;
-    group.add(proxy); colliders.push(proxy);
+    // **Nicht** in die Szene: die 760 unsichtbaren Quader würden je Bild
+    // durchlaufen und ihre Matrizen neu gerechnet, ohne je gezeichnet zu
+    // werden. Ihre Weltmatrix steht oben fest, und sie bewegen sich nie –
+    // für `intersectObjects` reicht das.
+    colliders.push(proxy);
     return proxy;
   };
   const solidBox = (box) => box3(box.min.x, box.min.y, box.min.z, box.max.x, box.max.y, box.max.z);
@@ -367,7 +371,10 @@ export function buildWorld(scene, renderer) {
    */
   const vorlagen = new Map();
   const sammlung = new Map();
-  const BEZIRK = 60;                     // Kantenlänge einer Sichtbarkeitskachel
+  // Kantenlänge einer Sichtbarkeitskachel. Kleiner heißt besseres Aussortieren
+  // und mehr Zeichenaufrufe; bei 60 m waren es 16 Kacheln und rund 600
+  // Instanzobjekte, bei 80 m neun Kacheln.
+  const BEZIRK = 80;
 
   const vorlage = (name) => {
     if (!vorlagen.has(name)) {
@@ -425,6 +432,9 @@ export function buildWorld(scene, renderer) {
         }
         inst.instanceMatrix.needsUpdate = true;
         inst.castShadow = true; inst.receiveShadow = true;
+        // Name mitgeben: ohne ihn ist jede Leistungsmessung eine Liste
+        // namenloser Objekte, und man rät, welches Bauteil die Dreiecke frisst.
+        inst.name = name;
         // Pflanzen bestehen aus Blattkärtchen, deren Form nur in der Alphastufe
         // steckt. Der Normalen-Durchgang kennt keinen Alphatest – die Kanten-
         // erkennung zöge dort Rahmen um die Rechtecke. Also außen vorbei.
@@ -596,10 +606,16 @@ export function buildWorld(scene, renderer) {
     seite(2, nx, d / 2);
     seite(3, nz, w / 2);
 
-    // Ecken verdecken die Stoßkanten der Wandstücke
-    for (const [ex, ez, ry] of [[-w / 2, -d / 2, 0], [w / 2, -d / 2, Math.PI / 2],
-                                [w / 2, d / 2, Math.PI], [-w / 2, d / 2, -Math.PI / 2]]) {
-      place(stein ? 'dorf:Corner_Exterior_Brick' : 'dorf:Corner_Exterior_Wood', x + ex, z + ez, ry, { solid: false, basis: h0 });
+    // Ecken verdecken die Stoßkanten der Wandstücke – aber nur im Tal, wo man
+    // dicht an den Häusern entlangläuft. Gemessen kostet allein die steinerne
+    // Eckleiste 3100 Dreiecke je Stück; über die ganze Stadt waren das 472 000,
+    // ein Viertel der Karte, für eine Fuge, die man aus zwanzig Metern nicht
+    // sieht.
+    if (Math.abs(z) < 30) {
+      for (const [ex, ez, ry] of [[-w / 2, -d / 2, 0], [w / 2, -d / 2, Math.PI / 2],
+                                  [w / 2, d / 2, Math.PI], [-w / 2, d / 2, -Math.PI / 2]]) {
+        place(stein ? 'dorf:Corner_Exterior_Brick' : 'dorf:Corner_Exterior_Wood', x + ex, z + ez, ry, { solid: false, basis: h0 });
+      }
     }
 
     if (terrasse) {
@@ -756,7 +772,12 @@ export function buildWorld(scene, renderer) {
     deck(cx, zz, 7, 6, PLATFORM_H, b);
     for (const [px, pz] of [[-3, -2.6], [3, -2.6], [-3, 2.6], [3, 2.6]]) pfosten(cx + px, zz + pz, PLATFORM_H, b);
     gelaender(cx, zz - 3, 2, 7, PLATFORM_H, b); gelaender(cx, zz + 3, 0, 7, PLATFORM_H, b);
-    treppe(cx, zz - s * 5.6, mdir(s, 0), { basis: b });
+    // Die Treppe beginnt auf dem **Boden**, nicht auf der Bauhöhe des Decks.
+    // Liegt das Gelände am Treppenfuß tiefer, steht die unterste Stufe sonst
+    // in der Luft – gemessen anderthalb Meter über dem Gras, und niemand kam
+    // hinauf.
+    const fuss = hoeheBei(cx, zz - s * 5.6);
+    treppe(cx, zz - s * 5.6, mdir(s, 0), { basis: fuss, bis: b + PLATFORM_H - fuss });
     place('dorf:Prop_Crate', cx + 2.6, zz + s * 1.8, 0.2, { y: PLATFORM_H, basis: b });
     place('dorf:Prop_Crate', cx - 3.6, zz - s * 4.4, 0.4, { basis: b });
     place('dorf:Prop_Vine1', cx + 4.4, zz + s * 2.2, mry(s, Math.PI), { solid: false, y: 0.4, basis: b });
@@ -851,7 +872,12 @@ export function buildWorld(scene, renderer) {
     deck(0, zz, 8, 6, PLATFORM_H, b);
     for (const [px, pz] of [[-3.4, -2.6], [3.4, -2.6], [-3.4, 2.6], [3.4, 2.6]]) pfosten(px, zz + pz, PLATFORM_H, b);
     gelaender(0, zz - 3, 2, 8, PLATFORM_H, b); gelaender(0, zz + 3, 0, 8, PLATFORM_H, b);
-    treppe(0, zz - s * 5.6, mdir(s, 0), { basis: b });
+    // Der Aufgang steigt **in x**, nicht in z: auf der Hochterrasse ist nach
+    // innen nur wenige Meter Platz, und eine Treppe in z stünde mit dem Fuß
+    // schon wieder in der Böschung. Dort greift die Neigungsgrenze, und
+    // gemessen kam niemand die ersten Stufen hinauf.
+    const fuss = hoeheBei(-8, zz);
+    treppe(-8, zz, 1, { basis: fuss, bis: b + PLATFORM_H - fuss });
     for (const [px, pz, r] of [[-7, -6, 0.3], [6, 5, 1.1], [9, -4, 0.7]]) {
       place('dorf:Prop_Crate', px, zz + s * pz, r);
     }
@@ -961,11 +987,14 @@ export function buildWorld(scene, renderer) {
   // ---- Talstadt: Gassen links und rechts des Markts ----
   seiten((s) => {
     gasse(s, 15, -66, 66, 8, { luecken: [[0, 14], [-44, 13], [44, 13]] });
-    // Handwerkerhof an jedem Ende der Marktstraße – Deckung auf dem langen Weg
-    // zum Tor und ein zweiter erhöhter Stand neben dem Markt.
-    hof(s, -44, 3);
-    hof(s, 44, 3);
   });
+  // Handwerkerhof an jedem Ende der Marktstraße – Deckung auf dem langen Weg
+  // zum Tor und ein erhöhter Stand neben dem Markt. Diese beiden stehen **auf**
+  // der Spiegelachse und werden deshalb nur einmal gebaut: gespiegelt lägen
+  // zwei Höfe sechs Meter auseinander, ihre Galerien überlappten, und die
+  // Treppe des einen endete im Deck des anderen.
+  hof(1, -44, 0);
+  hof(1, 44, 0);
 
   // ---- Die Aufstiege ----
   seiten((s) => {
@@ -1005,9 +1034,9 @@ export function buildWorld(scene, renderer) {
   // Böschungen zwischen den Hohlwegen. Er ist Kulisse und Wegweiser zugleich –
   // wo Bäume stehen, kommt man nicht hoch.
   let bi = 0;
-  for (let x = -112; x <= 112; x += 12) {
+  for (let x = -112; x <= 112; x += 18) {
     for (const [z0, z1] of [[-118, -100], [-96, -84], [-44, -30], [30, 44], [84, 96], [100, 118]]) {
-      for (let z = z0; z <= z1; z += 8) {
+      for (let z = z0; z <= z1; z += 11) {
         const px = x + Math.sin(bi * 2.7) * 2.5, pz = z + Math.cos(bi * 1.9) * 2.5;
         bi++;
         if (imHohlweg(px, pz, 4)) continue;                       // nie über einer Auffahrt
@@ -1019,7 +1048,7 @@ export function buildWorld(scene, renderer) {
     }
   }
   // Waldriegel an den Flanken: jenseits davon ist nichts mehr zu holen.
-  for (let z = -114; z <= 114; z += 9) {
+  for (let z = -114; z <= 114; z += 13) {
     for (const x of [-104, -96, 96, 104]) {
       const px = x + Math.sin(bi * 1.3) * 3, pz = z + Math.cos(bi * 2.1) * 3;
       bi++;
