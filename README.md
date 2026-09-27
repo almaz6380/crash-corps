@@ -103,6 +103,26 @@ statt einer Wand; wer die Abkürzung nimmt, spart den Weg außen herum.
 Die Karte ist punktsymmetrisch: jede Deckung, jeder Aufstieg und jeder
 Sichtschutz steht gespiegelt auch auf der anderen Seite.
 
+## Treffen und getroffen werden
+
+Kopftreffer machen doppelten Schaden – für dich wie für die Bots. Die
+Spalterklinge ist davon ausgenommen: acht Schrotkugeln treffen den Kopf von
+allein, das wäre kein Zielen.
+
+Am Fadenkreuz zeigt ein kurzes Kreuz, dass du getroffen hast: weiß am Körper,
+größer und golden am Kopf, rot beim Abschuss. Wirst du selbst getroffen, zeigt
+ein roter Keil, aus welcher Richtung der Schuss kam.
+
+Jede Waffe wirkt auf ihrer Entfernung: die Spalterklinge bis vier Meter voll und
+ab sechzehn kaum noch, der Bolzenwerfer bis zwölf, der Runenstab auf jede
+Entfernung gleich. Wer mit der falschen Waffe auf die falsche Entfernung geht,
+verliert – auch mit mehr Leben.
+
+Die Bots nutzen Deckung, wenn es eng wird, laden im richtigen Moment nach und
+setzen ihre Spezialfähigkeit ein: Grimmbart stürmt und rammt, Nachtschatten
+wischt weg, der Runenweber zielt scharf. Ihr Zielkreuz folgt dir träge – wer
+die Richtung wechselt, gewinnt einen Moment.
+
 ## Steuerung am Rechner
 
 WASD laufen · Shift sprinten · Leertaste springen · Klick schießen ·

@@ -172,9 +172,9 @@ export class Bot {
    */
   tryDodge(richtung = null, sicher = false) {
     const sp = SPECIALS[this.cls.special];
-    if (!sp?.speedMul || this.dodge > 0 || this.dodgeCool > 0 || (!sicher && Math.random() > 0.6)) return;
+    if (!sp?.speedMul || this.dodge > 0 || this.dodgeCool > 0 || (!sicher && Math.random() > 0.6)) return false;
     const dur = this.anim.roll();
-    if (!dur) return;
+    if (!dur) return false;
     // Gleiche Strecke wie der Spieler-Dash, gestreckt auf die Dauer des Roll-Clips
     const dist = this.cls.speed * sp.speedMul * sp.duration;
     const yaw = this.mesh.rotation.y;
@@ -185,6 +185,7 @@ export class Bot {
     // Der Clip ist eine Vorwärtsrolle: für die Dauer in die Ausweichrichtung drehen,
     // danach dreht die weiche Blickführung wieder zum Ziel zurück
     this.mesh.rotation.y = Math.atan2(this.dodgeDir.x, this.dodgeDir.z);
+    return true;
   }
 
   /** Figur aus der Szene nehmen und ihre geklonten Materialien freigeben. */
@@ -287,14 +288,16 @@ export class Bot {
       : this.cls.special === 'dash' ? leben < 0.5 || dist < 4
       : dist > 15;
     if (!lage || Math.random() > KI.spezialChance) return;
+    // Der Schattenschritt bringt nur etwas als Bewegung – und zwar vom Gegner
+    // weg. Klappt die Rolle nicht (kein Clip, noch in der Abklingzeit), bleibt
+    // auch die Fähigkeit ungenutzt, statt ins Leere zu laufen.
+    if (this.cls.special === 'dash') {
+      const weg = this.pos.clone().sub(feind.pos).setY(0);
+      if (weg.lengthSq() === 0 || !this.tryDodge(weg.normalize(), true)) return;
+    }
     this.spezialAktiv = sp.duration; this.spezialCool = sp.cooldown;
     this.sound?.spezial(this.cls.special, this.pos);
     if (sp.schaden) this.gerammt = new Set();
-    // Der Schattenschritt bringt nur etwas als Bewegung – und zwar vom Gegner weg
-    if (this.cls.special === 'dash') {
-      const weg = this.pos.clone().sub(feind.pos).setY(0);
-      if (weg.lengthSq() > 0) this.tryDodge(weg.normalize(), true);
-    }
   }
 
   /**
@@ -319,7 +322,9 @@ export class Bot {
       if (!feind || (this.deckungBis <= 0 && geladen)) { this.deckung = null; this.deckungWeg = false; }
       return;
     }
-    if (!feind || this.deckungPruefung > 0) return;
+    // Nicht mitten im Aufstieg: ein Deckungsziel würde das Rampen-Zwischenziel
+    // überschreiben, und der Bot stünde auf halber Treppe.
+    if (!feind || this.navPoint || this.deckungPruefung > 0) return;
     this.deckungPruefung = KI.deckungPruefen;
     const knapp = this.hp / this.cls.hp < KI.deckungAb || this.weapon.ammo === 0;
     if (!knapp) return;
