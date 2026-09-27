@@ -1,10 +1,9 @@
 import * as THREE from 'three';
-import { celRamp, buildSky, buildRealSky } from './render.js';
+import { celRamp, buildSky, buildRealSky, himmelAusHdri, OHNE_UMRISS } from './render.js';
 import { REAL } from './style.js';
 import { QUALITY } from './device.js';
 import { realisticMaterial, uvSurface, setImage } from './surface.js';
 import { spawnProp } from './assets.js';
-import { OHNE_UMRISS } from './render.js';
 import { Leben } from './leben.js';
 
 const RAMP = celRamp(4);
@@ -620,18 +619,30 @@ export function buildWorld(scene, renderer) {
   // Licht: Sonne + Himmel
   // Nachmittagssonne: tiefer und wärmer als Mittagslicht. Lange Schatten geben
   // den Gassen Tiefe, und die Ziegeldächer bekommen Farbe statt Grelle.
-  const sunDir = new THREE.Vector3(26, 24, 16);
-  const sun = new THREE.DirectionalLight(0xffe6b8, REAL ? 3.0 : 2.7);
+  // Im realen Stil bestimmt die HDRI, wo die Sonne steht – sonst stünde der
+  // Schatten woanders als der helle Fleck am Himmel, und genau das verrät ein
+  // gerechnetes Bild sofort.
+  const hdri = REAL ? himmelAusHdri(scene, renderer) : null;
+  const sunDir = hdri ? hdri.dir.clone().multiplyScalar(60) : new THREE.Vector3(26, 24, 16);
+  const sun = new THREE.DirectionalLight(0xfff1d8, REAL ? 6.0 : 2.7);
   sun.position.copy(sunDir); sun.castShadow = true;
   const sm = REAL ? QUALITY.shadowSize * 2 : QUALITY.shadowSize;
   sun.shadow.mapSize.set(sm, sm);
-  Object.assign(sun.shadow.camera, { left: -40, right: 40, top: 40, bottom: -40, far: 120 });
-  sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.02; sun.shadow.radius = REAL ? Math.max(1, QUALITY.shadowRadius - 1) : QUALITY.shadowRadius;
+  // Der Ausschnitt ist so eng wie möglich um das Spielfeld gelegt: je kleiner
+  // die Fläche, desto mehr Bildpunkte je Meter. Bei 4096 auf 68 m sind das
+  // 1,7 cm – damit bekommt ein Geländerpfosten einen eigenen Schatten.
+  // Kaskaden (CSM) bräuchte es erst für größere Karten; hier würden sie nur
+  // jedes Material im Spiel umschreiben.
+  const rand = REAL ? 34 : 40;
+  Object.assign(sun.shadow.camera, { left: -rand, right: rand, top: rand, bottom: -rand, far: 160 });
+  sun.shadow.bias = -0.00015; sun.shadow.normalBias = 0.015;
+  sun.shadow.radius = REAL ? 1 : QUALITY.shadowRadius;
   sun.shadow.camera.updateProjectionMatrix();
   group.add(sun);
   if (REAL) {
-    // Umgebungslicht kommt aus dem Himmel selbst, kein künstliches Fülllicht
-    buildRealSky(scene, renderer, sunDir.clone().normalize());
+    // Umgebungslicht kommt aus dem Himmel selbst, kein künstliches Fülllicht.
+    // Ohne HDRI (offline, erster Start) bleibt der gerechnete Himmel.
+    if (!hdri) buildRealSky(scene, renderer, sunDir.clone().normalize());
     scene.fog = new THREE.FogExp2(0x9fbdd4, 0.0012);
   } else {
     const rim = new THREE.DirectionalLight(0xbcd8ff, 0.8); rim.position.set(-20, 14, -25);

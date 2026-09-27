@@ -5,7 +5,7 @@ import { buildWorld, WORLD_PROPS } from './world.js';
 import { Player } from './player.js';
 import { Bot } from './bots.js';
 import { Hud } from './hud.js';
-import { Pipeline } from './render.js';
+import { Pipeline, ladeHimmel } from './render.js';
 import { preloadCharacters, preloadProps } from './assets.js';
 import { REAL } from './style.js';
 import { preloadTextures } from './surface.js';
@@ -304,6 +304,7 @@ Promise.all([
   preloadCharacters((p) => hud.loading(`Figuren … ${Math.round(p * 100)}%`), Object.values(CLASSES).map(c => c.model)),
   preloadProps(WORLD_PROPS, (p) => hud.loading(`Arena … ${Math.round(p * 100)}%`)),
   REAL ? preloadTextures((p) => hud.loading(`Oberflächen … ${Math.round(p * 100)}%`)) : null,
+  REAL ? ladeHimmel((p) => hud.loading(`Himmel … ${Math.round(p * 100)}%`)) : null,
 ])
   .then(() => {
     world = buildWorld(scene, renderer);

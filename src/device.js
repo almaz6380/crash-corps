@@ -23,6 +23,7 @@ export const QUALITY = {
   pixelRatio: LOW_END ? 1.4 : 2,
   shadowSize: LOW_END ? 1024 : 2048,
   ao: !LOW_END,              // Umgebungsverdeckung kostet 16 Abtastungen je Bildpunkt
+  bloom: !LOW_END,           // Streulicht: drei zusätzliche Durchgänge in halber Auflösung
   shadowRadius: LOW_END ? 1 : 3,
 };
 
