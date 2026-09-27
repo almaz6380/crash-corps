@@ -162,16 +162,21 @@ export function buildWorld(scene, renderer) {
   otex.wrapS = otex.wrapT = THREE.RepeatWrapping; otex.repeat.set(30, 30);
   otex.colorSpace = THREE.SRGBColorSpace; otex.anisotropy = 8;
   const groundMat = REAL
-    ? uvSurface(new THREE.MeshStandardMaterial({ name: 'Dirt', roughness: 1 }), 'leafy_grass', { repeat: 60 })
+    // 320 m Boden, Kachel rund 4 m: näher betrachtet sieht man Gras und Steine,
+    // von oben eine Wiese statt einer Farbfläche.
+    ? uvSurface(new THREE.MeshStandardMaterial({ name: 'Dirt', roughness: 1 }), 'dorf_wiese', { repeat: 80, makro: 0.8 })
     : new THREE.MeshToonMaterial({ map: otex, gradientMap: RAMP });
   const ground = new THREE.Mesh(new THREE.PlaneGeometry(320, 320), groundMat);
   ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; group.add(ground);
 
   // Bemalter Arenaboden darüber
   const floorMat = REAL
+    // Die gemalte Karte bleibt als Farbe – sie trägt Wege, Pfützen und
+    // Schlammflecken, also Ortskenntnis. Darüber kommt echtes Pflaster: Relief,
+    // Rauheit und zu zwei Dritteln auch seine Farbe.
     ? uvSurface(new THREE.MeshStandardMaterial({
         map: arenaFloorTexture(), name: 'Concrete', roughness: 1, polygonOffset: true, polygonOffsetFactor: -1 }),
-        'asphalt_03', { repeat: 26, keepMap: true })
+        'dorf_pflaster', { repeat: 30, keepMap: true, farbe: 0.65, normale: 1.1 })
     : new THREE.MeshToonMaterial({ map: arenaFloorTexture(), gradientMap: RAMP, polygonOffset: true, polygonOffsetFactor: -1 });
   const floor = new THREE.Mesh(new THREE.PlaneGeometry(SIZE, SIZE), floorMat);
   floor.rotation.x = -Math.PI / 2; floor.position.y = 0.012; floor.receiveShadow = true; group.add(floor);

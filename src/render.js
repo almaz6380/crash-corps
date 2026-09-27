@@ -319,7 +319,7 @@ export const OHNE_UMRISS = 1;
 const BILD = {
   // Belichtung nicht geraten, sondern gemessen: das geometrische Mittel der
   // Szenenwerte lag bei 0,22, mittleres Grau liegt bei 0,18 (tools: belichtung).
-  real: { belichtung: 0.82, saettigung: 1.05, agx: 1, bloom: 0.5, schwelle: 1.0, korn: 0.012, schaerfe: 0.25 },
+  real: { belichtung: 0.82, saettigung: 1.05, agx: 1, bloom: 0.5, schwelle: 1.0, korn: 0.012, schaerfe: 0.15 },
   toon: { belichtung: 1.15, saettigung: 1.05, agx: 0, bloom: 0.0, schwelle: 1.6, korn: 0.0, schaerfe: 0.0 },
 };
 

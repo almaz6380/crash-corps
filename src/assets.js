@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { clone as skinClone } from 'three/addons/utils/SkeletonUtils.js';
 import { REAL } from './style.js';
-import { realisticMaterial, SURFACE_FOR_PROP } from './surface.js';
+import { realisticMaterial, uvSurface, SURFACE_FOR_PROP, SURFACE_FOR_MATERIAL } from './surface.js';
 import { figurMaterial } from './figurlook.js';
 import { embeddedBytes } from './embed.js';
 
@@ -542,14 +542,26 @@ export function spawnProp(name, { ramp } = {}) {
   if (!src) throw new Error(`Prop "${name}" ist nicht geladen`);
   const m = src.clone(true);
   if (REAL) {
-    // Physikalische Materialien behalten, nur Rauheit/Metall setzen und
-    // prozedurale Struktur einhängen. Pro Ausgangsmaterial einmal.
+    // Physikalische Materialien behalten und ihnen eine echte Oberfläche geben.
+    // Zwei Wege, je nachdem, was das Modell mitbringt:
+    //  - Teile aus dem Dorfbausatz haben UV-Koordinaten und einen bekannten
+    //    Materialnamen (MI_Plaster, MI_RoundTiles …): dort werden die Karten
+    //    direkt zugewiesen, das sitzt genau.
+    //  - alles andere bekommt die Struktur im Weltraum projiziert.
+    // Pro Ausgangsmaterial einmal, das Ergebnis wird gemerkt.
     m.traverse(o => {
       if (!o.isMesh) return;
       const set = SURFACE_FOR_PROP[name] || null;
       const conv = (mat) => {
-        const key = mat.uuid + '|' + set;
-        if (!realCache.has(key)) realCache.set(key, realisticMaterial(mat.clone(), { set, scale: 0.4 }));
+        const fuerMaterial = SURFACE_FOR_MATERIAL[mat.name];
+        const key = mat.uuid + '|' + (fuerMaterial ? `m:${fuerMaterial.set}` : set);
+        if (!realCache.has(key)) {
+          const neu = mat.clone();
+          realCache.set(key, fuerMaterial
+            ? uvSurface(realisticMaterial(neu), fuerMaterial.set,
+              { repeat: fuerMaterial.wiederholung, farbe: fuerMaterial.farbe })
+            : realisticMaterial(neu, { set, scale: 0.4 }));
+        }
         return realCache.get(key);
       };
       o.material = Array.isArray(o.material) ? o.material.map(conv) : conv(o.material);
