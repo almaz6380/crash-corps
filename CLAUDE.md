@@ -192,6 +192,11 @@ tools/
   Seite. In einem Zug gerechnet fräße eine seitliche Hauswand auch den Abstand
   nach hinten. Bleibt weniger als `SCHULTER.zeigen` Platz, wird die Figur
   ausgeblendet – sonst steckt die Kamera im Kopf und nimmt das halbe Bild.
+- **Aus der Runde muss man wieder herauskommen.** Am Rechner macht das Esc, auf
+  dem Handy der Knopf ☰ oben links (`menu` in `DEFAULT_LAYOUT`). Beides hält die
+  Runde nur an: sie steht vollständig weiter da, und „Weiter spielen“ im Menü
+  setzt sie fort. Ein Menüknopf, der die Runde wegwirft, wäre ein Ausknopf – wer
+  nur den Ton umstellen will, verlöre sein Spiel.
 - Eingaben laufen nur über `input.js`. `player.js` kennt keine Tasten und keine Berührungen, sondern fragt `moveX/moveY`, `fire`, `jump` und die Flanken ab.
 - Blick kommt aus zwei Quellen: `takeLook()` in Pixeln (Maus, Wischen) und
   `takeGyro()` im Bogenmaß. Getrennt halten – das eine wird noch mit der
@@ -217,8 +222,12 @@ tools/
   erscheint **nur**, wenn es gar keine Achsen gibt (`hatAchsen`) oder wenn jemand
   ausdrücklich „Neu kalibrieren“ tippt. Ein Prüfschritt bei jedem Einschalten ist
   eine Zumutung, kein Schutz – genau das war er einmal, und es war falsch.
-  Frisch gemessene Achsen werden trotzdem erst nach dem Prüfschritt gespeichert
-  (`kalibBestaetigen()`), damit eine abgebrochene Messung nichts hinterlässt.
+  Die Einrichtung sind **zwei Bewegungen**, dann ist sie gespeichert und fertig.
+  Es gab dort einmal einen dritten Bildschirm, auf dem ein Punkt im Raster die
+  Richtung bestätigen musste. Wer ihn nicht bestand – und das ist genau der,
+  dessen Achsen verkehrt herum liegen –, bekam beim nächsten Einschalten wieder
+  alles von vorn und nie einen laufenden Gyro. Eine Prüfung, die nur den
+  aussperrt, der Hilfe braucht, ist keine.
 - Zielt der Gyro verkehrt herum, ist das **ein Tipp**: die Pfeile ↔ und ↕ stehen
   neben dem Kompass im Menü, sobald er an ist. Vorher lagen sie nur unter
   „Bedienung anpassen“, und wer das nicht weiß, hält den Gyro für kaputt. iOS gibt den Sensor nur aus einer Geste frei,
