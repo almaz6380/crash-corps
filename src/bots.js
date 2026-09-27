@@ -3,7 +3,7 @@ import { CLASSES, SPECIALS } from './classes.js';
 import { Weapon } from './weapons.js';
 import { buildCharacter, trefferQuader } from './characters.js';
 import { CharacterAnimator } from './animation.js';
-import { resolveCollisions, groundHeightAt, STEP_UP } from './world.js';
+import { resolveCollisions, groundHeightAt, STEP_UP, amStrahl, inBereich } from './world.js';
 import { TEAMS } from './domination.js';
 
 const NAMES = ['Brösel', 'Knacki', 'Zündel', 'Rumpel', 'Fiete', 'Gustl', 'Wuschel', 'Pumpf'];
@@ -79,6 +79,10 @@ export class Bot {
     this.target = null; this.wander = new THREE.Vector3();
     this.retarget = 0; this.reaction = 0; this.kills = 0;
     this.ray = new THREE.Raycaster();
+    // Eigene Listen für die Rasterabfragen: die Deckungssuche stellt in ihrer
+    // Schleife eine zweite Abfrage, ein geteilter Zwischenspeicher wäre danach
+    // leer und die Suche bräche nach dem ersten Quader ab.
+    this._kand = []; this._deckung = [];
     // Ausweichrolle (nur Klassen mit Dash-Spezial), Werte aus classes.js
     this.dodge = 0; this.dodgeCool = 0; this.dodgeDir = new THREE.Vector3(); this.dodgeSpeed = 0;
     this.vy = 0;   // Fallgeschwindigkeit, damit Bots von Plattformen fallen
@@ -216,7 +220,10 @@ export class Bot {
   sichtFrei(von, nach) {
     const dir = nach.clone().sub(von), dist = dir.length();
     this.ray.set(von, dir.normalize()); this.ray.far = dist;
-    return this.ray.intersectObjects(this.world.colliders, false).length === 0;
+    // Kandidaten aus dem Kollisionsraster: nur die Zellen, durch die der Strahl
+    // läuft. Diese Prüfung läuft je Bot und Bild, auf 240 m wäre „alle Quader"
+    // allein dafür die halbe Bildzeit.
+    return this.ray.intersectObjects(amStrahl(this.world, von, dir, dist, this._kand), false).length === 0;
   }
 
   /**
@@ -245,7 +252,10 @@ export class Bot {
     const ziel = feind.eye;
     const augen = this.cls.body.height * 0.9;
     let best = null, bestD = Infinity;
-    for (const c of this.world.colliders) {
+    // Nur die Quader im Umkreis – und in eine eigene Liste, weil die
+    // Sichtprüfung darunter selbst eine Rasterabfrage stellt.
+    const w = KI.deckungWeite;
+    for (const c of inBereich(this.world, this.pos.x - w, this.pos.z - w, this.pos.x + w, this.pos.z + w, this._deckung)) {
       const box = c.userData.box;
       if (!box) continue;
       const mx = (box.min.x + box.max.x) / 2, mz = (box.min.z + box.max.z) / 2;

@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { resolveCollisions, groundHeightAt, STEP_UP } from './world.js';
+import { resolveCollisions, groundHeightAt, STEP_UP, amStrahl } from './world.js';
 import { Weapon } from './weapons.js';
 import { SPECIALS } from './classes.js';
 import { buildViewmodel, buildCharacter, trefferQuader } from './characters.js';
@@ -279,7 +279,8 @@ export class Player {
     const rueck = this.aim.clone().negate();
     this.kamRay.set(this.eye, rueck);
     this.kamRay.far = SCHULTER.abstand;
-    const hinderniss = this.kamRay.intersectObjects(this.world.colliders, false)[0];
+    const hinderniss = this.kamRay.intersectObjects(
+      amStrahl(this.world, this.eye, rueck, SCHULTER.abstand), false)[0];
     const hinten = hinderniss
       ? Math.max(SCHULTER.nah, hinderniss.distance - SCHULTER.polster)
       : SCHULTER.abstand;
@@ -290,7 +291,8 @@ export class Player {
 
     this.kamRay.set(basis, rechts);
     this.kamRay.far = SCHULTER.seite;
-    const seitlich = this.kamRay.intersectObjects(this.world.colliders, false)[0];
+    const seitlich = this.kamRay.intersectObjects(
+      amStrahl(this.world, basis, rechts, SCHULTER.seite), false)[0];
     const seite = seitlich
       ? Math.max(0, seitlich.distance - SCHULTER.polster)
       : SCHULTER.seite * anteil;
@@ -315,7 +317,8 @@ export class Player {
     const richtung = ziel.clone().sub(this.eye).normalize();
     this.zielRay.set(this.eye, richtung);
     this.zielRay.far = SCHULTER.abstand;
-    const nah = this.zielRay.intersectObjects(this.world.colliders, false)[0];
+    const nah = this.zielRay.intersectObjects(
+      amStrahl(this.world, this.eye, richtung, SCHULTER.abstand), false)[0];
     if (!nah) return this.eye;
     return this.camera.position.clone().addScaledVector(this.aim, 0.5);
   }
@@ -333,7 +336,7 @@ export class Player {
     const von = this.camera.position;
     this.zielRay.set(von, this.aim);
     this.zielRay.far = 200;
-    const wand = this.zielRay.intersectObjects(this.world.colliders, false)[0];
+    const wand = this.zielRay.intersectObjects(amStrahl(this.world, von, this.aim, 200), false)[0];
     const gegner = this.zielRay.intersectObjects(targets.map(t => t.trefferKoerper ?? t.mesh), false)[0];
     const treffer = gegner && (!wand || gegner.distance < wand.distance) ? gegner : wand;
     if (treffer) this.zielPunkt.copy(treffer.point);

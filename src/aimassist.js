@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { amStrahl } from './world.js';
 
 /**
  * Zielhilfe für die Touch-Bedienung. Mit dem Daumen zu zielen ist deutlich
@@ -45,7 +46,8 @@ export function bestTarget(player, targets, world) {
     const angle = Math.acos(Math.min(1, Math.max(-1, _dir.dot(aim))));
     if (angle >= bestAngle) continue;
     _ray.set(eye, _dir); _ray.far = dist - 0.4;
-    if (_ray.intersectObjects(world.colliders, false).length) continue;   // Deckung dazwischen
+    // Nur die Quader entlang der Sichtlinie prüfen, nicht die ganze Stadt
+    if (_ray.intersectObjects(amStrahl(world, eye, _dir, dist), false).length) continue;   // Deckung dazwischen
     bestAngle = angle;
     best = {
       yaw: Math.atan2(-_dir.x, -_dir.z),

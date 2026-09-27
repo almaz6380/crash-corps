@@ -18,7 +18,9 @@ const canvas = document.getElementById('game');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
 renderer.setPixelRatio(Math.min(devicePixelRatio, QUALITY.pixelRatio));
 const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(80, 1, 0.05, 300);
+// Sichtweite auf die 240-m-Welt: von einer Ecke zur anderen sind es 339 m,
+// und die Hügel am Rand sollen im Dunst verschwinden, nicht abgeschnitten werden.
+const camera = new THREE.PerspectiveCamera(80, 1, 0.05, 450);
 camera.userData.canvas = canvas;
 scene.add(camera);
 const pipeline = new Pipeline(renderer, camera);
@@ -354,6 +356,9 @@ function simulieren(dt) {
   // Der Spieler schießt nur auf die andere Mannschaft
   player.update(dt, bots.filter(b => !b.dead && b.team !== player.team), fx);
   sound.listener(player.eye, player.yaw);   // Ohr sitzt am Auge und dreht mit
+  // Der Schattenausschnitt wandert mit: eng um den Spieler statt über die ganze
+  // Stadt gespannt (siehe lichtFolgen in world.js).
+  world.lichtFolgen?.(player.pos);
   if (player.dead && player.respawnIn <= 0) player.spawn(pickSpawn(bots, dom ? player.team : null));
   for (const b of bots) {
     b.update(dt, alle.filter(a => !a.dead && a.team !== b.team), bots, fx, dom);

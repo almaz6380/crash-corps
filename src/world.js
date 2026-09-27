@@ -762,17 +762,48 @@ export function buildWorld(scene, renderer) {
   sun.shadow.bias = -0.00015; sun.shadow.normalBias = 0.015;
   sun.shadow.radius = REAL ? 1 : QUALITY.shadowRadius;
   sun.shadow.camera.updateProjectionMatrix();
-  group.add(sun);
+  group.add(sun, sun.target);
+
+  /**
+   * Der Schattenausschnitt wandert mit dem Spieler.
+   *
+   * Über 240 m gespannt wäre eine 4096er Karte 6 cm je Bildpunkt – Matsch, wo
+   * heute ein Geländerpfosten seinen eigenen Schatten hat. Eng und mitwandernd
+   * bleibt die Auflösung, und was weit weg ist, hat keinen Schlagschatten; das
+   * sieht bei dieser Entfernung niemand.
+   *
+   * Eingerastet wird auf **Texelvielfache in den Achsen des Lichts**, nicht auf
+   * ganze Meter: verschiebt sich der Ausschnitt um Bruchteile eines Texels,
+   * wandern die Schattenkanten bei jedem Schritt sichtbar hin und her.
+   */
+  const lichtDir = sunDir.clone().normalize();
+  const lichtRechts = new THREE.Vector3(0, 1, 0).cross(lichtDir).normalize();
+  const lichtHoch = new THREE.Vector3().crossVectors(lichtDir, lichtRechts).normalize();
+  const texel = (2 * rand) / sm;
+  const _mitte = new THREE.Vector3();
+  const lichtFolgen = (pos) => {
+    const a = Math.round(pos.dot(lichtRechts) / texel) * texel;
+    const b = Math.round(pos.dot(lichtHoch) / texel) * texel;
+    _mitte.copy(lichtRechts).multiplyScalar(a)
+      .addScaledVector(lichtHoch, b)
+      .addScaledVector(lichtDir, pos.dot(lichtDir));
+    sun.target.position.copy(_mitte);
+    sun.position.copy(_mitte).addScaledVector(lichtDir, 60);
+  };
   if (REAL) {
     // Umgebungslicht kommt aus dem Himmel selbst, kein künstliches Fülllicht.
     // Ohne HDRI (offline, erster Start) bleibt der gerechnete Himmel.
     if (!hdri) buildRealSky(scene, renderer, sunDir.clone().normalize());
-    scene.fog = new THREE.FogExp2(0x9fbdd4, 0.0012);
+    // Dunst über die neue Entfernung: bei 0,0012 endete der Boden bei 300 m als
+    // harte Kante im Nichts. Jetzt verliert sich das Gelände im Blau, bevor die
+    // Kamera es abschneidet – und die fernen Bezirke liefern nichts mehr, was
+    // man erkennen könnte.
+    scene.fog = new THREE.FogExp2(0x9fbdd4, 0.0035);
   } else {
     const rim = new THREE.DirectionalLight(0xbcd8ff, 0.8); rim.position.set(-20, 14, -25);
     group.add(rim, new THREE.HemisphereLight(0xbfe6ff, 0x6b8f3a, 1.1));
     group.add(buildSky());
-    scene.fog = new THREE.Fog(0xc3d6e0, 60, 180);
+    scene.fog = new THREE.Fog(0xc3d6e0, 90, 330);
   }
 
   scene.add(group);
@@ -790,7 +821,105 @@ export function buildWorld(scene, renderer) {
   ];
   bauFertig();
   const leben = new Leben(group, schlote, punkte);
-  return { group, colliders, ramps, spawns, punkte, leben, bounds: SIZE / 2 - 1.5 };
+  // Kollisionsquader ins Raster einsortieren – erst hier, wenn alle stehen.
+  const raster = rasterBauen(colliders);
+
+  return { group, colliders, raster, ramps, spawns, punkte, leben, lichtFolgen, bounds: SIZE / 2 - 1.5 };
+}
+
+/**
+ * ---- Kollisionsraster ----
+ *
+ * `groundHeightAt()` und `resolveCollisions()` liefen über **alle** Quader, je
+ * Figur und Bild. Auf 60 m waren das 200; auf 240 m mit ausgebauter Stadt sind
+ * es einige Tausend, mal dreizehn Figuren, mal sechzig Bilder. Das allein
+ * frisst die Bildrate, lange bevor etwas davon zu sehen ist.
+ *
+ * Deshalb liegen die Quader in Zellen von 8 m. Eine Abfrage sieht nur die
+ * Zellen, die ihr Rechteck berührt – bei einer Figur mit 0,4 m Radius also
+ * eine bis vier statt aller.
+ */
+const KRASTER = 8;
+const schluessel = (i, j) => (i + 512) * 1024 + (j + 512);
+
+/** Quaderliste in Zellen einsortieren. Ein Quader steht in jeder Zelle, die er berührt. */
+export function rasterBauen(colliders) {
+  const raster = new Map();
+  for (const m of colliders) {
+    const b = m.userData.box;
+    const i0 = Math.floor(b.min.x / KRASTER), i1 = Math.floor(b.max.x / KRASTER);
+    const j0 = Math.floor(b.min.z / KRASTER), j1 = Math.floor(b.max.z / KRASTER);
+    for (let i = i0; i <= i1; i++) {
+      for (let j = j0; j <= j1; j++) {
+        const k = schluessel(i, j);
+        let a = raster.get(k); if (!a) raster.set(k, a = []);
+        a.push(m);
+      }
+    }
+  }
+  return raster;
+}
+
+// Ein Zähler statt einer Menge: derselbe Quader liegt in mehreren Zellen und
+// darf nur einmal in der Antwort stehen. Ein `Set` je Abfrage wäre Müll je Bild.
+let stempel = 0;
+const _bereich = [];
+const _strahl = [];
+
+/**
+ * Alle Quader, die ein Rechteck auf der Grundfläche berühren können.
+ * Ohne eigenes `out` schreibt die Abfrage in einen geteilten Zwischenspeicher –
+ * wer währenddessen eine zweite Abfrage stellt, muss eine eigene Liste mitgeben.
+ */
+export function inBereich(world, minX, minZ, maxX, maxZ, out = _bereich) {
+  out.length = 0;
+  if (!world.raster) { for (const m of world.colliders) out.push(m); return out; }
+  stempel++;
+  const i0 = Math.floor(minX / KRASTER), i1 = Math.floor(maxX / KRASTER);
+  const j0 = Math.floor(minZ / KRASTER), j1 = Math.floor(maxZ / KRASTER);
+  for (let i = i0; i <= i1; i++) {
+    for (let j = j0; j <= j1; j++) {
+      const a = world.raster.get(schluessel(i, j)); if (!a) continue;
+      for (const m of a) {
+        if (m.userData.stempel === stempel) continue;
+        m.userData.stempel = stempel; out.push(m);
+      }
+    }
+  }
+  return out;
+}
+
+/**
+ * Alle Quader entlang eines Strahls – die Kandidatenliste für `intersectObjects`.
+ *
+ * Der Strahl läuft Zelle für Zelle über das Raster (klassisches Voxel-Laufen),
+ * nicht in festen Schritten: ein Schrittmaß müsste kleiner sein als die Zelle,
+ * sonst springt der Strahl über Ecken hinweg und schießt durch Wände.
+ */
+export function amStrahl(world, origin, dir, dist, out = _strahl) {
+  out.length = 0;
+  if (!world.raster) { for (const m of world.colliders) out.push(m); return out; }
+  stempel++;
+  const x0 = origin.x, z0 = origin.z;
+  const x1 = x0 + dir.x * dist, z1 = z0 + dir.z * dist;
+  let i = Math.floor(x0 / KRASTER), j = Math.floor(z0 / KRASTER);
+  const iZ = Math.floor(x1 / KRASTER), jZ = Math.floor(z1 / KRASTER);
+  const dx = x1 - x0, dz = z1 - z0;
+  const si = Math.sign(dx), sj = Math.sign(dz);
+  let tx = si ? ((i + (si > 0 ? 1 : 0)) * KRASTER - x0) / dx : Infinity;
+  let tz = sj ? ((j + (sj > 0 ? 1 : 0)) * KRASTER - z0) / dz : Infinity;
+  const dtx = si ? KRASTER / Math.abs(dx) : Infinity;
+  const dtz = sj ? KRASTER / Math.abs(dz) : Infinity;
+  for (let schutz = 0; schutz < 200; schutz++) {
+    const a = world.raster.get(schluessel(i, j));
+    if (a) for (const m of a) {
+      if (m.userData.stempel === stempel) continue;
+      m.userData.stempel = stempel; out.push(m);
+    }
+    if (i === iZ && j === jZ) break;
+    if (tx < tz) { i += si; tx += dtx; } else { j += sj; tz += dtz; }
+  }
+  return out;
 }
 
 /**
@@ -801,7 +930,7 @@ export function groundHeightAt(pos, radius, world, maxY) {
   // Unter allem liegt das Gelände. Vorher begann diese Suche bei null – auf
   // einer Terrasse auf 17 m wäre das ein Sturz ins Bodenlose.
   let h = hoeheBei(pos.x, pos.z);
-  for (const m of world.colliders) {
+  for (const m of inBereich(world, pos.x - radius, pos.z - radius, pos.x + radius, pos.z + radius)) {
     const box = m.userData.box;
     if (box.max.y > maxY || box.max.y <= h) continue;
     const cx = Math.max(box.min.x, Math.min(pos.x, box.max.x));
@@ -828,7 +957,7 @@ export function resolveCollisions(pos, radius, world, { stepUp = STEP_UP, height
     && hoeheBei(pos.x, pos.z) > hoeheBei(von.x, von.z) + 0.02) {
     pos.x = von.x; pos.z = von.z;
   }
-  for (const m of world.colliders) {
+  for (const m of inBereich(world, pos.x - radius, pos.z - radius, pos.x + radius, pos.z + radius)) {
     const box = m.userData.box;
     if (box.max.y <= pos.y + stepUp) continue;      // begehbar oder unter den Füßen
     if (box.min.y >= pos.y + height) continue;      // über dem Kopf
