@@ -178,6 +178,45 @@ Jedes solide Prop bekommt einen unsichtbaren Kollisionsquader aus seiner
 Bounding-Box; Bewegung und Sichtlinien laufen dagegen, das Modell ist Optik.
 Quelle: https://quaternius.com/packs/toonshootergamekit.html
 
+## hdri/himmel.hdr — Himmel und Licht des realen Stils
+
+Eine HDRI von Poly Haven (CC0): `kloofendal_48d_partly_cloudy_puresky`, 1k,
+1,37 MB. Sie ist im realen Stil **die** Lichtquelle – Umgebungslicht über
+PMREM und zugleich der sichtbare Himmel.
+
+Warum nicht der gerechnete Himmel von three: der liefert Werte bis knapp über
+1. Gemessen lag damit das ganze Bild zwischen 0,09 und 0,5 – kein Glanz, keine
+tiefen Schatten, nichts, woraus eine Belichtung etwas machen könnte. Die HDRI
+bringt die echten Größenordnungen mit: Himmel um 1, Sonne 60 000.
+
+Die Sonnenrichtung liest `sonneAusHdri()` aus dem hellsten Fleck – gemessen
+48° Höhe, genau die 48 im Dateinamen. Neue HDRI holen:
+
+```
+node tools/hdri-holen.mjs <polyhaven-name> --res=1k
+```
+
+## textures/dorf_* — Fotooberflächen des Dorfes
+
+Sechs Sätze von Poly Haven (CC0), je Basisfarbe, Normale und Rauheit:
+
+| Ordner | Poly Haven | liegt auf |
+|---|---|---|
+| `dorf_putz/` | medieval_wall_01 | MI_Plaster – Putzwände |
+| `dorf_stein/` | medieval_blocks_05 | MI_UnevenBrick, MI_Brick, MI_RockTrim |
+| `dorf_dach/` | clay_roof_tiles_03 | MI_RoundTiles – Ziegeldächer |
+| `dorf_holz/` | medieval_wood | MI_WoodTrim – Balken, Geländer |
+| `dorf_pflaster/` | cobblestone_floor_02 | Arenaboden |
+| `dorf_wiese/` | aerial_grass_rock | Boden außerhalb |
+
+Holen und verkleinern mit `node tools/textur-holen.mjs <name> <ziel>`: aus rund
+3 MB Rohmaterial je Satz werden 600 KB. Zugeordnet wird in
+`SURFACE_FOR_MATERIAL` (`src/surface.js`) über den **Materialnamen** des
+Bausatzes, nicht über den Prop-Namen – nur so trifft es jedes Wandstück.
+
+Diese Dateien stehen **nicht** in der Vorlade-Liste: sie werden nur im realen
+Stil geholt und danach vom Service Worker zwischengespeichert.
+
 ## Eigene Figur bauen, ohne zu bezahlen
 
 Die KI-3D-Dienste lassen einen kostenlos erzeugen, aber nicht kostenlos

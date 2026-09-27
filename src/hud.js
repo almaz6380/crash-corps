@@ -1,5 +1,6 @@
 import { CLASSES } from './classes.js';
 import { TOUCH } from './device.js';
+import { REAL } from './style.js';
 import { TEAMS, REGELN } from './domination.js';
 import { Gyro } from './gyro.js';
 
@@ -21,6 +22,7 @@ export class Hud {
         <div id="menuknoepfe">
           ${TOUCH ? '<button id="anpassen" type="button">Bedienung anpassen</button>' : ''}
           <button id="gyro" type="button" title="Gyroskop">🧭</button>
+          <button id="grafik" type="button" title="Grafikstil umschalten"></button>
           <button id="ton" type="button" title="Ton an/aus (M)"></button>
         </div>
         ${TOUCH ? '' : `<div id="gyroeinst" hidden>
@@ -30,6 +32,7 @@ export class Hud {
           <label><input id="gyro-y" type="checkbox"> Y umkehren</label>
           <button id="gyro-kalib" type="button">Neu kalibrieren</button>
         </div>`}
+        <p id="hinweis" hidden></p>
         <p id="offline" hidden></p>
         <p id="stand">Stand ${typeof __BUILD__ !== 'undefined' ? __BUILD__ : '?'}</p>
         <p class="help">${TOUCH
@@ -95,6 +98,11 @@ export class Hud {
     root.querySelector('#pause').onclick = () => this.onPause?.();
     this._gyroAufbauen(root);
     // Zwei Knöpfe, ein Schalter: einer im Menü, einer während des Matches
+    const grafik = root.querySelector('#grafik');
+    if (grafik) {
+      grafik.textContent = REAL ? '📷 Fotoreal' : '✎ Comic';
+      grafik.onclick = () => this.onGrafik?.();
+    }
     this.tonKnoepfe = [root.querySelector('#ton'), root.querySelector('#ton2')];
     for (const b of this.tonKnoepfe) b.onclick = () => this.tonStand(this.onSound?.());
     const anp = root.querySelector('#anpassen');
@@ -304,6 +312,14 @@ export class Hud {
       f.style.backgroundImage = `url(${url})`;
       f.classList.add('da');
     }
+  }
+
+  /** Einzeiler im Menü, etwa wenn die Grafik selbsttätig zurückgeschaltet hat. */
+  hinweis(text) {
+    const el = this.root.querySelector('#hinweis');
+    if (!el) return;
+    el.textContent = text || '';
+    el.hidden = !text;
   }
 
   showMenu(on) { this.root.querySelector('#menu').hidden = !on; this.root.querySelector('#play').hidden = on; }

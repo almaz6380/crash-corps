@@ -107,6 +107,13 @@ export function setImage(name, which = 'diff') { return sets.get(name)?.[which]?
 
 /** Rauheit und Metallanteil nach Materialnamen – Blech spiegelt, Sandsack nicht. */
 const LOOK = [
+  // Figuren zuerst: ihre Materialien heißen nach dem Kleidungsstück, nicht nach
+  // dem Stoff. Ohne diese Zeilen landet Haut bei 0,1 Metallanteil – das sieht
+  // im echten Licht aus wie lackiert.
+  [/Superhero_Male|Regular_Male|skin|haut/i, { roughness: 0.68, metalness: 0.0 }],
+  [/Hair|Beard|haar/i, { roughness: 0.55, metalness: 0.0 }],
+  [/Eyes|auge/i, { roughness: 0.18, metalness: 0.0 }],
+  [/Peasant|Ranger|cloth|stoff|leather|leder/i, { roughness: 0.92, metalness: 0.0 }],
   [/metal|grey2|steel|tank|pipe/i, { roughness: 0.42, metalness: 0.75 }],
   [/grey|silver|chrome/i, { roughness: 0.5, metalness: 0.55 }],
   [/red|blue|green|yellow|cyan|orange|enemy|main/i, { roughness: 0.62, metalness: 0.35 }],

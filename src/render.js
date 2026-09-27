@@ -426,6 +426,18 @@ export class Pipeline {
     this.mat.uniforms.tBloom.value = this.hell.texture;
   }
 
+  /**
+   * Teure Effekte abschalten, wenn die Bildrate nicht reicht. Reihenfolge nach
+   * Kosten: erst Streulicht (drei Durchgänge), dann Umgebungsverdeckung
+   * (16 Abtastungen je Bildpunkt). Der Rest – HDR, Kurve, Schatten – bleibt,
+   * denn daran hängt das Bild, nicht die Zugabe.
+   */
+  sparsam() {
+    if (this.bloomAn) { this.bloomAn = false; this.mat.uniforms.bloom.value = 0; return 'Streulicht'; }
+    if (this.mat.uniforms.ao.value > 0) { this.mat.uniforms.ao.value = 0; return 'Umgebungsverdeckung'; }
+    return null;
+  }
+
   render(scene, camera) {
     const r = this.renderer;
     this.mat.uniforms.near.value = camera.near;

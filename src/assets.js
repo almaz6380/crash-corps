@@ -413,15 +413,26 @@ export function instantiate(id, { height, tint, weapon } = {}) {
     const mats = Array.isArray(o.material) ? o.material : [o.material];
     const cloned = mats.map(m => {
       const c = m.clone();
-      if (REAL) realisticMaterial(c);   // Figuren ohne Weltraum-Projektion, die würde beim Animieren wandern
-      // Saum und Bodenverdunkelung: gibt der Figur Form und trennt sie vom
-      // Hintergrund. Ohne das steht sie flach in einer Helligkeitsstufe.
-      figurMaterial(c, entry.height);
+      if (REAL) {
+        // Figuren ohne Weltraum-Projektion, die würde beim Animieren wandern.
+        // Und ohne die Cel-Hilfsmittel aus figurlook.js: Saum, gedämpftes
+        // Fülllicht und Bodenverdunkelung sind Ersatz für Licht, das es im
+        // realen Stil wirklich gibt – zusammen sähe die Figur aus, als klebte
+        // ein Aufkleber auf dem Bild.
+        realisticMaterial(c);
+      } else {
+        // Saum und Bodenverdunkelung: gibt der Figur Form und trennt sie vom
+        // Hintergrund. Ohne das steht sie flach in einer Helligkeitsstufe.
+        figurMaterial(c, entry.height);
+      }
       if (tint && (!def.tintMaterials || def.tintMaterials.includes(m.name))) {
         // Modelle mit Textur werden überblendet, flache Toon-Modelle bekommen die Farbe direkt
         // Mit Textur wird nur hineingemischt, sonst überdeckt die Klassenfarbe die
       // Zeichnung. Wie stark, sagt `tintMix`.
-      if (c.map) c.color.lerp(new THREE.Color(tint), def.tintMix ?? 0.8); else c.color.set(tint);
+      // Im realen Stil nur andeuten: eine komplett eingefärbte Figur ist ein
+      // Comic-Mittel. Wer zu wem gehört, sagt ohnehin der Wimpel über dem Kopf.
+      const mischung = (def.tintMix ?? 0.8) * (REAL ? 0.45 : 1);
+      if (c.map) c.color.lerp(new THREE.Color(tint), mischung); else c.color.set(tint);
       }
       materials.push(c); return c;
     });

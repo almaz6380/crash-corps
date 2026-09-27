@@ -7,7 +7,7 @@ import { Bot } from './bots.js';
 import { Hud } from './hud.js';
 import { Pipeline, ladeHimmel } from './render.js';
 import { preloadCharacters, preloadProps } from './assets.js';
-import { REAL } from './style.js';
+import { REAL, stilSetzen, stilZurueckfallen, schwachGemerkt } from './style.js';
 import { preloadTextures } from './surface.js';
 import { Input } from './input.js';
 import { buehneAnpassen, TOUCH, QUALITY } from './device.js';
@@ -171,6 +171,10 @@ function start(clsId) {
 hud.onPick = (id) => { sound.resume(); sound.klick(); start(id); };
 hud.onSound = () => { sound.resume(); const an = sound.schalten(); if (an) sound.klick(); return an; };
 hud.tonStand(sound.an);
+if (schwachGemerkt()) {
+  hud.hinweis('Die fotorealistische Fassung lief auf diesem Gerät zu langsam – '
+    + 'das Spiel startet deshalb im Comic-Stil. Über den Knopf lässt sie sich zurückholen.');
+}
 hud.onCustomize = () => {
   sound.klick();
   // Menü ausblenden, Bedienung über dem eingefrorenen Bild anordnen
@@ -180,6 +184,13 @@ hud.onCustomize = () => {
 };
 hud.onPause = () => { if (running) { sound.klick(); running = false; input.showTouch(false); hud.showMenu(true); hud.hint(false); } };
 hud.onModus = () => sound.klick();
+// Grafikstil: die halbe Szene hängt daran (Materialien, Licht, Himmel,
+// Render-Ziele), deshalb wird neu geladen statt umgebaut.
+hud.onGrafik = () => {
+  sound.klick();
+  stilSetzen(REAL ? 'toon' : 'real');
+  location.reload();
+};
 // Gyroskop. Der Knopf ist die Nutzergeste, die iOS für die Erlaubnis verlangt.
 // Einschalten heißt immer kalibrieren: zwei Bewegungen, aus denen die Achsen
 // gemessen werden. Ohne gültige Achsen bleibt der Gyro aus.
@@ -354,16 +365,43 @@ function simulieren(dt) {
   fx.update(dt);
 }
 
+/**
+ * Bildrate beobachten. Die fotorealistische Fassung kostet, und nicht jedes
+ * Gerät trägt sie. Statt sie dort einfach ruckeln zu lassen, wird sie
+ * stufenweise billiger; reicht auch das nicht, startet das Spiel beim
+ * nächsten Mal im Comic-Stil. Wer den Stil selbst gewählt hat, wird nicht
+ * bevormundet – das entscheidet `stilZurueckfallen()`.
+ */
+const LEISTUNG = { fenster: 100, sparenUnter: 26, aufgebenUnter: 19 };
+const bildzeiten = [];
+function leistungPruefen(dt) {
+  if (!REAL) return;
+  bildzeiten.push(dt);
+  if (bildzeiten.length < LEISTUNG.fenster) return;
+  const sortiert = [...bildzeiten].sort((a, b) => a - b);
+  const median = sortiert[Math.floor(sortiert.length / 2)];
+  bildzeiten.length = 0;
+  const fps = 1 / Math.max(median, 1e-4);
+  if (fps >= LEISTUNG.sparenUnter) return;
+  const weg = pipeline.sparsam();
+  if (weg) { hud.kill(`Zu langsam – ${weg} aus`); return; }
+  if (fps < LEISTUNG.aufgebenUnter && stilZurueckfallen()) {
+    hud.kill('Zu langsam – nächster Start im Comic-Stil');
+  }
+}
+
 let last = performance.now();
 function loop(now) {
   requestAnimationFrame(loop);
-  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  const roh = (now - last) / 1000;              // echte Bildzeit, ungedeckelt
+  const dt = Math.min(0.05, roh); last = now;
   if (input.takeMute()) hud.tonStand(sound.schalten());
   if (input.takeSicht() && player) { sound.klick(); player.sichtUmschalten(); }
   if (input.takeMenu() && running) { running = false; input.showTouch(false); hud.showMenu(true); hud.hint(false); }
   // Im Menü sammelt sich sonst Drehung an, die beim Start den Blick wegreißt –
   // außer während der Kalibrierung, da liest der Prüfschritt den Puffer selbst.
   if (!running) { if (!kalibLaeuft) input.gyro.leeren(); pipeline.render(scene, camera); return; }
+  leistungPruefen(roh);
   for (let i = 0; i < TEMPO && running; i++) simulieren(dt);
   hud.update(player, bots, time);
   pipeline.render(scene, camera);
