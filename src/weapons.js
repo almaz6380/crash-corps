@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { amStrahl } from './world.js';
 
 /**
  * Die drei Waffen. `abfall` ist der Schadensabfall über die Entfernung: voller
@@ -85,7 +86,7 @@ export class Weapon {
       d.z += (Math.random() - 0.5) * this.def.spread * 2;
       d.normalize();
       ray.set(origin, d);
-      const wall = ray.intersectObjects(world.colliders, false)[0];
+      const wall = ray.intersectObjects(amStrahl(world, origin, d, this.def.range), false)[0];
       const hit = ray.intersectObjects(meshes, false)[0];
       if (hit && (!wall || hit.distance < wall.distance)) {
         let o = hit.object; while (o && !o.userData.target) o = o.parent;

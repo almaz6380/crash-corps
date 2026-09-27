@@ -13,12 +13,16 @@ import { Input } from './input.js';
 import { buehneAnpassen, TOUCH, QUALITY } from './device.js';
 import { Sound } from './sound.js';
 import { Domination, TEAMS } from './domination.js';
+import { Navgitter } from './navgitter.js';
+import { WELT } from './terrain.js';
 
 const canvas = document.getElementById('game');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
 renderer.setPixelRatio(Math.min(devicePixelRatio, QUALITY.pixelRatio));
 const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(80, 1, 0.05, 300);
+// Sichtweite auf die 240-m-Welt: von einer Ecke zur anderen sind es 339 m,
+// und die Hügel am Rand sollen im Dunst verschwinden, nicht abgeschnitten werden.
+const camera = new THREE.PerspectiveCamera(80, 1, 0.05, 450);
 camera.userData.canvas = canvas;
 scene.add(camera);
 const pipeline = new Pipeline(renderer, camera);
@@ -88,6 +92,7 @@ const fx = {
 
 let player = null, bots = [], time = 0, running = false;
 let dom = null;              // Domination-Zustand, null im Deathmatch
+let zuvielFiguren = 0;       // wie viele Bots die Leistungsstufe schon gestrichen hat
 
 function resize() {
   const { w, h } = buehneAnpassen();
@@ -103,16 +108,39 @@ addEventListener('resize', resize); resize();
  * mitten unter Gegnern.
  */
 function pickSpawn(avoid, team = null) {
-  const plaetze = team == null ? world.spawns : world.spawns.filter(s => seite(s) === team);
+  // Im Deathmatch gelten die Plätze des Ausschnitts, sonst die der Stadt.
+  const alle = world.grenze?.spawns ?? world.spawns;
+  const plaetze = team == null ? alle : alle.filter(s => seite(s) === team);
+  const auswahl = plaetze.length ? plaetze : alle;
+  const abstand = (s) => avoid.filter(a => a && !a.dead)
+    .reduce((m, a) => Math.min(m, a.pos.distanceTo(s)), 1e9);
+  // Über die ganze Stadt zählt nicht mehr „möglichst weit weg": wer nach jedem
+  // Tod am anderen Ende erscheint, läuft eine Minute. Also der Platz, der
+  // einem eigenen Punkt am nächsten liegt – solange kein Gegner danebensteht.
+  const eigene = dom?.punkte.filter(k => k.besitzer === team) ?? [];
+  if (eigene.length) {
+    let best = null, bd = Infinity;
+    for (const s of auswahl) {
+      if (abstand(s) < 16) continue;
+      const d = eigene.reduce((m, k) => Math.min(m, k.pos.distanceTo(s)), 1e9);
+      if (d < bd) { bd = d; best = s; }
+    }
+    if (best) return best;
+  }
   let best = null, bd = -1;
-  for (const s of (plaetze.length ? plaetze : world.spawns)) {
-    const d = avoid.filter(a => a && !a.dead).reduce((m, a) => Math.min(m, a.pos.distanceTo(s)), 1e9);
+  for (const s of auswahl) {
+    const d = abstand(s);
     if (d > bd) { bd = d; best = s; }
   }
   return best;
 }
-/** Arenahälfte eines Punktes: Südwesten gehört Rot, Nordosten Blau. */
-const seite = (v) => (v.x + v.z < 0 ? 0 : 1);
+/**
+ * Welcher Mannschaft eine Stelle zugeordnet ist. Die Karte ist an z = 0
+ * gespiegelt: Süden gehört Rot, Norden Blau. (Vorher entschied x + z – das
+ * passte zur alten, punktsymmetrischen Arena, nicht zum Tal zwischen zwei
+ * Terrassen.)
+ */
+const seite = (v) => (v.z < 0 ? 0 : 1);
 
 function start(clsId) {
   if (player) player.dispose();
@@ -120,11 +148,19 @@ function start(clsId) {
   dom?.dispose(); dom = null;
   sound.resume();                        // Browser lassen Ton erst nach einer Geste zu
   const domination = hud.modus === 'domination';
+  // Jeder Modus bekommt seinen Ausschnitt der Stadt: Domination die ganze
+  // Karte, Deathmatch das Tal. Sechs Figuren auf 240 m wären eine Wanderung.
+  world.grenze = domination ? world.zonen.ganz : world.zonen.deathmatch;
 
   player = new Player(camera, CLASSES[clsId], world, scene, input, sound);
   const ids = Object.keys(CLASSES);
-  // Deathmatch: der Spieler allein gegen fünf Bots. Domination: drei gegen drei.
-  const teams = domination ? [0, 0, 1, 1, 1] : [1, 1, 1, 1, 1];
+  // Deathmatch: der Spieler allein gegen fünf Bots, eng und schnell.
+  // Domination: sechs gegen sechs über fünf Punkte und drei Ebenen – bei
+  // weniger Leuten steht die halbe Karte leer.
+  const teams = domination
+    ? [0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1]
+    : [1, 1, 1, 1, 1];
+  zuvielFiguren = 0;
   bots = teams.map((team, i) => {
     const b = new Bot(scene, world, ids[i % ids.length], sound, team);
     b.onDeath = (von) => {
@@ -319,6 +355,10 @@ Promise.all([
 ])
   .then(() => {
     world = buildWorld(scene, renderer);
+    // Das Navigationsgitter kommt **nach** dem Weltaufbau: es liest die
+    // fertigen Kollisionsquader. Gebaut wird es hier und nicht in `world.js`,
+    // damit die beiden Module nicht im Kreis voneinander abhängen.
+    world.nav = new Navgitter(world, WELT);
     // Bilder der Figuren für die Klassenwahl. Aus der Ich-Perspektive sieht man
     // die eigene Figur nie – ohne diese Vorschau wählt man blind.
     hud.klassenBilder(klassenBilder(Object.values(CLASSES)));
@@ -343,7 +383,7 @@ if (!TOUCH) {
  * Spiel. Mit `tempo` laufen Bots, Waffen und Modus schneller, gezeichnet wird
  * weiter einmal je Bild. Am normalen Spiel (ohne Schalter) ändert sich nichts.
  */
-const TEMPO = Math.max(1, Math.min(20, +new URLSearchParams(location.search).get('tempo') || 1));
+const TEMPO = Math.max(1, Math.min(100, +new URLSearchParams(location.search).get("tempo") || 1));
 
 /** Ein Rechenschritt: alles, was sich um dt weiterbewegt. */
 function simulieren(dt) {
@@ -354,6 +394,9 @@ function simulieren(dt) {
   // Der Spieler schießt nur auf die andere Mannschaft
   player.update(dt, bots.filter(b => !b.dead && b.team !== player.team), fx);
   sound.listener(player.eye, player.yaw);   // Ohr sitzt am Auge und dreht mit
+  // Der Schattenausschnitt wandert mit: eng um den Spieler statt über die ganze
+  // Stadt gespannt (siehe lichtFolgen in world.js).
+  world.lichtFolgen?.(player.pos);
   if (player.dead && player.respawnIn <= 0) player.spawn(pickSpawn(bots, dom ? player.team : null));
   for (const b of bots) {
     b.update(dt, alle.filter(a => !a.dead && a.team !== b.team), bots, fx, dom);
@@ -385,9 +428,29 @@ function leistungPruefen(dt) {
   if (fps >= LEISTUNG.sparenUnter) return;
   const weg = pipeline.sparsam();
   if (weg) { hud.kill(`Zu langsam – ${weg} aus`); return; }
+  if (figurenKuerzen()) return;
   if (fps < LEISTUNG.aufgebenUnter && stilZurueckfallen()) {
     hud.kill('Zu langsam – nächster Start im Comic-Stil');
   }
+}
+
+/**
+ * Der letzte Regler vor dem Stilwechsel: weniger Figuren.
+ *
+ * Eine Figur kostet Skelett, Animation, Wegsuche und einen Schatten – auf
+ * zwölf Figuren summiert sich das. Genommen wird paarweise, je eine aus jeder
+ * Mannschaft, sonst verschiebt das Sparen den Spielstand. Unter acht Figuren
+ * wird nicht gekürzt; dann ist die Karte leer und das Spiel kaputtgespart.
+ */
+function figurenKuerzen() {
+  if (bots.length < 7 || zuvielFiguren >= 4) return false;
+  for (const team of [0, 1]) {
+    const i = bots.findLastIndex(b => b.team === team);
+    if (i < 0) continue;
+    bots[i].dispose(); bots.splice(i, 1); zuvielFiguren++;
+  }
+  hud.kill(`Zu langsam – ${zuvielFiguren} Figuren weniger`);
+  return true;
 }
 
 let last = performance.now();

@@ -3,7 +3,7 @@ import { CLASSES, SPECIALS } from './classes.js';
 import { Weapon } from './weapons.js';
 import { buildCharacter, trefferQuader } from './characters.js';
 import { CharacterAnimator } from './animation.js';
-import { resolveCollisions, groundHeightAt, STEP_UP } from './world.js';
+import { resolveCollisions, groundHeightAt, STEP_UP, amStrahl, inBereich } from './world.js';
 import { TEAMS } from './domination.js';
 
 const NAMES = ['Brösel', 'Knacki', 'Zündel', 'Rumpel', 'Fiete', 'Gustl', 'Wuschel', 'Pumpf'];
@@ -79,10 +79,17 @@ export class Bot {
     this.target = null; this.wander = new THREE.Vector3();
     this.retarget = 0; this.reaction = 0; this.kills = 0;
     this.ray = new THREE.Raycaster();
+    // Eigene Listen für die Rasterabfragen: die Deckungssuche stellt in ihrer
+    // Schleife eine zweite Abfrage, ein geteilter Zwischenspeicher wäre danach
+    // leer und die Suche bräche nach dem ersten Quader ab.
+    this._kand = []; this._deckung = [];
     // Ausweichrolle (nur Klassen mit Dash-Spezial), Werte aus classes.js
     this.dodge = 0; this.dodgeCool = 0; this.dodgeDir = new THREE.Vector3(); this.dodgeSpeed = 0;
     this.vy = 0;   // Fallgeschwindigkeit, damit Bots von Plattformen fallen
     this.navPoint = null; this.navRefresh = 0;   // Zwischenziel beim Ebenenwechsel
+    // Weg aus dem Navigationsgitter: Liste von Punkten, Zeiger darauf, Alter
+    this.weg = null; this.wegIndex = 0; this.wegZiel = null; this.wegAlter = 0;
+    this.klemmt = 0; this.klemmStrecke = 0; this.klemmZeit = 0;
     this.schrittWeg = 0;                         // Strecke seit dem letzten Schritt
     this.zielPunkt = new THREE.Vector3();        // nachgeführtes Zielkreuz
     this.deckung = null; this.deckungBis = 0; this.deckungPruefung = 0; this.deckungWeg = false;
@@ -95,6 +102,7 @@ export class Bot {
     this.weapon = new Weapon(this.cls.weapon); this.retarget = 0; this.reaction = 0;
     this.dodge = 0; this.dodgeCool = 0; this.navPoint = null; this.navRefresh = 0;
     this.schrittWeg = 0;
+    this.weg = null; this.wegZiel = null; this.wegAlter = 0; this.klemmt = 0;
     this.deckung = null; this.deckungWeg = false; this.deckungBis = 0;
     this.spezialAktiv = 0; this.spezialCool = 0; this.spezialFrage = 0; this.gerammt = null;
     this.zielPunkt.set(0, 0, 0);
@@ -127,6 +135,66 @@ export class Bot {
    * mehrstufige Aufgänge Stück für Stück.
    */
   routeTo(dst, dt) {
+    // Der Aufstieg ist der **letzte** Schritt, nicht der erste.
+    //
+    // Vorher schickte jedes höher liegende Ziel den Bot sofort auf die
+    // nächstbeste Treppe. Auf 60 m ging das: dort war die nächste Treppe auch
+    // die richtige. In der Stadt am Hang steht er dann auf einem Dach im Tal,
+    // während der Punkt vierzig Meter weiter oben auf der Terrasse liegt –
+    // erreichbar nur über einen Hohlweg, und den kennt die Rampenliste nicht,
+    // sondern das Gitter.
+    //
+    // Also erst über den Boden in die Nähe, dann hinauf. Ein begonnener
+    // Aufstieg wird zu Ende gebracht, sonst dreht der Bot auf halber Treppe um.
+    const nah = Math.hypot(dst.x - this.pos.x, dst.z - this.pos.z) < 12;
+    if (this.navPoint || nah) {
+      const ebene = this.ebenenZiel(dst, dt);
+      if (ebene !== dst) {
+        // Zum **Fuß** einer Treppe läuft man wie zu jedem anderen Bodenziel:
+        // über das Gitter. Geradeaus dorthin lief der Bot sonst durch den
+        // Zaun des Innenhofs – gemessen 35 von 50 Klemmstellen an einer
+        // einzigen Ecke. Nur der Aufstieg selbst geht geradeaus; auf der
+        // Treppe hat das Gitter nichts zu sagen, es kennt nur den Boden.
+        return ebene.y > this.pos.y + 0.6 ? ebene : this.gitterZiel(ebene, dt);
+      }
+    } else {
+      this.navRefresh -= dt;
+    }
+    return this.gitterZiel(dst, dt);
+  }
+
+  /**
+   * Der Weg **in** der Ebene, aus dem Navigationsgitter (`navgitter.js`).
+   *
+   * Gesucht wird nur, wenn die gerade Linie verstellt ist – das ist der
+   * seltene Fall, und A* je Bot und Bild wäre pure Verschwendung. Ein
+   * gefundener Weg hält gut eine Sekunde; danach kann sich das Ziel bewegt
+   * haben. Findet die Suche nichts, bleibt Geradeaus: schlechter als ein Weg,
+   * besser als Stehenbleiben.
+   */
+  gitterZiel(dst, dt) {
+    const nav = this.world.nav;
+    if (!nav) return dst;
+    this.wegAlter -= dt;
+    if (this.klemmt <= 0 && nav.sicht(this.pos.x, this.pos.z, dst.x, dst.z)) {
+      this.weg = null; return dst;
+    }
+    const neuesZiel = !this.wegZiel || this.wegZiel.distanceTo(dst) > 4;
+    if (!this.weg || this.wegAlter <= 0 || neuesZiel) {
+      this.weg = nav.weg(this.pos, dst);
+      this.wegIndex = 0;
+      this.wegZiel = dst.clone();
+      this.wegAlter = 1.2;
+      this.klemmt = 0;
+      if (!this.weg) return dst;
+    }
+    while (this.wegIndex < this.weg.length - 1
+      && this.pos.distanceTo(this.weg[this.wegIndex]) < 1.6) this.wegIndex++;
+    return this.weg[this.wegIndex];
+  }
+
+  /** Zwischenziel beim Ebenenwechsel – das bisherige `routeTo`. */
+  ebenenZiel(dst, dt) {
     this.navRefresh -= dt;
     // Ein gewähltes Zwischenziel wird gehalten, bis es erreicht ist. Ohne das
     // verwirft der Bot es auf halber Rampe, weil der Höhenunterschied schrumpft.
@@ -216,7 +284,10 @@ export class Bot {
   sichtFrei(von, nach) {
     const dir = nach.clone().sub(von), dist = dir.length();
     this.ray.set(von, dir.normalize()); this.ray.far = dist;
-    return this.ray.intersectObjects(this.world.colliders, false).length === 0;
+    // Kandidaten aus dem Kollisionsraster: nur die Zellen, durch die der Strahl
+    // läuft. Diese Prüfung läuft je Bot und Bild, auf 240 m wäre „alle Quader"
+    // allein dafür die halbe Bildzeit.
+    return this.ray.intersectObjects(amStrahl(this.world, von, dir, dist, this._kand), false).length === 0;
   }
 
   /**
@@ -245,7 +316,10 @@ export class Bot {
     const ziel = feind.eye;
     const augen = this.cls.body.height * 0.9;
     let best = null, bestD = Infinity;
-    for (const c of this.world.colliders) {
+    // Nur die Quader im Umkreis – und in eine eigene Liste, weil die
+    // Sichtprüfung darunter selbst eine Rasterabfrage stellt.
+    const w = KI.deckungWeite;
+    for (const c of inBereich(this.world, this.pos.x - w, this.pos.z - w, this.pos.x + w, this.pos.z + w, this._deckung)) {
       const box = c.userData.box;
       if (!box) continue;
       const mx = (box.min.x + box.max.x) / 2, mz = (box.min.z + box.max.z) / 2;
@@ -358,8 +432,9 @@ export class Bot {
     this.dodgeCool = Math.max(0, this.dodgeCool - dt);
     if (this.dodge > 0) {
       this.dodge -= dt;
+      const vorRolle = { x: this.pos.x, z: this.pos.z };
       this.pos.addScaledVector(this.dodgeDir, this.dodgeSpeed * dt);
-      resolveCollisions(this.pos, 0.5, this.world, { height: this.cls.body.height });
+      resolveCollisions(this.pos, 0.5, this.world, { height: this.cls.body.height, von: vorRolle });
       this.applyGravity(dt);
       this.anim.update(dt, { moving: false, speed: 0 });
       return;
@@ -381,7 +456,15 @@ export class Bot {
         // streifen sie wie bisher ziellos umher.
         const ziel = dom?.zielFuer(this);
         if (ziel) this.wander.copy(ziel);
-        else this.wander.set((Math.random() - 0.5) * 50, 0, (Math.random() - 0.5) * 50);
+        else {
+          // Ziellos, aber innerhalb der Zone des Modus und in Reichweite: über
+          // die ganze Stadt gestreut liefe ein Bot sonst minutenlang in den
+          // leeren Waldrand, statt dorthin, wo gespielt wird.
+          const g = this.world.grenze ?? this.world.zonen.ganz;
+          this.wander.set(
+            Math.max(-g.x, Math.min(g.x, this.pos.x + (Math.random() - 0.5) * 70)), 0,
+            Math.max(-g.z, Math.min(g.z, this.pos.z + (Math.random() - 0.5) * 70)));
+        }
         this.retarget = dom ? 1.5 + Math.random() * 1.5 : 3 + Math.random() * 3;
       }
     }
@@ -421,14 +504,36 @@ export class Bot {
     const sturm = this.spezialAktiv > 0 && SPECIALS[this.cls.special].schaden;
     const speed = this.cls.speed * 0.8 * (sturm ? SPECIALS[this.cls.special].speedMul : 1);
     const walking = mv.lengthSq() > 0;
+    const vorSchritt = { x: this.pos.x, z: this.pos.z };
     if (walking) this.pos.addScaledVector(mv.normalize(), speed * dt);
-    resolveCollisions(this.pos, 0.5, this.world, { height: this.cls.body.height });
+    resolveCollisions(this.pos, 0.5, this.world, { height: this.cls.body.height, von: vorSchritt });
     this.applyGravity(dt);
     // Bots untereinander leicht auseinanderdrücken
     if (!climbing) for (const o of others) if (o !== this && !o.dead && Math.abs(o.pos.y - this.pos.y) < 1.2) {
       const d = this.pos.clone().sub(o.pos).setY(0); const l = d.length();
       if (l < 1.4 && l > 0) this.pos.addScaledVector(d.normalize(), (1.4 - l) * 0.5);
     }
+    // Steckenbleiben erkennen. Ein Bot, der laufen will und sich über zwei
+    // Sekunden kaum bewegt, steht an einer Ecke, die weder Gitter noch Rampe
+    // kennt. Dann wird der Weg verworfen und neu gesucht – und beim nächsten
+    // Mal auch dann, wenn die Luftlinie frei aussieht.
+    // Gezählt wird nur, wer **unterwegs** ist. Im Gefecht und auf einem Punkt
+    // steht ein Bot mit Absicht fast still (Abstandsspiel, seitliches
+    // Ausweichen, Halten) – zählte das mit, meldete die Erkennung 86 % der
+    // Proben als klemmend und würfe jeden Weg dauernd weg.
+    const reisen = walking && !sees && !halten;
+    if (reisen) {
+      this.klemmZeit += dt;
+      this.klemmStrecke += Math.hypot(this.pos.x - vorSchritt.x, this.pos.z - vorSchritt.z);
+    } else { this.klemmZeit = 0; this.klemmStrecke = 0; }
+    this.klemmt -= dt;
+    if (this.klemmZeit >= 2) {
+      if (this.klemmStrecke < 1.2) {
+        this.weg = null; this.wegAlter = 0; this.navPoint = null; this.klemmt = 3;
+      }
+      this.klemmZeit = 0; this.klemmStrecke = 0;
+    }
+
     // Blickrichtung: weich drehen statt umschnappen
     const look = sees && !climbing ? feind.pos : this.pos.clone().add(mv);
     if (walking || sees) {

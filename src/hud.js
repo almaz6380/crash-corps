@@ -15,8 +15,8 @@ export class Hud {
         <h1>Crash Corps</h1>
         <p class="sub">Wähl Modus und Klasse. Dann rein.</p>
         <div id="modi">
-          <button type="button" data-modus="deathmatch">Deathmatch<small>Jeder gegen jeden</small></button>
-          <button type="button" data-modus="domination">Domination<small>3 Punkte, 3 gegen 3</small></button>
+          <button type="button" data-modus="deathmatch">Deathmatch<small>Sechs im Tal</small></button>
+          <button type="button" data-modus="domination">Domination<small>5 Punkte, 6 gegen 6</small></button>
         </div>
         <div id="classes"></div>
         <div id="menuknoepfe">
