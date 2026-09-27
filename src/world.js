@@ -254,7 +254,7 @@ function kantenMaske() {
 
 /**
  * Baut die Arena. Zwei Ebenen: Boden und begehbare Containerdächer, verbunden
- * über Rampen. Gibt {group, colliders, spawns, bounds} zurück.
+ * über Rampen. Gibt {group, colliders, spawns, zonen} zurück.
  * colliders sind achsenparallele Quader; die Props selbst sind reine Optik.
  */
 export function buildWorld(scene, renderer) {
@@ -742,8 +742,16 @@ export function buildWorld(scene, renderer) {
     const zz = s * cz;
     const b = bauhoehe(cx, zz, 7, 6);
     haus(cx + 6.5, zz, 2, 3, { stein: true });
-    haus(cx - 6.5, zz, 2, 3, { tuer: 3 });
     const hinten = haus(cx, zz + s * 6.5, 3, 2, { tuer: 1 });
+    // Die vierte Seite bleibt offen. Mit Häusern ringsum und der Treppe als
+    // einzigem Ausgang war der Hof im Navigationsgitter eine eigene Insel:
+    // Treppenstufen sind dort Wand, und ein Bot, der hineinlief, kam nie
+    // wieder heraus. Ein Zaun gibt dieselbe Deckung, ohne den Hof zu schließen.
+    for (let i = -1; i <= 1; i++) {
+      place(i ? 'dorf:Prop_WoodenFence_Extension1' : 'dorf:Prop_WoodenFence_Single',
+        cx - 6.5, zz + i * 2, mry(s, Math.PI / 2), { solid: false, basis: b });
+    }
+    box3(cx - 6.8, b, zz - 3, cx - 6.2, b + 0.85, zz + 3);
     schlot(hinten, 1.6, 0);
     deck(cx, zz, 7, 6, PLATFORM_H, b);
     for (const [px, pz] of [[-3, -2.6], [3, -2.6], [-3, 2.6], [3, 2.6]]) pfosten(cx + px, zz + pz, PLATFORM_H, b);
@@ -1170,7 +1178,25 @@ export function buildWorld(scene, renderer) {
   // Kollisionsquader ins Raster einsortieren – erst hier, wenn alle stehen.
   const raster = rasterBauen(colliders);
 
-  return { group, colliders, raster, ramps, spawns, punkte, leben, lichtFolgen, bounds: SIZE / 2 - 1.5 };
+  /**
+   * Spielfeldgrenzen je Modus. Die Stadt ist 240 m groß; im Deathmatch mit
+   * sechs Figuren wäre das eine Wanderung, kein Gefecht. Deshalb bekommt jeder
+   * Modus seinen Ausschnitt, und `grenze` sagt, welcher gerade gilt.
+   */
+  const zonen = {
+    ganz: { x: SIZE / 2 - 1.5, z: SIZE / 2 - 1.5 },
+    // Deathmatch: das Tal bis zu den beiden Handwerkerhöfen, rund 96 × 52 m
+    deathmatch: {
+      x: 48, z: 26,
+      spawns: [[-34, -16], [34, 16], [-34, 16], [34, -16], [0, -20], [0, 20], [-20, 0], [20, 0]]
+        .map(([sx, sz]) => new THREE.Vector3(sx, hoeheBei(sx, sz), sz)),
+    },
+  };
+
+  return {
+    group, colliders, raster, ramps, spawns, punkte, leben, lichtFolgen,
+    zonen, grenze: zonen.ganz,
+  };
 }
 
 /**
@@ -1293,9 +1319,11 @@ export function groundHeightAt(pos, radius, world, maxY) {
  * man steigt auf sie. Quader über dem Kopf blockieren nicht, man läuft darunter durch.
  */
 export function resolveCollisions(pos, radius, world, { stepUp = STEP_UP, height = 1.8, von = null } = {}) {
-  const b = world.bounds;
-  pos.x = Math.min(b, Math.max(-b, pos.x));
-  pos.z = Math.min(b, Math.max(-b, pos.z));
+  // Die Grenze ist je Achse eigen: das Tal ist dreimal so lang wie breit, und
+  // ein quadratischer Ausschnitt läge zur Hälfte in der Böschung.
+  const b = world.grenze ?? world.zonen.ganz;
+  pos.x = Math.min(b.x, Math.max(-b.x, pos.x));
+  pos.z = Math.min(b.z, Math.max(-b.z, pos.z));
   // Steile Böschungen sind Wand, nicht Rampe: wer bergauf in eine Neigung über
   // `NEIGUNG_MAX` läuft, bleibt stehen. Ohne diese Regel liefe man jede Terrasse
   // gerade hinauf, und die Höhe im Gelände wäre bedeutungslos.

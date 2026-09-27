@@ -28,6 +28,21 @@ export const ZELLE = 2;
 /** Wie hoch eine Figur ist. Was tiefer hängt, blockiert. */
 const KOPF = 1.8;
 
+/** Wie breit eine Figur ist – derselbe Radius, mit dem `resolveCollisions` schiebt. */
+const RADIUS = 0.55;
+
+/**
+ * Wie viel Höhe zwischen zwei Nachbarzellen liegen darf.
+ *
+ * **Nicht `STEP_UP`.** Die Schrittweite gilt fürs Hinaufsteigen auf eine Kante
+ * – auf einem durchgehenden Hang läuft die Figur einfach bergauf, dort
+ * begrenzt allein die Neigung. Mit der Schrittweite als Grenze wären die
+ * Hohlwege gesperrt: 0,32 Steigung über 2 m sind 0,64 m, und damit wäre jede
+ * Auffahrt der Karte eine Wand. Gemessen hat das Gitter so nur 7,7 % seiner
+ * Wege gefunden.
+ */
+const STUFE = NEIGUNG_MAX * ZELLE * 1.05;
+
 /** Achter-Nachbarschaft, Diagonalen zuletzt. */
 const NACHBARN = [
   [1, 0, 1], [-1, 0, 1], [0, 1, 1], [0, -1, 1],
@@ -57,9 +72,18 @@ export class Navgitter {
         // ragt und unter Kopfhöhe beginnt, steht im Weg. Ein Steg auf 2,4 m
         // blockiert nicht – darunter läuft man durch.
         let blockiert = false;
-        for (const m of inBereich(world, x - 0.9, z - 0.9, x + 0.9, z + 0.9, eigene)) {
+        for (const m of inBereich(world, x - RADIUS, z - RADIUS, x + RADIUS, z + RADIUS, eigene)) {
           const b = m.userData.box;
-          if (b.max.y > h + STEP_UP && b.min.y < h + KOPF) { blockiert = true; break; }
+          if (b.max.y <= h + STEP_UP || b.min.y >= h + KOPF) continue;
+          // `inBereich` liefert **Kandidaten** aus 8-m-Zellen, keine Treffer.
+          // Ohne diese Prüfung sperrt ein einziges Haus seine ganze Rasterzelle,
+          // und in einer dichten Stadt bleibt vom Gitter fast nichts übrig –
+          // gemessen war so das ganze Tal unbegehbar.
+          const cx = Math.max(b.min.x, Math.min(x, b.max.x));
+          const cz = Math.max(b.min.z, Math.min(z, b.max.z));
+          const dx = x - cx, dz = z - cz;
+          if (dx * dx + dz * dz > RADIUS * RADIUS) continue;
+          blockiert = true; break;
         }
         if (!blockiert) this.frei[j * n + i] = 1;
       }
@@ -69,8 +93,14 @@ export class Navgitter {
     this.f = new Float32Array(n * n);
     this.her = new Int32Array(n * n);
     this.stand = new Int32Array(n * n);     // Durchlaufmarke statt „geschlossen"-Menge
+    this.zu = new Int32Array(n * n);        // schon abgearbeitet
     this.lauf = 0;
-    this.halde = new Int32Array(n * n);
+    // Die Halde muss mehr fassen als es Zellen gibt: eine Zelle wird jedes Mal
+    // neu eingefügt, wenn ein günstigerer Weg zu ihr auftaucht (statt sie in
+    // der Halde zu suchen und herabzustufen). Zu klein bemessen schreibt das
+    // typisierte Feld stillschweigend ins Leere, und die Suche findet Wege
+    // nicht mehr, die es gibt – gemessen: 136 von 400.
+    this.halde = new Int32Array(n * n * 4);
     this.anzahl = 0;
   }
 
@@ -116,7 +146,7 @@ export class Navgitter {
   /** Darf man von Zelle a nach Zelle b treten? Stufenhöhe und Ecken zählen. */
   schritt(a, b, di, dj) {
     if (!this.frei[b]) return false;
-    if (Math.abs(this.hoehe[b] - this.hoehe[a]) > STEP_UP) return false;
+    if (Math.abs(this.hoehe[b] - this.hoehe[a]) > STUFE) return false;
     if (di && dj) {
       // Keine Diagonale durch eine Hausecke: beide geraden Nachbarn müssen frei
       // sein. Sonst schneidet der geglättete Weg die Ecke, und der Bot drückt
@@ -140,7 +170,7 @@ export class Navgitter {
       const t = i / schritte;
       const k = this.index(x0 + dx * t, z0 + dz * t);
       if (k < 0 || !this.frei[k]) return false;
-      if (k !== letzte && Math.abs(this.hoehe[k] - this.hoehe[letzte]) > STEP_UP) return false;
+      if (k !== letzte && Math.abs(this.hoehe[k] - this.hoehe[letzte]) > STUFE) return false;
       letzte = k;
     }
     return true;
@@ -152,17 +182,21 @@ export class Navgitter {
    * kostet mehr als er nützt, und Geradeaus ist dann immer noch besser als ein
    * Bild Aussetzer.
    */
-  weg(von, nach, maxZellen = 4000) {
+  weg(von, nach, maxZellen = 9000) {
     const start = this.naechsteFreie(von.x, von.z);
     const ziel = this.naechsteFreie(nach.x, nach.z);
     if (start < 0 || ziel < 0) return null;
     if (start === ziel) return [new THREE.Vector3(nach.x, nach.y, nach.z)];
 
-    const { n, g, f, her, stand, halde } = this;
+    const { n, g, f, her, stand, zu } = this;
     this.lauf++;
     const lauf = this.lauf;
     const zx = this.weltX(ziel), zz = this.weltZ(ziel);
-    const schaetzung = (k) => Math.hypot(this.weltX(k) - zx, this.weltZ(k) - zz);
+    // Leicht übergewichtete Schätzung: A* läuft damit zielstrebiger und findet
+    // gelegentlich einen ein paar Meter längeren Weg. Das ist der richtige
+    // Tausch – ein Bot, der eine Zehntelsekunde stockt, fällt auf, ein Umweg
+    // von drei Metern nicht.
+    const schaetzung = (k) => Math.hypot(this.weltX(k) - zx, this.weltZ(k) - zz) * 1.15;
 
     this.anzahl = 0;
     g[start] = 0; f[start] = schaetzung(start); her[start] = -1; stand[start] = lauf;
@@ -171,6 +205,12 @@ export class Navgitter {
 
     while (this.anzahl > 0) {
       const k = this.entnehmen();
+      // Dieselbe Zelle steht mehrfach in der Halde – einmal je gefundener
+      // Verbesserung. Ohne diese Marke zählte jede Wiederholung als besuchte
+      // Zelle, und die Suche gab auf, lange bevor sie die Karte gesehen hatte:
+      // gemessen fanden 168 von 400 Wegen kein Ziel, das es gab.
+      if (zu[k] === lauf) continue;
+      zu[k] = lauf;
       if (k === ziel) return this.glaetten(k, nach);
       if (++besucht > maxZellen) break;
       const i = k % n, j = Math.floor(k / n);
@@ -212,6 +252,7 @@ export class Navgitter {
   // ---- Binärhalde, auf typisierten Feldern ----
   einfuegen(k) {
     const { halde, f } = this;
+    if (this.anzahl >= halde.length) return;      // voll: lieber kein Weg als Unsinn
     let i = this.anzahl++;
     halde[i] = k;
     while (i > 0) {
