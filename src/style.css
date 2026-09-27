@@ -27,6 +27,30 @@ body.gedreht #buehne { transform-origin: 0 0; transform: rotate(90deg) translate
 
 #cross { position: absolute; left: 50%; top: 50%; width: 14px; height: 14px; transform: translate(-50%,-50%); border: 3px solid var(--paper); border-radius: 50%; box-shadow: 0 0 0 2px var(--ink); }
 #flash { position: absolute; inset: 0; background: radial-gradient(transparent 55%, rgba(224,82,42,.75)); opacity: 0; }
+
+/* Hitmarker: vier Striche, die vom Fadenkreuz nach außen zeigen. Sie sitzen in
+   einem gedrehten Quadrat, damit ein X entsteht und nicht ein Kreuz – das Kreuz
+   läge genau auf dem Fadenkreuz und wäre nicht zu unterscheiden. */
+#marker { position: absolute; left: 50%; top: 50%; width: 34px; height: 34px; transform: translate(-50%,-50%); }
+#marker i { position: absolute; left: 50%; top: 50%; width: 3px; height: 10px; margin: -5px 0 0 -1.5px;
+  background: var(--paper); box-shadow: 0 0 0 1.5px var(--ink); border-radius: 2px; }
+#marker i:nth-child(1) { transform: rotate(45deg) translateY(-11px); }
+#marker i:nth-child(2) { transform: rotate(135deg) translateY(-11px); }
+#marker i:nth-child(3) { transform: rotate(225deg) translateY(-11px); }
+#marker i:nth-child(4) { transform: rotate(315deg) translateY(-11px); }
+#marker[data-art="kopf"] { width: 44px; height: 44px; }
+#marker[data-art="kopf"] i { background: var(--sun); height: 14px; }
+#marker[data-art="kopf"] i:nth-child(1) { transform: rotate(45deg) translateY(-14px); }
+#marker[data-art="kopf"] i:nth-child(2) { transform: rotate(135deg) translateY(-14px); }
+#marker[data-art="kopf"] i:nth-child(3) { transform: rotate(225deg) translateY(-14px); }
+#marker[data-art="kopf"] i:nth-child(4) { transform: rotate(315deg) translateY(-14px); }
+#marker[data-art="abschuss"] i { background: var(--red); }
+
+/* Woher kam der Schuss: ein Keil, der um die Bildmitte kreist. */
+#woher { position: absolute; left: 50%; top: 50%; width: 220px; height: 220px; }
+#woher i { position: absolute; left: 50%; top: 0; width: 0; height: 0; margin-left: -22px;
+  border-left: 22px solid transparent; border-right: 22px solid transparent;
+  border-bottom: 26px solid rgba(224,82,42,.85); filter: drop-shadow(0 0 2px rgba(0,0,0,.6)); }
 #feed { position: absolute; top: 18px; right: 18px; display: grid; gap: 6px; text-align: right; }
 #feed div { background: var(--paper); border: 3px solid var(--ink); padding: 4px 10px; border-radius: 10px; font-weight: bold; box-shadow: 3px 3px 0 var(--ink); }
 #score { position: absolute; top: 18px; left: 18px; background: var(--paper); border: 3px solid var(--ink); padding: 6px 12px; border-radius: 10px; box-shadow: 3px 3px 0 var(--ink); }

@@ -5,6 +5,23 @@ import { buildWeapon } from './gear.js';
 export { buildViewmodel } from './gear.js';
 
 /**
+ * Unsichtbarer Trefferquader einer Figur. Auf ihn wird geschossen, nicht auf
+ * die Figur: ein Strahl gegen eine animierte Figur verfehlt sie verlässlich
+ * unzuverlässig, weil three ihn vorher an der Hülle aus der Bindepose
+ * verwirft – die passt zur Laufpose nicht.
+ *
+ * Schmaler als `body.width`: der Wert dort stammt aus der Zeit der eckigen
+ * Bauklotz-Figuren, ein Barbar ist keine 1,3 m breit.
+ */
+export function trefferQuader(cls) {
+  const b = cls.body;
+  return new THREE.Mesh(
+    new THREE.BoxGeometry(b.width * 0.62, b.height, b.width * 0.42),
+    new THREE.MeshBasicMaterial({ visible: false }),
+  );
+}
+
+/**
  * Baut eine Spielfigur aus dem geladenen Modell der Klasse.
  * Root steht mit den Füßen auf y=0 und schaut nach +z.
  *

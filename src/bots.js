@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { CLASSES, SPECIALS } from './classes.js';
 import { Weapon } from './weapons.js';
-import { buildCharacter } from './characters.js';
+import { buildCharacter, trefferQuader } from './characters.js';
 import { CharacterAnimator } from './animation.js';
 import { resolveCollisions, groundHeightAt, STEP_UP } from './world.js';
 import { TEAMS } from './domination.js';
@@ -21,8 +21,18 @@ export class Bot {
     this.cls = CLASSES[clsId]; this.world = world; this.scene = scene; this.sound = sound;
     this.team = team;
     this.name = NAMES[nameIdx++ % NAMES.length];
-    this.mesh = buildCharacter(this.cls); this.mesh.userData.target = this;
+    this.mesh = buildCharacter(this.cls);
     this.anim = new CharacterAnimator(this.mesh);
+    // Trefferkörper: ein unsichtbarer Quader, nicht die Figur selbst.
+    //
+    // Ein Strahl gegen eine animierte Figur verfehlt sie verlässlich
+    // unzuverlässig: three prüft zuerst die Hülle aus der Bindepose, und die
+    // passt zur Laufpose nicht – gemessen gingen 15 von 17 Schüssen auf die
+    // stehende Figur ins Leere. Der Spieler hatte von Anfang an einen Quader;
+    // jetzt haben ihn beide, und damit gelten für beide dieselben Zonen.
+    this.trefferKoerper = trefferQuader(this.cls);
+    this.trefferKoerper.userData.target = this;
+    scene.add(this.trefferKoerper);
     // Wimpel in Mannschaftsfarbe über dem Kopf. Ohne ihn sieht man im
     // Domination-Modus nicht, auf wen man schießen darf.
     this.wimpel = new THREE.Mesh(
@@ -47,21 +57,28 @@ export class Bot {
   }
   spawn(at) {
     this.pos.copy(at); this.vy = 0; this.hp = this.cls.hp; this.dead = false; this.mesh.visible = true;
+    this.trefferSetzen();
     this.weapon = new Weapon(this.cls.weapon); this.retarget = 0; this.reaction = 0;
     this.dodge = 0; this.dodgeCool = 0; this.navPoint = null; this.navRefresh = 0;
     this.schrittWeg = 0;
     this.anim.reset();
   }
-  onHit(dmg) {
+  /**
+   * @param {number} dmg
+   * @param {{kopf?:boolean, von?:object}} [info] Trefferzone und Schütze. Der
+   *   Schütze wird an `onDeath` weitergereicht: nur so weiß `main.js`, wer den
+   *   Abschuss hat – in Domination schießen auch die eigenen Leute.
+   */
+  onHit(dmg, { kopf = false, von = null } = {}) {
     if (this.dead) return;
     this.hp -= dmg; this.anim.hit();
-    this.sound?.koerpertreffer(this.pos);
+    this.sound?.koerpertreffer(this.pos, kopf);
     if (this.hp > 0) this.tryDodge();
     if (this.hp <= 0) {
       this.hp = 0; this.dead = true; this.respawnIn = 4;
       this.anim.die(); // Leiche bleibt sichtbar, bis sie umgefallen ist
       this.sound?.sturz(this.pos);
-      this.onDeath?.();
+      this.onDeath?.(von);
     }
   }
   get eye() { return this.pos.clone().setY(this.pos.y + this.cls.body.height * 0.9); }
@@ -102,6 +119,12 @@ export class Bot {
     this.pos.y += this.vy * dt;
     const support = groundHeightAt(this.pos, 0.35, this.world, this.pos.y + STEP_UP);
     if (this.pos.y <= support) { this.pos.y = support; this.vy = 0; }
+    this.trefferSetzen();
+  }
+
+  /** Trefferquader der Figur nachführen – er steht auf den Füßen, nicht im Bauch. */
+  trefferSetzen() {
+    this.trefferKoerper.position.set(this.pos.x, this.pos.y + this.cls.body.height / 2, this.pos.z);
   }
 
   /** Seitlich wegrollen, wenn die Klasse Dash hat, die Abklingzeit um ist und der Zufall will. */
@@ -123,9 +146,10 @@ export class Bot {
 
   /** Figur aus der Szene nehmen und ihre geklonten Materialien freigeben. */
   dispose() {
-    this.scene.remove(this.mesh);
+    this.scene.remove(this.mesh, this.trefferKoerper);
     for (const m of this.mesh.userData.rig.inst.materials) m.dispose();
     this.wimpel.geometry.dispose(); this.wimpel.material.dispose();
+    this.trefferKoerper.geometry.dispose(); this.trefferKoerper.material.dispose();
   }
 
   /** Nächster sichtbarer Gegner, oder null. */
@@ -237,7 +261,7 @@ export class Bot {
     if (sees && this.reaction > 0.6 && this.weapon.canFire()) {
       const aim = feind.eye.clone().sub(this.eye);
       aim.x += (Math.random() - 0.5) * 0.6; aim.y += (Math.random() - 0.5) * 0.4; aim.z += (Math.random() - 0.5) * 0.6;
-      const hits = this.weapon.fire(this.eye, aim.normalize(), [feind], this.world);
+      const hits = this.weapon.fire(this.eye, aim.normalize(), [feind], this.world, 1, this);
       if (hits) {
         this.anim.fire();
         this.sound?.schuss(this.cls.weapon, this.eye);

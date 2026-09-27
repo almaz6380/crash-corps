@@ -127,9 +127,14 @@ function start(clsId) {
   const teams = domination ? [0, 0, 1, 1, 1] : [1, 1, 1, 1, 1];
   bots = teams.map((team, i) => {
     const b = new Bot(scene, world, ids[i % ids.length], sound, team);
-    b.onDeath = () => {
-      // Nur gegnerische Abschüsse zählen für den Spieler
-      if (b.team !== player.team) { player.kills++; hud.kill(`Du → ${b.name}`); sound.abschuss(); }
+    b.onDeath = (von) => {
+      // Nur eigene Abschüsse zählen. Vorher zählte jeder tote Gegner als
+      // Abschuss des Spielers – in Domination schießen aber auch die Bots
+      // der eigenen Mannschaft.
+      if (von === player) {
+        player.kills++; hud.kill(`Du → ${b.name}`); sound.abschuss();
+        player.marker('abschuss');
+      } else if (von) hud.kill(`${von.name ?? 'Jemand'} → ${b.name}`);
       else hud.kill(`${b.name} gefallen`);
     };
     return b;
@@ -339,7 +344,8 @@ function loop(now) {
     b.update(dt, alle.filter(a => !a.dead && a.team !== b.team), bots, fx, dom);
     if (b.dead && b.respawnIn <= 0) b.spawn(pickSpawn(alle, dom ? b.team : null));
   }
-  if (!wasDead && player.dead) hud.kill(`Ein Gegner → Du`);
+  // Wer den Spieler erwischt hat, steht seit dem letzten Treffer fest
+  if (!wasDead && player.dead) hud.kill(`${player.letzterSchuetze?.name ?? 'Ein Gegner'} → Du`);
   dom?.update(dt, alle);
   fx.update(dt);
   hud.update(player, bots, time);

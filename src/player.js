@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { resolveCollisions, groundHeightAt, STEP_UP } from './world.js';
 import { Weapon } from './weapons.js';
 import { SPECIALS } from './classes.js';
-import { buildViewmodel, buildCharacter } from './characters.js';
+import { buildViewmodel, buildCharacter, trefferQuader } from './characters.js';
 import { ViewmodelAnimator, CharacterAnimator } from './animation.js';
 import { AIM_ASSIST } from './device.js';
 import { bestTarget, pullToward, ASSIST } from './aimassist.js';
@@ -35,12 +35,13 @@ export class Player {
     this.baseFov = camera.fov;
     this.viewmodel = buildViewmodel(cls); camera.add(this.viewmodel);
     this.vmAnim = new ViewmodelAnimator(this.viewmodel);
-    // Unsichtbarer Trefferkörper – ohne ihn können die Bots den Spieler nicht anvisieren.
-    this.mesh = new THREE.Mesh(
-      new THREE.BoxGeometry(cls.body.width, cls.body.height, cls.body.width * 0.6),
-      new THREE.MeshBasicMaterial({ visible: false }),
-    );
+    // Unsichtbarer Trefferkörper – ohne ihn können die Bots den Spieler nicht
+    // anvisieren. Die Bots haben seit den Trefferzonen denselben Quader, aus
+    // demselben Bauplan: auf eine animierte Figur zu schießen, trifft sie nicht
+    // verlässlich (siehe `trefferQuader` in bots.js).
+    this.mesh = trefferQuader(cls);
     this.mesh.userData.target = this;
+    this.trefferKoerper = this.mesh;
     scene.add(this.mesh);
     // Eigene Figur. In der Ego-Sicht unsichtbar, sonst sieht man sich von innen.
     this.figur = buildCharacter(cls);
@@ -88,15 +89,27 @@ export class Player {
     this.special.active = this.special.def.duration; this.special.cool = this.special.def.cooldown;
     this.sound?.spezial(this.cls.special);
   }
-  onHit(dmg) {
+  /**
+   * @param {number} dmg
+   * @param {{kopf?:boolean, von?:object}} [info] Trefferzone und Schütze.
+   *   Der Schütze wird als Position gemerkt, nicht als Winkel: der Keil im HUD
+   *   soll auf ihn zeigen, auch wenn man sich danach dreht.
+   */
+  onHit(dmg, { kopf = false, von = null } = {}) {
     if (this.dead) return;
-    this.hp -= dmg; this.flash = 0.25;
+    this.hp -= dmg; this.flash = kopf ? 0.4 : 0.25;
+    this.schadenVon = von?.pos?.clone() ?? null;
+    this.letzterSchuetze = von;
+    this.schadenZeit = 1.2;
     this.figurAnim.hit();
     if (this.hp <= 0) {
       this.hp = 0; this.dead = true; this.deaths++; this.respawnIn = 3;
       this.figurAnim.die(); this.sound?.tod();
     } else this.sound?.schmerz();
   }
+
+  /** Trefferrückmeldung am Fadenkreuz. `art`: 'körper' | 'kopf' | 'abschuss'. */
+  marker(art) { this.trefferArt = art; this.trefferZeit = art === 'abschuss' ? 0.6 : 0.3; }
 
   get forward() { return new THREE.Vector3(-Math.sin(this.yaw), 0, -Math.cos(this.yaw)); }
   get aim() { return new THREE.Vector3(-Math.sin(this.yaw) * Math.cos(this.pitch), Math.sin(this.pitch), -Math.cos(this.yaw) * Math.cos(this.pitch)); }
@@ -135,6 +148,8 @@ export class Player {
     this.special.cool = Math.max(0, this.special.cool - dt);
     this.special.active = Math.max(0, this.special.active - dt);
     this.flash = Math.max(0, (this.flash || 0) - dt);
+    this.trefferZeit = Math.max(0, (this.trefferZeit || 0) - dt);
+    this.schadenZeit = Math.max(0, (this.schadenZeit || 0) - dt);
     if (this.dead) { this.respawnIn -= dt; return; }
 
     // Bewegung
@@ -187,12 +202,16 @@ export class Player {
       const dmgMul = sp.active > 0 && sp.def.damageMul ? sp.def.damageMul : 1;
       const von = this.schussStart(ziel);
       const richtung = ziel.clone().sub(von).normalize();
-      const hits = this.weapon.fire(von, richtung, targets, this.world, dmgMul);
+      const hits = this.weapon.fire(von, richtung, targets, this.world, dmgMul, this);
       if (hits) {
         this.vmAnim.fire(); this.figurAnim.fire();
         fx.tracers(this.eye, hits, this.cls.accent);
         this.sound?.schuss(this.cls.weapon);
-        if (this.weapon.hitCount > 0) this.sound?.treffer();
+        if (this.weapon.hitCount > 0) {
+          const kopf = this.weapon.kopfCount > 0;
+          this.marker(kopf ? 'kopf' : 'körper');
+          if (kopf) this.sound?.kopftreffer(); else this.sound?.treffer();
+        }
       }
       if (!this.weapon.def.auto) inp.fireHeld = false;   // Einzelschuss: Taste muss neu gedrückt werden
     }
@@ -287,7 +306,7 @@ export class Player {
     this.zielRay.set(von, this.aim);
     this.zielRay.far = 200;
     const wand = this.zielRay.intersectObjects(this.world.colliders, false)[0];
-    const gegner = this.zielRay.intersectObjects(targets.map(t => t.mesh), true)[0];
+    const gegner = this.zielRay.intersectObjects(targets.map(t => t.trefferKoerper ?? t.mesh), false)[0];
     const treffer = gegner && (!wand || gegner.distance < wand.distance) ? gegner : wand;
     if (treffer) this.zielPunkt.copy(treffer.point);
     else this.zielPunkt.copy(von).addScaledVector(this.aim, 120);
