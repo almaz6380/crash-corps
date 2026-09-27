@@ -280,12 +280,20 @@ export class Sound {
     this._ton(z, { dauer: 0.05, f0: 1750, f1: 1500, form: 'triangle', laut: 0.6 });
   }
 
-  /** Einschlag im Körper eines Bots – dumpf, am Ort des Bots. */
-  koerpertreffer(pos) {
+  /** Eigener Kopftreffer: derselbe Tick, aber höher und mit zweitem Ton drauf. */
+  kopftreffer() {
     if (!this._bereit()) return;
-    const z = this.at(pos, 0.55);
+    const z = this.at(null, 0.6);
+    this._ton(z, { dauer: 0.05, f0: 2400, f1: 2100, form: 'triangle', laut: 0.6 });
+    this._ton(z, { dauer: 0.08, f0: 3200, f1: 2600, form: 'triangle', laut: 0.35, start: 0.04 });
+  }
+
+  /** Einschlag im Körper eines Bots – dumpf, am Ort des Bots; am Kopf härter. */
+  koerpertreffer(pos, kopf = false) {
+    if (!this._bereit()) return;
+    const z = this.at(pos, kopf ? 0.65 : 0.55);
     if (!z) return;
-    this._rausch(z, { dauer: 0.09, f0: 1100, f1: 260, laut: 0.7 });
+    this._rausch(z, { dauer: kopf ? 0.06 : 0.09, f0: kopf ? 2600 : 1100, f1: 260, laut: 0.7 });
     this._ton(z, { dauer: 0.11, f0: 190, f1: 90, laut: 0.4 });
   }
 
@@ -357,9 +365,11 @@ export class Sound {
   }
 
   /** Spezialfähigkeit ausgelöst. */
-  spezial(art) {
+  /** @param {THREE.Vector3} [pos] Ort in der Welt; ohne ihn klingt es als eigenes. */
+  spezial(art, pos = null) {
     if (!this._bereit()) return;
-    const z = this.at(null, 0.6);
+    const z = this.at(pos, 0.6);
+    if (!z) return;
     if (SPEZIAL[art] === 'ton') {
       this._ton(z, { dauer: 0.4, f0: 420, f1: 950, form: 'triangle', laut: 0.35 });
       this._ton(z, { dauer: 0.4, f0: 630, f1: 1420, form: 'sine', laut: 0.18 });

@@ -127,9 +127,14 @@ function start(clsId) {
   const teams = domination ? [0, 0, 1, 1, 1] : [1, 1, 1, 1, 1];
   bots = teams.map((team, i) => {
     const b = new Bot(scene, world, ids[i % ids.length], sound, team);
-    b.onDeath = () => {
-      // Nur gegnerische Abschüsse zählen für den Spieler
-      if (b.team !== player.team) { player.kills++; hud.kill(`Du → ${b.name}`); sound.abschuss(); }
+    b.onDeath = (von) => {
+      // Nur eigene Abschüsse zählen. Vorher zählte jeder tote Gegner als
+      // Abschuss des Spielers – in Domination schießen aber auch die Bots
+      // der eigenen Mannschaft.
+      if (von === player) {
+        player.kills++; hud.kill(`Du → ${b.name}`); sound.abschuss();
+        player.marker('abschuss');
+      } else if (von) hud.kill(`${von.name ?? 'Jemand'} → ${b.name}`);
       else hud.kill(`${b.name} gefallen`);
     };
     return b;
@@ -317,16 +322,19 @@ if (!TOUCH) {
   document.addEventListener('pointerlockchange', () => hud.hint(running && document.pointerLockElement !== canvas));
 }
 
-let last = performance.now();
-function loop(now) {
-  requestAnimationFrame(loop);
-  const dt = Math.min(0.05, (now - last) / 1000); last = now;
-  if (input.takeMute()) hud.tonStand(sound.schalten());
-  if (input.takeSicht() && player) { sound.klick(); player.sichtUmschalten(); }
-  if (input.takeMenu() && running) { running = false; input.showTouch(false); hud.showMenu(true); hud.hint(false); }
-  // Im Menü sammelt sich sonst Drehung an, die beim Start den Blick wegreißt –
-  // außer während der Kalibrierung, da liest der Prüfschritt den Puffer selbst.
-  if (!running) { if (!kalibLaeuft) input.gyro.leeren(); pipeline.render(scene, camera); return; }
+/**
+ * Testschalter `?tempo=N`: N Rechenschritte je Bild statt einem.
+ *
+ * Im kopflosen Browser zeichnet die Software-Grafik etwa ein Bild je Sekunde,
+ * und weil ein Schritt auf 50 ms gedeckelt ist, vergeht dort im Spiel nur ein
+ * Zwanzigstel der Zeit: eine Messung über drei Minuten wäre neun Sekunden
+ * Spiel. Mit `tempo` laufen Bots, Waffen und Modus schneller, gezeichnet wird
+ * weiter einmal je Bild. Am normalen Spiel (ohne Schalter) ändert sich nichts.
+ */
+const TEMPO = Math.max(1, Math.min(20, +new URLSearchParams(location.search).get('tempo') || 1));
+
+/** Ein Rechenschritt: alles, was sich um dt weiterbewegt. */
+function simulieren(dt) {
   time += dt;
   world.leben?.update(dt, dom);
   const alle = [player, ...bots];
@@ -339,9 +347,23 @@ function loop(now) {
     b.update(dt, alle.filter(a => !a.dead && a.team !== b.team), bots, fx, dom);
     if (b.dead && b.respawnIn <= 0) b.spawn(pickSpawn(alle, dom ? b.team : null));
   }
-  if (!wasDead && player.dead) hud.kill(`Ein Gegner → Du`);
+  // Wer den Spieler erwischt hat, steht seit dem letzten Treffer fest
+  if (!wasDead && player.dead) hud.kill(`${player.letzterSchuetze?.name ?? 'Ein Gegner'} → Du`);
   dom?.update(dt, alle);
   fx.update(dt);
+}
+
+let last = performance.now();
+function loop(now) {
+  requestAnimationFrame(loop);
+  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  if (input.takeMute()) hud.tonStand(sound.schalten());
+  if (input.takeSicht() && player) { sound.klick(); player.sichtUmschalten(); }
+  if (input.takeMenu() && running) { running = false; input.showTouch(false); hud.showMenu(true); hud.hint(false); }
+  // Im Menü sammelt sich sonst Drehung an, die beim Start den Blick wegreißt –
+  // außer während der Kalibrierung, da liest der Prüfschritt den Puffer selbst.
+  if (!running) { if (!kalibLaeuft) input.gyro.leeren(); pipeline.render(scene, camera); return; }
+  for (let i = 0; i < TEMPO && running; i++) simulieren(dt);
   hud.update(player, bots, time);
   pipeline.render(scene, camera);
 }

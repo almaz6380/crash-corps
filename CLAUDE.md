@@ -69,6 +69,8 @@ tools/
                     --dreiecke und --textur für Figuren aus Bild-zu-3D-Diensten
   glb-nach-obj.mjs  GLB nach OBJ+MTL+Textur als ZIP – so nimmt Mixamo eine Figur an
   fbx-nach-glb.mjs  Mixamo-FBX zurück nach GLB und alle Clips in eine Datei
+  balance.mjs       Rechnet Duelldauern aus Klassen- und Waffenwerten aus und
+                    meldet Ausreißer – ohne das Spiel zu starten
   assets-liste.mjs  Welche Assets das Spiel zur Laufzeit wirklich holt
   sw-liste.mjs      Trägt Liste und Version in den Service Worker ein
   einzeldatei.mjs   Packt den Build in eine einzelne HTML-Datei
@@ -76,6 +78,35 @@ tools/
 
 ## Regeln für Änderungen
 - Gameplay-Werte (HP, Schaden, Cooldowns) leben nur in `classes.js` / `weapons.js`, nirgends hartcodiert.
+- Auf Figuren wird nie direkt geschossen: jede trägt einen unsichtbaren
+  Trefferquader aus `trefferQuader()` (`characters.js`), und der ist das Ziel
+  der Strahlen. Ein Strahl gegen eine animierte Figur verfehlt sie verlässlich
+  unzuverlässig – three prüft zuerst die Hülle aus der Bindepose, und die passt
+  zur Laufpose nicht. Der Kopf ist die oberste Zone des Quaders
+  (`TREFFERZONEN.hoehe`), Kopftreffer zählen doppelt, und Zone mal Spezial ist
+  auf `MAX_FAKTOR` gedeckelt.
+- Jede Waffe hat ihre eigene Abfallkurve (`abfall` in `weapons.js`), keine
+  gemeinsame Formel: die Kurve entscheidet, welche Klasse auf welcher
+  Entfernung gewinnt. Nach jeder Änderung an Klassen- oder Waffenwerten
+  `node tools/balance.mjs` laufen lassen – es rechnet Duelldauern aus und
+  meldet Ausreißer (Abschuss mit einem Körpertreffer, Revier vertauscht).
+- Bots zielen auf die Brust (`ZIELHOEHE` in `bots.js`), nie auf die Augen: auf
+  Augenhöhe liegt der Kopf, und dann wäre fast jeder zweite Treffer ein
+  Kopftreffer, ohne dass jemand gezielt hätte.
+- Wie gut ein Bot ist, steht in der Tabelle `KI` in `bots.js` – Reaktionszeit,
+  Streuung, ab wann er Deckung sucht, wie oft er die Spezialfähigkeit nutzt.
+  Das sind keine Klassenwerte (die stehen in `classes.js`), sondern Können.
+  Die Streuung ist ein **Winkel**: ein fester Versatz auf dem Richtungsvektor
+  machte Bots auf 30 m genauer als auf 5 m, weil der Vektor so lang ist wie die
+  Entfernung.
+- Das Zielkreuz eines Bots wird nachgeführt (`zielFuehren`), es schnappt nicht.
+  Die Waffen treffen ohne Flugzeit – würde ein Bot sofort auf die aktuelle
+  Position zielen, wäre Ausweichen wirkungslos. Die Nachführung ist der einzige
+  Hebel, den ein Spieler gegen einen Hitscan-Gegner hat.
+- Deckung (`deckungSuchen`) sind Punkte an den vier Seiten naher
+  Kollisionsquader, geprüft mit derselben Sichtprüfung wie beim Zielen. Die
+  Suche läuft höchstens alle `KI.deckungPruefen` Sekunden, nicht je Bild – sie
+  schießt je Kandidat einen Strahl.
 - Kein Server-Code in diesem Repo, bis der Single-Player-Loop sauber ist. Multiplayer kommt als separater Schritt (autoritativer Server, Colyseus oder eigenes WS-Protokoll).
 - Neue Klasse = Eintrag in `classes.js` (inkl. `model`) + ggf. Modell-Eintrag in `assets.js`. Sonst nichts anfassen.
 - Neue Figur: **erst `node tools/glb-info.mjs <datei.glb>`**, dann den Eintrag schreiben.
@@ -100,6 +131,9 @@ tools/
   Deathmatch ist derselbe Code: Spieler in Mannschaft 0, alle Bots in Mannschaft 1.
 - Domination-Regelwerte stehen nur in `REGELN` in `domination.js`. Die Lage der
   Kontrollpunkte gehört zur Karte und kommt aus `world.js` (`world.punkte`).
+  `zielFuer()` schickt die Bots los: fremde und neutrale Punkte zuerst, ein
+  eigener nur, wenn er gerade umkämpft ist – sonst rennt die ganze Mannschaft
+  nach vorn, während zu Hause in Ruhe erobert wird.
 - Die Toon-Kit-Figuren sind CC0 und dürfen bleiben. Eigene Modelle: siehe public/assets/README.md.
 - Performance-Ziel: 60 fps auf Mittelklasse-Laptop, spielbar auf Handy. Auf Touch-Geräten greift automatisch die niedrigere Leistungsstufe aus `device.js`.
 - Figuren behalten ihr physikalisches Material aus dem Loader, während Props und

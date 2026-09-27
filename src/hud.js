@@ -38,6 +38,8 @@ export class Hud {
       </div>
       <div id="play" hidden>
         <div id="cross"></div>
+        <div id="marker" hidden><i></i><i></i><i></i><i></i></div>
+        <div id="woher" hidden><i></i></div>
         <div id="flash"></div>
         <div id="feed"></div>
         <div id="score"></div>
@@ -310,6 +312,37 @@ export class Hud {
     const el = document.createElement('div'); el.textContent = text; this.feed.prepend(el);
     setTimeout(() => el.remove(), 4000);
   }
+  /**
+   * Hitmarker am Fadenkreuz. Vier kurze Striche, die nach außen zeigen: weiß
+   * für den Körper, gelb und größer für den Kopf, rot für den Abschuss. Ohne
+   * diese Rückmeldung merkt man im Getümmel nicht, ob man überhaupt trifft.
+   */
+  trefferZeigen(p) {
+    const el = this.root.querySelector('#marker');
+    const t = p.trefferZeit || 0;
+    el.hidden = t <= 0;
+    if (t <= 0) return;
+    el.dataset.art = p.trefferArt || 'körper';
+    el.style.opacity = Math.min(1, t * 8);   // volle Deckkraft, nur das letzte Achtel blendet aus
+  }
+
+  /**
+   * Keil in Richtung des Schützen. Gerechnet wird je Bild aus dessen Position
+   * und dem eigenen Blickwinkel – ein einmal gemerkter Winkel zeigte nach der
+   * ersten Drehung ins Leere.
+   */
+  schadenZeigen(p) {
+    const el = this.root.querySelector('#woher');
+    const t = p.schadenZeit || 0;
+    el.hidden = t <= 0 || !p.schadenVon;
+    if (el.hidden) return;
+    const dx = p.schadenVon.x - p.pos.x, dz = p.schadenVon.z - p.pos.z;
+    // Bildschirmwinkel: 0 = vorn. Der Blick zeigt bei yaw = 0 nach −z.
+    const winkel = Math.atan2(dx, -dz) + p.yaw;
+    el.style.transform = `translate(-50%,-50%) rotate(${winkel}rad)`;
+    el.style.opacity = Math.min(1, t * 2);
+  }
+
   update(p, bots, time) {
     const q = s => this.root.querySelector(s);
     q('#hpbar').style.width = (p.hp / p.cls.hp * 100) + '%';
@@ -319,6 +352,8 @@ export class Hud {
     q('#special').textContent = s.cool > 0 ? `Q in ${s.cool.toFixed(1)}s` : 'Q bereit';
     q('#special').classList.toggle('ready', s.cool === 0);
     q('#flash').style.opacity = p.flash || 0;
+    this.trefferZeigen(p);
+    this.schadenZeigen(p);
     const m = Math.floor(time / 60), sec = Math.floor(time % 60).toString().padStart(2, '0');
     if (this.dom) this.domUpdate(this.dom);
     else {
