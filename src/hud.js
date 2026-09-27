@@ -22,6 +22,8 @@ export class Hud {
         <div id="menuknoepfe">
           ${TOUCH ? '<button id="anpassen" type="button">Bedienung anpassen</button>' : ''}
           <button id="gyro" type="button" title="Gyroskop">🧭</button>
+          <button id="gyro-um-x" type="button" title="Links/rechts umkehren" hidden>↔</button>
+          <button id="gyro-um-y" type="button" title="Oben/unten umkehren" hidden>↕</button>
           <button id="grafik" type="button" title="Grafikstil umschalten"></button>
           <button id="ton" type="button" title="Ton an/aus (M)"></button>
         </div>
@@ -118,6 +120,18 @@ export class Hud {
     const knopf = root.querySelector('#gyro');
     if (!knopf) return;
     this.gyroKnopf = knopf;
+    // Umkehr-Pfeile direkt neben dem Kompass. Zielt der Gyro verkehrt herum,
+    // ist das ein Tipp – vorher musste man dafür das Spiel starten und die
+    // Bedienung anpassen, und wer das nicht weiß, hält den Gyro für kaputt.
+    this.umKnoepfe = { x: root.querySelector('#gyro-um-x'), y: root.querySelector('#gyro-um-y') };
+    for (const achse of ['x', 'y']) {
+      this.umKnoepfe[achse].onclick = () => {
+        const an = !(achse === 'x' ? this.gyroEinst?.invertX : this.gyroEinst?.invertY);
+        if (this.gyroEinst) this.gyroEinst[achse === 'x' ? 'invertX' : 'invertY'] = an;
+        this.onGyroUmkehr?.(achse, an);
+        this.gyroStand(true, this.gyroEinst);
+      };
+    }
     this.hilfeZeile = root.querySelector('#menu .help');
     this.hilfeText = this.hilfeZeile.textContent;
     // Ohne Sensor gar nicht erst anbieten – aber sagen, warum. Ein Knopf, der
@@ -202,8 +216,15 @@ export class Hud {
    */
   gyroStand(an, einst) {
     if (!this.gyroKnopf || this.gyroKnopf.disabled) return;
+    if (einst) this.gyroEinst = einst;
     this.gyroKnopf.classList.toggle('an', !!an);
     this.gyroKnopf.textContent = an ? '🧭 Gyro an' : '🧭 Gyro aus';
+    for (const achse of ['x', 'y']) {
+      const k = this.umKnoepfe?.[achse];
+      if (!k) continue;
+      k.hidden = !an;
+      k.classList.toggle('an', !!(achse === 'x' ? this.gyroEinst?.invertX : this.gyroEinst?.invertY));
+    }
     if (this.gyroFeld) {
       this.gyroFeld.hidden = !an;
       if (einst) {
@@ -214,7 +235,7 @@ export class Hud {
     } else {
       // Bei Touch stehen die Regler woanders – dorthin verweisen
       this.hilfeZeile.innerHTML = an
-        ? 'Gyroskop an · <b>Stärke, Umkehren, neu kalibrieren: „Bedienung anpassen“</b>'
+        ? 'Gyroskop an · verkehrt herum? <b>↔ / ↕ antippen</b> · Stärke und neu kalibrieren: „Bedienung anpassen“'
         : this.hilfeText;
     }
   }

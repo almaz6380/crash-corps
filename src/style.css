@@ -241,6 +241,13 @@ body.touch #ende > div { font-size: 24px; padding: 18px 28px; }
   box-shadow: 3px 3px 0 var(--ink); cursor: pointer; white-space: nowrap; }
 #gyro.an { background: var(--sun); }
 #gyro:disabled { opacity: .5; cursor: default; }
+/* Umkehr-Pfeile neben dem Kompass: schmal, damit die Knopfzeile nicht wächst.
+   Eingerückt (`.an`) heißt: diese Achse läuft umgekehrt. */
+#gyro-um-x, #gyro-um-y { font: bold 18px/1 inherit; color: var(--ink); background: var(--paper);
+  border: 3px solid var(--ink); border-radius: 12px; width: 44px; height: 44px; padding: 0;
+  box-shadow: 3px 3px 0 var(--ink); cursor: pointer; }
+#gyro-um-x.an, #gyro-um-y.an { background: var(--sun); transform: translate(2px, 2px); box-shadow: 1px 1px 0 var(--ink); }
+#gyro-um-x[hidden], #gyro-um-y[hidden] { display: none; }
 
 /* Gyro-Einstellungen sitzen im Anpassen-Bildschirm, und zwar in der Werkzeug-
    leiste: das Menü ist im Querformat eines Handys randvoll, und frei im Bild

@@ -213,14 +213,15 @@ tools/
   über x/y/z in diesen Code schreiben – wenn etwas falsch herum läuft, neu
   kalibrieren, nicht das Vorzeichen raten. Während der Kalibrierung darf die
   Schleife den Gyro-Puffer nicht leeren (`kalibLaeuft` in `main.js`).
-- **Eine Kalibrierung gilt erst, wenn der Prüfschritt bestanden ist.** Gemessene
-  Achsen werden nicht gespeichert, `kalibBestaetigen()` speichert sie; `kalibriert`
-  ist nur mit der Marke `geprueft` wahr, `hatAchsen` sagt, ob überhaupt welche da
-  sind. Vorher wurden sie sofort beim Messen gespeichert – wer den Prüfschritt
-  abbrach, behielt eine ungeprüfte Kalibrierung für immer, und die zielte dann
-  womöglich verkehrt herum, ohne dass je wieder jemand nachgefragt hätte. Sind
-  Achsen da, aber ungeprüft, prüft der Gyro-Knopf zuerst und misst nur neu, wenn
-  die Prüfung durchfällt; „Neu kalibrieren“ misst immer neu. iOS gibt den Sensor nur aus einer Geste frei,
+- **Ein Tipp auf den Kompass schaltet ein und lässt an.** Der Kalibrierbildschirm
+  erscheint **nur**, wenn es gar keine Achsen gibt (`hatAchsen`) oder wenn jemand
+  ausdrücklich „Neu kalibrieren“ tippt. Ein Prüfschritt bei jedem Einschalten ist
+  eine Zumutung, kein Schutz – genau das war er einmal, und es war falsch.
+  Frisch gemessene Achsen werden trotzdem erst nach dem Prüfschritt gespeichert
+  (`kalibBestaetigen()`), damit eine abgebrochene Messung nichts hinterlässt.
+- Zielt der Gyro verkehrt herum, ist das **ein Tipp**: die Pfeile ↔ und ↕ stehen
+  neben dem Kompass im Menü, sobald er an ist. Vorher lagen sie nur unter
+  „Bedienung anpassen“, und wer das nicht weiß, hält den Gyro für kaputt. iOS gibt den Sensor nur aus einer Geste frei,
   deshalb holt `main.js` das Einschalten bei der ersten Berührung nach.
 - Klangfarben stehen nur in `sound.js` (Tabelle `SCHUSS`). Spieler und Bots rufen
   Methoden auf (`schuss`, `treffer`, `schritt` …) und kennen keine Frequenzen.
