@@ -231,12 +231,12 @@ hud.onGrafik = () => {
 // Einschalten heißt immer kalibrieren: zwei Bewegungen, aus denen die Achsen
 // gemessen werden. Ohne gültige Achsen bleibt der Gyro aus.
 let kalibLaeuft = false;   // solange wahr, darf die Schleife den Gyro-Puffer nicht leeren
-async function gyroKalibrieren(opt) {
+async function gyroKalibrieren() {
   kalibLaeuft = true;
-  try { return await _gyroKalibrieren(input.gyro, opt); }
+  try { return await _gyroKalibrieren(input.gyro); }
   finally { kalibLaeuft = false; }
 }
-async function _gyroKalibrieren(g, { nurPruefen = true } = {}) {
+async function _gyroKalibrieren(g) {
   let fehler = null, gewarnt = false;
   // Anzeige der Rohwerte in jedem Schritt: so lässt sich aus einem Bildschirm-
   // foto ablesen, was das Gerät bei welcher Bewegung meldet.
@@ -279,14 +279,9 @@ async function _gyroKalibrieren(g, { nurPruefen = true } = {}) {
   };
 
   try {
-    // Liegen Achsen vor, die nie bestätigt wurden – aus einer älteren Fassung
-    // oder aus einer abgebrochenen Kalibrierung –, wird **nicht neu gemessen**,
-    // sondern erst geprüft. Stimmt die Richtung, bleibt alles, wie es war.
-    if (nurPruefen && g.hatAchsen && !g.kalibriert) {
-      if (await pruefen()) { g.kalibBestaetigen(); return true; }
-      g.kalibVerwerfen();
-      fehler = 'Dann messen wir die Achsen neu.';
-    }
+    // Hierher kommt nur, wer **keine** Achsen hat oder ausdrücklich „Neu
+    // kalibrieren“ getippt hat. Niemand sonst sieht diesen Bildschirm – ein
+    // Prüfschritt bei jedem Einschalten ist eine Zumutung, kein Schutz.
     for (let versuch = 0; versuch < 5; versuch++) {
       g.kalibStart();
       let weiter = await hud.kalibSchritt(1, 'Nach links schwenken',
@@ -334,10 +329,11 @@ hud.onGyro = async () => {
   const g = input.gyro;
   if (g.einst.an && g.laeuft) { g.ausschalten(); hud.gyroStand(false); return false; }
   if (!(await g.einschalten())) { hud.gyroStand(false); return false; }     // keine Erlaubnis
-  // Einmal **bestätigt** bleibt bestätigt. Sind Achsen da, aber ungeprüft,
-  // kommt zuerst der Prüfschritt; neu gemessen wird nur, wenn er nicht besteht
-  // oder nichts gespeichert ist.
-  const ok = g.kalibriert || await gyroKalibrieren();
+  // **Ein Tipp schaltet ein und lässt an.** Gemessen wird nur, wenn es nichts
+  // zu messen gibt: ohne Achsen kann der Gyro nicht zielen. Sind welche da,
+  // kommt kein Bildschirm dazwischen – stimmt die Richtung nicht, drehen die
+  // Pfeile neben dem Kompass sie um, und „Neu kalibrieren“ misst neu.
+  const ok = g.hatAchsen || await gyroKalibrieren();
   if (!ok) g.ausschalten();
   hud.gyroStand(ok, g.einst);
   return ok;
@@ -347,7 +343,7 @@ hud.onGyro = async () => {
 // nachholen, was beim Laden nicht ging.
 const gyroNachholen = async () => {
   const g = input.gyro;
-  if (!g.einst.an || g.laeuft || !g.kalibriert) return;
+  if (!g.einst.an || g.laeuft || !g.hatAchsen) return;
   await g.einschalten().catch(() => {});
   hud.gyroStand(g.einst.an && g.laeuft, g.einst);
 };
@@ -357,8 +353,8 @@ hud.onGyroKalib = async () => {
   const g = input.gyro;
   if (!(await g.einschalten())) return;
   // „Neu kalibrieren“ heißt neu messen, nicht nur nachprüfen.
-  const ok = await gyroKalibrieren({ nurPruefen: false });
-  if (!ok && !g.kalibriert) g.ausschalten();
+  const ok = await gyroKalibrieren();
+  if (!ok && !g.hatAchsen) g.ausschalten();
   hud.gyroStand(g.einst.an && g.laeuft, g.einst);
 };
 if (input.touch) input.touch.onKalib = () => hud.onGyroKalib();
