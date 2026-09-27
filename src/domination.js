@@ -191,8 +191,11 @@ export class Domination {
     let best = null, bestKosten = Infinity;
     for (const p of this.punkte) {
       const eigen = p.besitzer === bot.team;
-      // Fremde und neutrale Punkte zuerst, eigene nur als Rückfallziel
-      const gewicht = eigen ? 60 : p.besitzer == null ? 0 : -12;
+      // Fremde und neutrale Punkte zuerst, eigene nur als Rückfallziel – außer
+      // der eigene wird gerade angegriffen. Ohne diese Ausnahme rennt die ganze
+      // Mannschaft nach vorn, während zu Hause in Ruhe erobert wird.
+      const gewicht = eigen ? (p.umkaempft || p.drin[1 - bot.team] > 0 ? -25 : 60)
+        : p.besitzer == null ? 0 : -12;
       const kosten = bot.pos.distanceTo(p.pos) + gewicht;
       if (kosten < bestKosten) { bestKosten = kosten; best = p; }
     }

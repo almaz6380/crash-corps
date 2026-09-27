@@ -12,7 +12,7 @@ import * as THREE from 'three';
  */
 export const WEAPONS = {
   shotgun: { name: 'Spalterklinge', damage: 11, pellets: 8, spread: 0.09, cooldown: 0.85, mag: 6, reload: 1.8, range: 26, auto: false,
-    abfall: { ab: 4, bis: 16, rest: 0.25 } },
+    abfall: { ab: 4, bis: 16, rest: 0.25 }, kopfzone: false },
   smg:     { name: 'Bolzenwerfer', damage: 9,  pellets: 1, spread: 0.035, cooldown: 0.09, mag: 32, reload: 1.4, range: 45, auto: true,
     abfall: { ab: 12, bis: 30, rest: 0.4 } },
   rifle:   { name: 'Runenstab',    damage: 70, pellets: 1, spread: 0.002, cooldown: 1.3, mag: 5, reload: 2.2, range: 120, auto: false,
@@ -96,7 +96,12 @@ export class Weapon {
           // Trefferpunkt kommt aus dem Strahl, eine zweite Abfrage braucht es
           // nicht – und ein eigener Kopf-Quader wäre ein Kollider mehr je Figur.
           const hoehe = ziel.cls?.body.height ?? 1.8;
-          const kopf = hit.point.y - ziel.pos.y > hoehe * TREFFERZONEN.hoehe;
+          // Streuwaffen kennen keine Kopfzone: acht Schrotkugeln über einen
+          // halben Meter verteilt treffen den Kopf von allein, das hat mit
+          // Zielen nichts zu tun – und vergäbe nebenbei den Abschuss mit einem
+          // einzigen Schuss, den es sonst nirgends gibt.
+          const kopf = this.def.kopfzone !== false
+            && hit.point.y - ziel.pos.y > hoehe * TREFFERZONEN.hoehe;
           const faktor = Math.min(MAX_FAKTOR, (kopf ? TREFFERZONEN.kopf : 1) * damageMul);
           ziel.onHit(this.def.damage * falloff * faktor, { kopf, von });
           this.hitCount++; if (kopf) this.kopfCount++;

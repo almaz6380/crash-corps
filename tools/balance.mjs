@@ -27,7 +27,8 @@ const ENTFERNUNGEN = opt('entfernungen', '2,6,12,25,40').split(',').map(Number);
 function schaden(waffe, entfernung, { kopf = false, spezial = 1 } = {}) {
   const def = WEAPONS[waffe];
   if (entfernung > def.range) return 0;
-  const faktor = Math.min(MAX_FAKTOR, (kopf ? TREFFERZONEN.kopf : 1) * spezial);
+  const zone = kopf && def.kopfzone !== false ? TREFFERZONEN.kopf : 1;
+  const faktor = Math.min(MAX_FAKTOR, zone * spezial);
   return def.damage * def.pellets * abfallFaktor(def, entfernung) * faktor;
 }
 

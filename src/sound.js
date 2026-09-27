@@ -365,9 +365,11 @@ export class Sound {
   }
 
   /** Spezialfähigkeit ausgelöst. */
-  spezial(art) {
+  /** @param {THREE.Vector3} [pos] Ort in der Welt; ohne ihn klingt es als eigenes. */
+  spezial(art, pos = null) {
     if (!this._bereit()) return;
-    const z = this.at(null, 0.6);
+    const z = this.at(pos, 0.6);
+    if (!z) return;
     if (SPEZIAL[art] === 'ton') {
       this._ton(z, { dauer: 0.4, f0: 420, f1: 950, form: 'triangle', laut: 0.35 });
       this._ton(z, { dauer: 0.4, f0: 630, f1: 1420, form: 'sine', laut: 0.18 });

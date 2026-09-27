@@ -93,6 +93,20 @@ tools/
 - Bots zielen auf die Brust (`ZIELHOEHE` in `bots.js`), nie auf die Augen: auf
   Augenhöhe liegt der Kopf, und dann wäre fast jeder zweite Treffer ein
   Kopftreffer, ohne dass jemand gezielt hätte.
+- Wie gut ein Bot ist, steht in der Tabelle `KI` in `bots.js` – Reaktionszeit,
+  Streuung, ab wann er Deckung sucht, wie oft er die Spezialfähigkeit nutzt.
+  Das sind keine Klassenwerte (die stehen in `classes.js`), sondern Können.
+  Die Streuung ist ein **Winkel**: ein fester Versatz auf dem Richtungsvektor
+  machte Bots auf 30 m genauer als auf 5 m, weil der Vektor so lang ist wie die
+  Entfernung.
+- Das Zielkreuz eines Bots wird nachgeführt (`zielFuehren`), es schnappt nicht.
+  Die Waffen treffen ohne Flugzeit – würde ein Bot sofort auf die aktuelle
+  Position zielen, wäre Ausweichen wirkungslos. Die Nachführung ist der einzige
+  Hebel, den ein Spieler gegen einen Hitscan-Gegner hat.
+- Deckung (`deckungSuchen`) sind Punkte an den vier Seiten naher
+  Kollisionsquader, geprüft mit derselben Sichtprüfung wie beim Zielen. Die
+  Suche läuft höchstens alle `KI.deckungPruefen` Sekunden, nicht je Bild – sie
+  schießt je Kandidat einen Strahl.
 - Kein Server-Code in diesem Repo, bis der Single-Player-Loop sauber ist. Multiplayer kommt als separater Schritt (autoritativer Server, Colyseus oder eigenes WS-Protokoll).
 - Neue Klasse = Eintrag in `classes.js` (inkl. `model`) + ggf. Modell-Eintrag in `assets.js`. Sonst nichts anfassen.
 - Neue Figur: **erst `node tools/glb-info.mjs <datei.glb>`**, dann den Eintrag schreiben.
@@ -117,6 +131,9 @@ tools/
   Deathmatch ist derselbe Code: Spieler in Mannschaft 0, alle Bots in Mannschaft 1.
 - Domination-Regelwerte stehen nur in `REGELN` in `domination.js`. Die Lage der
   Kontrollpunkte gehört zur Karte und kommt aus `world.js` (`world.punkte`).
+  `zielFuer()` schickt die Bots los: fremde und neutrale Punkte zuerst, ein
+  eigener nur, wenn er gerade umkämpft ist – sonst rennt die ganze Mannschaft
+  nach vorn, während zu Hause in Ruhe erobert wird.
 - Die Toon-Kit-Figuren sind CC0 und dürfen bleiben. Eigene Modelle: siehe public/assets/README.md.
 - Performance-Ziel: 60 fps auf Mittelklasse-Laptop, spielbar auf Handy. Auf Touch-Geräten greift automatisch die niedrigere Leistungsstufe aus `device.js`.
 - Figuren behalten ihr physikalisches Material aus dem Loader, während Props und
