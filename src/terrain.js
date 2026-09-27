@@ -57,9 +57,14 @@ const stufe = (t) => { const x = Math.min(1, Math.max(0, t)); return x * x * (3 
  */
 const HOHLWEGE = [];
 for (const seite of [1, -1]) {
+  // Untere Böschung: die Treppenstraße in der Achse der Stadt, dazu je ein
+  // Karrenweg links und rechts. Drei Aufstiege je Seite – bei einem einzigen
+  // stünde die ganze Mannschaft in derselben Engstelle.
+  HOHLWEGE.push({ x: 0, z0: seite * 28, z1: seite * 50, breite: 9 });
   for (const x of [-34, 34]) {
     HOHLWEGE.push({ x, z0: seite * 26, z1: seite * 52, breite: 11 });
   }
+  // Obere Böschung: zwei Wege hinauf zur Ruine, weit außen.
   for (const x of [-72, 72]) {
     HOHLWEGE.push({ x, z0: seite * 82, z1: seite * 106, breite: 11 });
   }
@@ -112,6 +117,20 @@ function roh(x, z) {
 const feld = new Float32Array(N * N);
 for (let j = 0; j < N; j++) {
   for (let i = 0; i < N; i++) feld[j * N + i] = roh(-HALB + i * RASTER, -HALB + j * RASTER);
+}
+
+/**
+ * Liegt ein Punkt in einem Hohlweg (oder dicht daneben)? Der Weltaufbau fragt
+ * das, bevor er Bäume setzt – ein Wald quer über der einzigen Auffahrt wäre
+ * genau die Art Fehler, die man erst im Spiel bemerkt.
+ */
+export function imHohlweg(x, z, rand = 3) {
+  for (const w of HOHLWEGE) {
+    if (Math.abs(x - w.x) > w.breite / 2 + rand) continue;
+    const lo = Math.min(w.z0, w.z1), hi = Math.max(w.z0, w.z1);
+    if (z >= lo - rand && z <= hi + rand) return true;
+  }
+  return false;
 }
 
 /** Geländehöhe an einem Punkt, bilinear zwischen den Stützstellen. */
