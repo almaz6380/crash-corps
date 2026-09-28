@@ -486,6 +486,27 @@ export class Pipeline {
   }
 
   /**
+   * Ist diese Stufe gerade an?
+   *
+   * Der Testflug muss das wissen, bevor er sie abschaltet: auf der niedrigen
+   * Leistungsstufe sind Streulicht und Verdeckung von vornherein aus, und ein
+   * Lauf, der nichts abschaltet, misst trotzdem einen Abstand – Rauschen, das
+   * wie ein Befund aussieht. Genau das stand in der ersten Messung auf dem
+   * Handy: „ohne Verdeckung (−13,4)", wo gar keine Verdeckung an war.
+   */
+  istAn(name) {
+    const u = this.mat.uniforms;
+    if (name === 'bloom') return this.bloomAn && u.bloom.value > 0;
+    if (name === 'ao') return u.ao.value > 0;
+    if (name === 'normal') return this.normalAn;
+    if (name === 'schatten') return this.renderer.shadowMap.enabled;
+    if (name === 'kanten') return this.color.samples > 0;
+    if (name === 'schattenkarte') return !!this.sonne;
+    if (name === 'halb') return true;
+    return true;
+  }
+
+  /**
    * Kantenglättung am Farb-Target. Sie sitzt nicht am Renderer – gezeichnet
    * wird in Render-Targets, und `antialias` am Renderer wäre wirkungslos.
    *

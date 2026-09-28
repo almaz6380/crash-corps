@@ -37,6 +37,7 @@ export class Hud {
           <button id="gyro-kalib" type="button">Neu kalibrieren</button>
         </div>`}
         <p id="hinweis" hidden></p>
+        <p id="spielzahlen" hidden></p>
         <p id="offline" hidden></p>
         <p id="stand">Stand ${typeof __BUILD__ !== 'undefined' ? __BUILD__ : '?'}</p>
         <p class="help">${TOUCH
@@ -378,6 +379,17 @@ export class Hud {
 
   /** Läuft im Hintergrund eine angehaltene Runde? Dann gibt es den Rückweg. */
   pause(on) { if (this.fortsetzenKnopf) this.fortsetzenKnopf.hidden = !on; }
+
+  /**
+   * Wie die letzte Runde wirklich lief. Steht im Menü, sobald jemand pausiert –
+   * der Testflug misst einen Kameraflug, diese Zeile misst das Spielen.
+   */
+  spielzahlen(text) {
+    const el = this.root.querySelector('#spielzahlen');
+    if (!el) return;
+    el.textContent = text || '';
+    el.hidden = !text;
+  }
 
   /**
    * Fortschritt des Testflugs. Während der Messung steht nur eine Zeile da –

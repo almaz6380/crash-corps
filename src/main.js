@@ -15,7 +15,7 @@ import { Sound } from './sound.js';
 import { Domination, TEAMS } from './domination.js';
 import { Navgitter } from './navgitter.js';
 import { WELT } from './terrain.js';
-import { Testflug, LAEUFE } from './mess.js';
+import { Testflug, Spielmessung, LAEUFE } from './mess.js';
 
 const canvas = document.getElementById('game');
 // `antialias` wäre hier wirkungslos: gezeichnet wird in Render-Targets, auf den
@@ -32,7 +32,6 @@ const camera = new THREE.PerspectiveCamera(80, 1, 0.05, 450);
 camera.userData.canvas = canvas;
 scene.add(camera);
 const pipeline = new Pipeline(renderer, camera);
-globalThis.__mess = { renderer, scene, camera, pipeline };   // NUR MESSUNG, wird entfernt
 
 let world = null;                      // wird nach dem Laden der Props gebaut
 const input = new Input(canvas);
@@ -200,6 +199,7 @@ function start(clsId) {
   }
   hud.domAufbauen(dom);
   hud.ende(null); hud.pause(false);   // neue Runde: nichts mehr zum Fortsetzen
+  spielmessung.leeren(); hud.spielzahlen('');
   time = 0; running = true;
   hud.showMenu(false);
   if (TOUCH) {
@@ -227,7 +227,11 @@ hud.onCustomize = () => {
   input.touch.onDone = () => { input.touch.edit(false); hud.showMenu(true); };
   input.touch.edit(true);
 };
-hud.onPause = () => { if (running) { sound.klick(); running = false; input.showTouch(false); hud.showMenu(true); hud.hint(false); } };
+hud.onPause = () => {
+  if (!running) return;
+  sound.klick(); running = false; input.showTouch(false);
+  hud.showMenu(true); hud.hint(false); hud.spielzahlen(spielmessung.zeile());
+};
 hud.onModus = () => sound.klick();
 // Grafikstil: die halbe Szene hängt daran (Materialien, Licht, Himmel,
 // Render-Ziele), deshalb wird neu geladen statt umgebaut.
@@ -356,6 +360,10 @@ const flug = new Testflug({
       for (const b of bots) b.mesh.visible = an;
     } else pipeline.stufe(name, an);
   },
+  // War die Stufe überhaupt an? Auf der niedrigen Leistungsstufe sind
+  // Streulicht und Verdeckung von vornherein aus – ein Lauf, der nichts
+  // abschaltet, darf keinen Abstand melden, als hätte er etwas gespart.
+  istAn: (name) => (name === 'figuren' ? bots.length > 0 : pipeline.istAn(name)),
   zaehler: () => ({
     aufrufe: renderer.info.render.calls,
     dreiecke: renderer.info.render.triangles,
@@ -514,6 +522,12 @@ const LEISTUNG = {
 };
 const bildzeiten = [];
 let gutGelaufen = 0;
+/**
+ * Mitschreiber über die letzten Sekunden echten Spiels. Der Testflug misst
+ * einen Kameraflug mit stehendem Spieler – wenn er 59 Bilder meldet und es
+ * sich trotzdem hakelig anfühlt, steht die Antwort hier und nicht dort.
+ */
+const spielmessung = new Spielmessung();
 function leistungPruefen(dt) {
   bildzeiten.push(dt);
   // Das Fenster zählt Bilder **und** Zeit. Mit einer reinen Bildzahl dauert
@@ -583,11 +597,12 @@ function loop(now) {
   // ans Ende, und der einzige Ausweg wäre „Abbrechen“ im Überblendfenster.
   if (input.takeMenu() && running && !flug.aktiv) {
     running = false; input.showTouch(false); hud.showMenu(true); hud.hint(false); hud.pause(true);
+    hud.spielzahlen(spielmessung.zeile());
   }
   // Im Menü sammelt sich sonst Drehung an, die beim Start den Blick wegreißt –
   // außer während der Kalibrierung, da liest der Prüfschritt den Puffer selbst.
   if (!running) { if (!kalibLaeuft) input.gyro.leeren(); pipeline.render(scene, camera); return; }
-  if (!flug.aktiv) leistungPruefen(roh);
+  if (!flug.aktiv) { leistungPruefen(roh); spielmessung.bild(roh); }
   // Die Bildzeit wird in zwei Hälften genommen: was die Simulation kostet und
   // was das Zeichnen kostet. Ohne diese Trennung sagt eine niedrige Bildrate
   // nicht, ob an Zeichenaufrufen oder an der Bot-KI zu drehen ist.

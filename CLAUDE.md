@@ -317,6 +317,19 @@ tools/
   seinen Framebuffer: ohne `dispose()` bleibt die alte Anzahl stehen und der
   Schalter tut stillschweigend nichts. Dasselbe gilt für die Schattenkarte –
   `mapSize` allein reicht nicht, die Karte muss weg (`shadow.map = null`).
+- **Am Anschlag misst der Testflug nichts.** Liegt der erste Lauf beim Takt des
+  Bildschirms, sind die Abstände in Klammern Streuung, keine Kosten – gemessen
+  auf einem Handy: 58,8 Bilder und „ohne Verdeckung (−13,4)", obwohl auf der
+  niedrigen Stufe gar keine Verdeckung an war. Der Bericht schätzt den Takt
+  deshalb aus den schnellsten Bildern und sagt es dazu; und eine Stufe, die
+  ohnehin aus war, bekommt „(war aus)" statt einer Zahl.
+- Der Testflug misst einen **Kameraflug mit stehendem Spieler**: keine Eingabe,
+  keine Kollision, keine Verfolgerkamera. Meldet er 59 Bilder und es fühlt sich
+  trotzdem hakelig an, liegt es genau in diesem Unterschied – oder am Drosseln
+  nach ein paar Minuten. Dafür schreibt `Spielmessung` nebenher mit und zeigt
+  im Pausenmenü Median, 1-%-Tief und die Zahl der **Hänger** (Bilder länger als
+  zwei Bildschirmperioden). Ein Hänger ist das, was man sieht; im Median ist er
+  unsichtbar.
 - Jede Stufe der Leiter gehört auch in `LAEUFE` in `mess.js`. Eine Messung, die
   andere Knöpfe drückt als das Spiel, misst das falsche Spiel.
 - Die Leiter hat einen **Rückweg** (`grosszuegig()`). Ohne ihn ist sie eine
