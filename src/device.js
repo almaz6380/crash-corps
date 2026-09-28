@@ -15,9 +15,35 @@ export const TOUCH = q?.get('touch') === '1' || (
 const forced = q?.get('leistung');
 export const LOW_END = forced ? forced === 'niedrig' : TOUCH;
 
-/** Zielhilfe: auf Touch an, sonst aus. ?zielhilfe=an|aus überschreibt das. */
+/**
+ * Zielhilfe: auf Touch an, sonst aus. `?zielhilfe=an|aus` überschreibt das, und
+ * der Knopf im Menü merkt sich die Wahl.
+ *
+ * Umschaltbar muss sie sein, weil sie sich nicht messen lässt: ob eine
+ * Zielhilfe hilft oder im Weg ist, sagt nur der, der sie benutzt – und ohne
+ * Schalter kann er es nicht ausprobieren und mir auch nicht sagen.
+ */
 const aimForced = q?.get('zielhilfe');
-export const AIM_ASSIST = aimForced ? aimForced === 'an' : TOUCH;
+const ZIELHILFE_KEY = 'crashcorps.zielhilfe';
+let zielhilfe = (() => {
+  if (aimForced) return aimForced === 'an';
+  try {
+    const v = localStorage.getItem(ZIELHILFE_KEY);
+    if (v !== null) return v === 'an';
+  } catch { /* privater Modus */ }
+  return TOUCH;
+})();
+
+/** Ist die Zielhilfe gerade an? Als Funktion, damit der Schalter sofort wirkt. */
+export const zielhilfeAn = () => zielhilfe;
+
+/** Zielhilfe umschalten und merken. @returns {boolean} der neue Stand */
+export function zielhilfeSetzen(an) {
+  zielhilfe = !!an;
+  try { localStorage.setItem(ZIELHILFE_KEY, zielhilfe ? 'an' : 'aus'); } catch { /* privater Modus */ }
+  return zielhilfe;
+}
+
 
 export const QUALITY = {
   pixelRatio: LOW_END ? 1.4 : 2,

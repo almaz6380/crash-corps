@@ -10,12 +10,12 @@ import { preloadCharacters, preloadProps } from './assets.js';
 import { REAL, stilSetzen, stilZurueckfallen, schwachGemerkt } from './style.js';
 import { preloadTextures } from './surface.js';
 import { Input } from './input.js';
-import { buehneAnpassen, TOUCH, QUALITY, LOW_END } from './device.js';
+import { buehneAnpassen, TOUCH, QUALITY, LOW_END, zielhilfeAn, zielhilfeSetzen } from './device.js';
 import { Sound } from './sound.js';
 import { Domination, TEAMS } from './domination.js';
 import { Navgitter } from './navgitter.js';
 import { WELT } from './terrain.js';
-import { Testflug, LAEUFE } from './mess.js';
+import { Testflug, Spielmessung, LAEUFE } from './mess.js';
 
 const canvas = document.getElementById('game');
 // `antialias` wäre hier wirkungslos: gezeichnet wird in Render-Targets, auf den
@@ -199,6 +199,7 @@ function start(clsId) {
   }
   hud.domAufbauen(dom);
   hud.ende(null); hud.pause(false);   // neue Runde: nichts mehr zum Fortsetzen
+  spielmessung.leeren(); hud.spielzahlen('');
   time = 0; running = true;
   hud.showMenu(false);
   if (TOUCH) {
@@ -226,7 +227,15 @@ hud.onCustomize = () => {
   input.touch.onDone = () => { input.touch.edit(false); hud.showMenu(true); };
   input.touch.edit(true);
 };
-hud.onPause = () => { if (running) { sound.klick(); running = false; input.showTouch(false); hud.showMenu(true); hud.hint(false); } };
+// Zielhilfe umschalten. Sie wirkt sofort – `player.js` fragt bei jedem Bild.
+hud.onZielhilfe = () => { sound.klick(); return zielhilfeSetzen(!zielhilfeAn()); };
+hud.zielhilfeStand(zielhilfeAn());
+
+hud.onPause = () => {
+  if (!running) return;
+  sound.klick(); running = false; input.showTouch(false);
+  hud.showMenu(true); hud.hint(false); hud.spielzahlen(spielmessung.zeile());
+};
 hud.onModus = () => sound.klick();
 // Grafikstil: die halbe Szene hängt daran (Materialien, Licht, Himmel,
 // Render-Ziele), deshalb wird neu geladen statt umgebaut.
@@ -342,9 +351,10 @@ hud.onGyroStaerke = (v) => input.gyro.staerke(v);
 hud.onGyroUmkehr = (achse, an) => input.gyro.umkehren(achse, an);
 hud.gyroStand(input.gyro.einst.an && input.gyro.laeuft, input.gyro.einst);
 /**
- * Der Testflug (`mess.js`). Er fliegt dieselbe Strecke siebenmal und schaltet
- * je Lauf eine Stufe ab – der Abstand zwischen zwei Läufen ist das, was diese
- * Stufe auf **diesem** Gerät kostet.
+ * Der Testflug (`mess.js`). Er fliegt dieselbe Strecke einmal je Stufe und
+ * schaltet dabei je Lauf eine ab – der Abstand zwischen zwei Läufen ist das,
+ * was diese Stufe auf **diesem** Gerät kostet. Welche Stufen es gibt, steht in
+ * `LAEUFE`, und das ist dieselbe Liste, an der die Sparleiter dreht.
  */
 const flug = new Testflug({
   kamera: camera,
@@ -354,6 +364,10 @@ const flug = new Testflug({
       for (const b of bots) b.mesh.visible = an;
     } else pipeline.stufe(name, an);
   },
+  // War die Stufe überhaupt an? Auf der niedrigen Leistungsstufe sind
+  // Streulicht und Verdeckung von vornherein aus – ein Lauf, der nichts
+  // abschaltet, darf keinen Abstand melden, als hätte er etwas gespart.
+  istAn: (name) => (name === 'figuren' ? bots.length > 0 : pipeline.istAn(name)),
   zaehler: () => ({
     aufrufe: renderer.info.render.calls,
     dreiecke: renderer.info.render.triangles,
@@ -430,6 +444,9 @@ Promise.all([
 ])
   .then(() => {
     world = buildWorld(scene, renderer);
+    // Die Sparleiter darf an der Schattenkarte drehen – dafür muss sie das
+    // Sonnenlicht kennen, und das gibt es erst, wenn die Welt steht.
+    pipeline.sonneSetzen(world.sonne);
     // Das Navigationsgitter kommt **nach** dem Weltaufbau: es liest die
     // fertigen Kollisionsquader. Gebaut wird es hier und nicht in `world.js`,
     // damit die beiden Module nicht im Kreis voneinander abhängen.
@@ -499,7 +516,9 @@ function simulieren(dt) {
  * nicht in den Comic-Stil zurückgeworfen werden.
  */
 const LEISTUNG = {
-  fenster: 90,          // Bilder je Prüfung (bei 60 rund anderthalb Sekunden)
+  fenster: 90,          // höchstens so viele Bilder je Prüfung
+  sekunden: 1.5,        // oder so lange – was zuerst eintritt
+  mindest: 20,          // darunter ist der Median Zufall
   sparenUnter: 52,      // darunter wird eine Stufe abgeschaltet
   zurueckAb: 58,        // darüber darf eine Stufe zurückkommen
   ruhe: 8,              // so viele gute Prüfungen hintereinander, bevor sie es darf
@@ -507,9 +526,22 @@ const LEISTUNG = {
 };
 const bildzeiten = [];
 let gutGelaufen = 0;
+/**
+ * Mitschreiber über die letzten Sekunden echten Spiels. Der Testflug misst
+ * einen Kameraflug mit stehendem Spieler – wenn er 59 Bilder meldet und es
+ * sich trotzdem hakelig anfühlt, steht die Antwort hier und nicht dort.
+ */
+const spielmessung = new Spielmessung();
 function leistungPruefen(dt) {
   bildzeiten.push(dt);
-  if (bildzeiten.length < LEISTUNG.fenster) return;
+  // Das Fenster zählt Bilder **und** Zeit. Mit einer reinen Bildzahl dauert
+  // eine Prüfung bei 20 Bildern viereinhalb Sekunden statt anderthalb – und
+  // bis die Leiter unten ankommt, vergeht eine halbe Minute. Genau dann, wenn
+  // es am nötigsten ist, ist sie am langsamsten.
+  const genug = bildzeiten.length >= LEISTUNG.fenster
+    || (bildzeiten.length >= LEISTUNG.mindest
+        && bildzeiten.reduce((a, b) => a + b, 0) >= LEISTUNG.sekunden);
+  if (!genug) return;
   const sortiert = [...bildzeiten].sort((a, b) => a - b);
   const median = sortiert[Math.floor(sortiert.length / 2)];
   bildzeiten.length = 0;
@@ -569,11 +601,12 @@ function loop(now) {
   // ans Ende, und der einzige Ausweg wäre „Abbrechen“ im Überblendfenster.
   if (input.takeMenu() && running && !flug.aktiv) {
     running = false; input.showTouch(false); hud.showMenu(true); hud.hint(false); hud.pause(true);
+    hud.spielzahlen(spielmessung.zeile());
   }
   // Im Menü sammelt sich sonst Drehung an, die beim Start den Blick wegreißt –
   // außer während der Kalibrierung, da liest der Prüfschritt den Puffer selbst.
   if (!running) { if (!kalibLaeuft) input.gyro.leeren(); pipeline.render(scene, camera); return; }
-  if (!flug.aktiv) leistungPruefen(roh);
+  if (!flug.aktiv) { leistungPruefen(roh); spielmessung.bild(roh); }
   // Die Bildzeit wird in zwei Hälften genommen: was die Simulation kostet und
   // was das Zeichnen kostet. Ohne diese Trennung sagt eine niedrige Bildrate
   // nicht, ob an Zeichenaufrufen oder an der Bot-KI zu drehen ist.

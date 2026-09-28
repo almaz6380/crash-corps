@@ -41,9 +41,9 @@ src/
   leben.js     Was sich bewegt, ohne mitzuspielen: Schornsteinrauch, Banner in
                Mannschaftsfarbe an den Kontrollpunkten, Vögel über dem Dorf
   style.js     Stilumschalter (?stil=real)
-  mess.js      Testflug: feste Strecke, siebenmal geflogen, je Lauf eine Stufe
-               abgeschaltet. Der Abstand zwischen zwei Läufen ist, was die
-               Stufe auf diesem Gerät kostet
+  mess.js      Testflug: feste Strecke, einmal je Stufe geflogen, und in jedem
+               Lauf ist eine Stufe aus. Der Abstand zwischen zwei Läufen ist,
+               was die Stufe auf diesem Gerät kostet
   device.js    Touch-Erkennung, Leistungsstufe (Auflösung, Schatten, Verdeckung) und die
                Bühne: Bildmaße, bei hochkant gehaltenem Handy um 90° gedreht
   input.js     Eingabe-Schicht: Tastatur, Maus und Touch gebündelt; Anordnung der
@@ -132,6 +132,28 @@ tools/
   schießt je Kandidat einen Strahl.
 - Kein Server-Code in diesem Repo, bis der Single-Player-Loop sauber ist. Multiplayer kommt als separater Schritt (autoritativer Server, Colyseus oder eigenes WS-Protokoll).
 - Neue Klasse = Eintrag in `classes.js` (inkl. `model`) + ggf. Modell-Eintrag in `assets.js`. Sonst nichts anfassen.
+- **Ein Gangzyklus sind zwei Schritte.** Die Obergrenze der Abspielrate in
+  `animation.js` ist eine Schrittfrequenz, keine abstrakte Zahl: Rate 1,9 heißt
+  beim Barbaren Zyklus 0,49 s und 245 Schritte je Minute, Rate 2,8 heißt 361 –
+  das rennt niemand, und genau so sah es aus. Wer die Grenze anfasst, rechnet
+  vorher `2 / (Zyklusdauer / Rate) * 60` aus.
+- Die Zielhilfe führt das Fadenkreuz **nur nach, während der Spieler selbst den
+  Blick bewegt** – Wischen oder Gyro, nicht der Laufstick. Mit dem Stick in der
+  Rechnung drehte die Kamera beim bloßen Laufen mit bis zu 50 Grad je Sekunde
+  von allein, sobald ein Gegner im Kegel stand; das fühlt sich an, als gehorche
+  die Steuerung nicht. Umschaltbar ist sie über den Knopf 🎯 im Menü – ob eine
+  Zielhilfe hilft oder im Weg ist, lässt sich nicht messen, das sagt nur der,
+  der sie benutzt.
+- Die **Wisch-Empfindlichkeit** ist einstellbar („Bedienung anpassen", gemerkt
+  in `localStorage`). Auf dem Handy ist Wischen die einzige Art zu zielen, und
+  der richtige Wert hängt an Daumen und Bildschirmgröße – eine feste Zahl ist
+  für die eine Hälfte zäh und für die andere nervös. `player.js` multipliziert
+  sie auf `sens`; der Gyro hat seinen eigenen Regler, weil er Winkel liefert
+  und keine Pixel.
+- `BLICK.ab` ist die Schwelle, ab der „rückwärts" gilt, und sie wird am
+  Laufstick gemessen: -0,3 sind bei voller Auslenkung 17 Grad hinter der
+  Querrichtung, also fast jede seitliche Bewegung. Auf dem Handy ist der Stick
+  analog – damit drehte der Blick ständig von selbst mit.
 - **`walkSpeed`/`runSpeed` werden gemessen, nicht geschätzt** (`tools/gangtempo.mjs`).
   Sie sagen, für welches Tempo der Clip gebaut ist; `animation.js` rechnet daraus
   die Abspielrate. Steht dort eine erfundene Zahl, rutschen die Füße über den
@@ -309,6 +331,29 @@ tools/
   (die den Normalen-Durchgang mitnimmt), dann Bildpunkte, dann Figuren, zuletzt
   der Stil. Sie läuft in **beiden** Stilen; vorher stieg sie bei `if (!REAL)
   return` sofort aus, und auf dem Handy gab es damit gar keine Automatik.
+- Die Stufen der Leiter stehen in `sparsam()` in `render.js`, nach Kosten je
+  sichtbarem Verlust: Streulicht → Umgebungsverdeckung (nimmt den
+  Normalen-Durchgang mit) → Kantenglättung → Bildpunkte → Schattenschärfe →
+  Bildpunkte tiefer → Figuren → Stil. Die Kantenglättung sitzt **nicht** am
+  Renderer, sondern als `samples` am Farb-Target, und ein Target merkt sich
+  seinen Framebuffer: ohne `dispose()` bleibt die alte Anzahl stehen und der
+  Schalter tut stillschweigend nichts. Dasselbe gilt für die Schattenkarte –
+  `mapSize` allein reicht nicht, die Karte muss weg (`shadow.map = null`).
+- **Am Anschlag misst der Testflug nichts.** Liegt der erste Lauf beim Takt des
+  Bildschirms, sind die Abstände in Klammern Streuung, keine Kosten – gemessen
+  auf einem Handy: 58,8 Bilder und „ohne Verdeckung (−13,4)", obwohl auf der
+  niedrigen Stufe gar keine Verdeckung an war. Der Bericht schätzt den Takt
+  deshalb aus den schnellsten Bildern und sagt es dazu; und eine Stufe, die
+  ohnehin aus war, bekommt „(war aus)" statt einer Zahl.
+- Der Testflug misst einen **Kameraflug mit stehendem Spieler**: keine Eingabe,
+  keine Kollision, keine Verfolgerkamera. Meldet er 59 Bilder und es fühlt sich
+  trotzdem hakelig an, liegt es genau in diesem Unterschied – oder am Drosseln
+  nach ein paar Minuten. Dafür schreibt `Spielmessung` nebenher mit und zeigt
+  im Pausenmenü Median, 1-%-Tief und die Zahl der **Hänger** (Bilder länger als
+  zwei Bildschirmperioden). Ein Hänger ist das, was man sieht; im Median ist er
+  unsichtbar.
+- Jede Stufe der Leiter gehört auch in `LAEUFE` in `mess.js`. Eine Messung, die
+  andere Knöpfe drückt als das Spiel, misst das falsche Spiel.
 - Die Leiter hat einen **Rückweg** (`grosszuegig()`). Ohne ihn ist sie eine
   Einbahnstraße: ein einziger schwerer Moment – ein Rauchfeld, nachgeladene
   Texturen – kostete den Rest der Runde die halbe Grafik. Zurückgenommen wird
@@ -359,7 +404,7 @@ tools/
 - **Leistung wird gemessen, nicht geschätzt** – und zwar auf dem Gerät, auf dem
   gespielt wird: der Testbrowser rendert in Software mit rund 0,3 Bildern je
   Sekunde, und diese Zahl sagt nichts. Der Knopf 📊 im Menü fliegt dieselbe
-  Strecke siebenmal und schaltet je Lauf eine Stufe ab; der **Abstand** zwischen
+  Strecke einmal je Stufe und schaltet dabei eine ab; der **Abstand** zwischen
   zwei Läufen ist die Antwort. Eine reine Bildratenanzeige verrät nicht, was
   teuer ist. Gemessen wird Median **und** 1-%-Tief: die schlechtesten Bilder
   sind das Ruckeln, und ein guter Median versteckt sie.

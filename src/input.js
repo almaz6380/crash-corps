@@ -12,12 +12,27 @@ import { Gyro } from './gyro.js';
  * Dauerzustände: moveX/moveY, fire, sprint, jump.
  * Flanken (einmal je Druck): reload, special, menu, mute – über take…() abzuholen.
  */
+const WISCH_KEY = 'crashcorps.wisch';
+
+/** Gemerkte Wisch-Empfindlichkeit, 1 ist der Ausgangswert. */
+function ladeWisch() {
+  try {
+    const v = +localStorage.getItem(WISCH_KEY);
+    if (v >= 0.4 && v <= 2.5) return v;
+  } catch { /* privater Modus */ }
+  return 1;
+}
+
 export class Input {
   constructor(canvas) {
     this.canvas = canvas;
     this.keys = {};
     this.stickX = 0; this.stickY = 0;      // Touch-Stick
     this.lookX = 0; this.lookY = 0;        // aufgelaufene Blickänderung
+    // Wie weit ein Wischen den Blick dreht. Auf dem Handy ist das die einzige
+    // Art zu zielen, und der richtige Wert hängt an Daumen und Bildschirmgröße –
+    // eine feste Zahl ist für die eine Hälfte zäh und für die andere nervös.
+    this.wisch = ladeWisch();
     this.fireHeld = false; this.jumpHeld = false; this.sprintHeld = false;
     this._reload = false; this._special = false; this._menu = false; this._mute = false;
     // Gyro vor der Touch-Bedienung: deren Anpassen-Bildschirm greift beim Aufbau
@@ -72,6 +87,13 @@ export class Input {
 
   /** Blickänderung seit dem letzten Abruf, in Pixeln. */
   takeLook() { const v = [this.lookX, this.lookY]; this.lookX = 0; this.lookY = 0; return v; }
+
+  /** Wisch-Empfindlichkeit setzen und merken. */
+  wischSetzen(v) {
+    this.wisch = Math.min(2.5, Math.max(0.4, +v || 1));
+    try { localStorage.setItem(WISCH_KEY, String(this.wisch)); } catch { /* privater Modus */ }
+    return this.wisch;
+  }
   /** Blickänderung aus dem Gyroskop, in Bogenmaß. */
   takeGyro() { return this.gyro.take(); }
   takeReload() { const v = this._reload; this._reload = false; return v; }
@@ -140,6 +162,9 @@ class TouchControls {
           <input id="t-edit-size" type="range" min="44" max="180" step="2" disabled />
           <button id="t-edit-reset" type="button">Zurücksetzen</button>
           <button id="t-edit-done" type="button">Fertig</button>
+          <label id="t-wisch" title="Wie weit ein Wischen den Blick dreht">Wischen
+            <input id="wisch-staerke" type="range" min="0.4" max="2.5" step="0.1" />
+          </label>
           <div id="t-gyro">
             <b>Gyroskop</b>
             <label>Stärke <input id="gyro-staerke" type="range" min="0.2" max="3" step="0.1"></label>
@@ -321,6 +346,11 @@ class TouchControls {
       this.applyLayout(); this.saveLayout(); this.select(this.selected);
     });
     el.querySelector('#t-edit-done').addEventListener('click', () => this.onDone?.());
+    const wi = el.querySelector('#wisch-staerke');
+    if (wi) {
+      wi.value = this.input.wisch;
+      wi.addEventListener('input', (e) => this.input.wischSetzen(+e.target.value));
+    }
     // Gyro-Einstellungen sitzen hier, weil das Menü im Querformat randvoll ist
     const g = this.input.gyro;
     const st = el.querySelector('#gyro-staerke'), ix = el.querySelector('#gyro-x'), iy = el.querySelector('#gyro-y');

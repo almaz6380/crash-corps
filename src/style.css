@@ -265,6 +265,13 @@ body.touch #ende > div { font-size: 24px; padding: 18px 28px; }
    Gyro-Zeile einfach die ganze Breite. */
 #t-edit-bar { display: grid; grid-template-columns: auto auto auto auto;
   justify-items: center; max-width: min(96%, 900px); }
+/* Wisch-Empfindlichkeit: eigene Zeile über dem Gyro-Block, damit die
+   vier Spalten der Leiste nicht zerfallen. */
+#t-wisch { grid-column: 1 / -1; display: flex; align-items: center; gap: 8px;
+  padding-top: 7px; font-size: 13px; font-weight: bold; color: var(--ink); }
+#t-wisch input[type="range"] { width: 140px; }
+body.klein #t-wisch { font-size: 12px; padding-top: 4px; }
+body.klein #t-wisch input[type="range"] { width: 100px; }
 #t-gyro { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center;
   padding-top: 7px; border-top: 3px solid rgba(43,33,24,.2);
   font-size: 13px; font-weight: bold; color: var(--ink); }
@@ -352,4 +359,7 @@ body.klein #kalib button { padding: 9px 16px; font-size: 14px; }
 #kalib #kalib-mess { font: 12px/1.3 ui-monospace, Menlo, Consolas, monospace; opacity: .7; white-space: pre-wrap; min-height: 1.3em; }
 #kalib button:disabled { opacity: .45; box-shadow: none; transform: translate(3px, 3px); cursor: default; }
 #stand { margin: 0; font-size: 11px; color: var(--paper); opacity: .55; }
+/* Zahlen aus dem laufenden Spiel, nur nach einer Pause sichtbar. */
+#spielzahlen { margin: 0 0 4px; font-size: 12px; font-family: ui-monospace, Menlo, Consolas, monospace;
+  color: var(--paper); opacity: .8; }
 body.klein #kalib-feld { width: 120px; height: 120px; }

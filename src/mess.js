@@ -36,9 +36,16 @@ export const LAEUFE = [
   { aus: 'bloom', name: 'ohne Streulicht' },
   { aus: 'ao', name: 'ohne Verdeckung' },
   { aus: 'normal', name: 'ohne Normalen-Durchgang' },
+  { aus: 'kanten', name: 'ohne Kantenglättung' },
   { aus: 'schatten', name: 'ohne Schatten' },
+  { aus: 'schattenkarte', name: 'gröbere Schattenkarte' },
   { aus: 'halb', name: 'halbe Auflösung' },
   { aus: 'figuren', name: 'ohne Figuren' },
+  // Derselbe Lauf wie der erste, ganz am Ende. Er misst keine Stufe, sondern
+  // das Gerät: wird ein Handy warm oder schaltet es herunter, liegt zwischen
+  // diesen beiden Läufen der Unterschied – und dann ist jeder Abstand
+  // dazwischen ebenso gut Drift wie Kosten.
+  { aus: null, name: 'Alles an, zum Schluss' },
 ];
 
 /** Sekunden je Wegpunkt-Abschnitt und Aufwärmzeit je Lauf. */
@@ -52,6 +59,77 @@ function quantil(sortiert, p) {
   if (!sortiert.length) return 0;
   const i = Math.min(sortiert.length - 1, Math.max(0, Math.round(p * (sortiert.length - 1))));
   return sortiert[i];
+}
+
+/**
+ * Wie läuft das **Spiel**, nicht der Testflug?
+ *
+ * Der Flug setzt die Kamera auf eine feste Strecke und lässt den Spieler
+ * stehen. Er misst damit das Bild, aber nicht das Spielen: keine Eingabe,
+ * keine Kollision, keine Verfolgerkamera, die sich an Hauswänden entlangtastet.
+ * Wenn der Flug 59 Bilder meldet und es sich trotzdem hakelig anfühlt, ist
+ * genau dieser Unterschied die Spur.
+ *
+ * Deshalb läuft nebenher ein Mitschreiber über die letzten Sekunden echten
+ * Spiels. Er kostet nichts – eine Zahl in einen Ringpuffer – und die Auswertung
+ * passiert erst, wenn jemand ins Pausenmenü geht.
+ */
+export class Spielmessung {
+  constructor(fenster = 600) {
+    this.fenster = fenster;
+    this.zeiten = new Float32Array(fenster);
+    this.i = 0;
+    this.voll = false;
+  }
+
+  bild(dt) {
+    this.zeiten[this.i] = dt;
+    this.i = (this.i + 1) % this.fenster;
+    if (this.i === 0) this.voll = true;
+  }
+
+  leeren() { this.i = 0; this.voll = false; }
+
+  /**
+   * Median, 1-%-Tief, schlechtestes Bild, geschätzter Bildschirmtakt und die
+   * Zahl der **Hänger**: Bilder, die länger gebraucht haben als zwei Perioden
+   * des Bildschirms. Ein Hänger ist das, was man als Ruckeln sieht – im Median
+   * ist er unsichtbar.
+   */
+  auswerten() {
+    const n = this.voll ? this.fenster : this.i;
+    if (n < 30) return null;
+    const a = Array.from(this.zeiten.subarray(0, n)).sort((x, y) => x - y);
+    const bei = (q) => a[Math.min(n - 1, Math.max(0, Math.round(q * (n - 1))))];
+    const periode = bei(0.05);
+    const takt = periode > 0 ? 1 / periode : 0;
+    const grenze = periode * 2;
+    let haenger = 0;
+    for (const t of a) if (t > grenze) haenger++;
+    return {
+      bilder: n,
+      fps: 1 / Math.max(bei(0.5), 1e-4),
+      tief: 1 / Math.max(bei(0.99), 1e-4),
+      schlimmstes: a[n - 1] * 1000,
+      takt,
+      haenger,
+      anteil: haenger / n,
+    };
+  }
+
+  /** Eine Zeile fürs Pausenmenü. Kurz genug, dass sie niemanden erschlägt. */
+  zeile() {
+    const w = this.auswerten();
+    if (!w) return '';
+    // „Schnellstes Bild", nicht „Bildschirm": erreicht das Gerät den Takt des
+    // Schirms nie, ist das schnellste Bild nicht seine Periode. Die Zahl bleibt
+    // trotzdem nützlich – sie sagt, was hier überhaupt drin war.
+    const takt = w.takt ? ` · schnellstes Bild ${w.takt.toFixed(0)}/s` : '';
+    const haenger = w.haenger
+      ? ` · ${w.haenger} Hänger (schlimmstes ${w.schlimmstes.toFixed(0)} ms)`
+      : ' · keine Hänger';
+    return `Im Spiel: ${w.fps.toFixed(0)} Bilder/s, 1-%-Tief ${w.tief.toFixed(0)}${takt}${haenger}`;
+  }
 }
 
 export class Testflug {
@@ -69,6 +147,31 @@ export class Testflug {
     this.simZeiten = [];
     this.bildZeiten = [];
     this.ergebnisse = [];
+    // Die kürzesten Bildabstände des ganzen Flugs. Daraus wird der Takt des
+    // Bildschirms geschätzt – ohne ihn ist keine der Zahlen einzuordnen:
+    // 58,8 Bilder heißt auf einem 60-Hz-Schirm „am Anschlag" und auf einem
+    // 120-Hz-Schirm „die Hälfte".
+    this.schnellste = [];
+  }
+
+  /**
+   * Takt des Bildschirms, geschätzt aus den schnellsten Bildern. Schneller als
+   * der Schirm kann niemand zeichnen, also ist das kürzeste wiederkehrende
+   * Bildintervall seine Periode. Genommen wird nicht das allerkürzeste
+   * (Ausreißer), sondern das fünfte Perzentil.
+   */
+  get takt() {
+    if (this.schnellste.length < 20) return { hz: 0, anschlag: false };
+    const s = [...this.schnellste].sort((a, b) => a - b);
+    const bei = (q) => s[Math.max(0, Math.min(s.length - 1, Math.round(q * (s.length - 1))))];
+    const schnell = bei(0.05), mitte = bei(0.5);
+    // „Am Anschlag" heißt: fast jedes Bild ist so schnell wie das schnellste.
+    // Nur dann ist das schnellste Bild die Bildschirmperiode. Ist das Gerät
+    // dagegen ausgelastet, streuen die Bildzeiten – und dann wäre es falsch,
+    // das schnellste Bild für den Takt des Schirms zu halten. Genau darauf
+    // wäre eine einfache Perzentil-Schätzung hereingefallen: sie hätte jedem
+    // langsamen Gerät bescheinigt, es liege am Anschlag.
+    return { hz: schnell > 0 ? 1 / schnell : 0, anschlag: mitte <= schnell * 1.08 };
   }
 
   /** Dauer eines Laufs in Sekunden. */
@@ -78,7 +181,7 @@ export class Testflug {
     this.aktiv = true;
     this.lauf = 0; this.zeit = 0;
     this.proben = []; this.simZeiten = []; this.bildZeiten = [];
-    this.ergebnisse = [];
+    this.ergebnisse = []; this.schnellste = [];
     this._stufeSetzen(0);
   }
 
@@ -96,6 +199,9 @@ export class Testflug {
   _stufeSetzen(i) {
     this._alleStufenAn();
     const l = LAEUFE[i];
+    // Erst fragen, dann schalten: war die Stufe ohnehin aus, ist der Lauf eine
+    // Wiederholung des ersten und sein „Abstand" nichts als Streuung.
+    this.warAn = l.aus ? (this.u.istAn?.(l.aus) ?? true) : true;
     if (l.aus) this.u.stufe(l.aus, false);
   }
 
@@ -132,6 +238,7 @@ export class Testflug {
     // und Texturen hochgeladen, und das misst den Start, nicht das Spiel.
     if (this.zeit > AUFWAERMEN) {
       this.proben.push(dt); this.simZeiten.push(sim); this.bildZeiten.push(bild);
+      this.schnellste.push(dt);
     }
 
     if (this.zeit < Testflug.laufDauer) return false;
@@ -153,6 +260,7 @@ export class Testflug {
     const z = this.u.zaehler();
     this.ergebnisse.push({
       name: LAEUFE[this.lauf].name,
+      warAn: this.warAn !== false,
       bilder: this.proben.length,
       fps: 1 / Math.max(quantil(sortiert, 0.5), 1e-4),
       tief: 1 / Math.max(quantil(sortiert, 0.99), 1e-4),   // 1-%-Tief
@@ -187,10 +295,33 @@ export class Testflug {
     ];
     const erste = this.ergebnisse[0];
     const zeilen = this.ergebnisse.map((e) => {
-      const delta = erste && e !== erste ? ` (${e.fps >= erste.fps ? '+' : ''}${(e.fps - erste.fps).toFixed(1)})` : '';
-      return `${(e.name + delta).padEnd(30)} ${e.fps.toFixed(1).padStart(8)} ${e.tief.toFixed(1).padStart(9)} `
+      // Eine Stufe, die ohnehin aus war, hat nichts gespart. Der Abstand wäre
+      // reine Streuung – und eine Zahl in Klammern liest sich wie ein Befund.
+      const anhang = e === erste ? ''
+        : !e.warAn ? ' (war aus)'
+        : ` (${e.fps >= erste.fps ? '+' : ''}${(e.fps - erste.fps).toFixed(1)})`;
+      return `${(e.name + anhang).padEnd(30)} ${e.fps.toFixed(1).padStart(8)} ${e.tief.toFixed(1).padStart(9)} `
         + `${e.sim.toFixed(1).padStart(8)} ${e.bild.toFixed(1).padStart(9)} ${String(e.aufrufe).padStart(9)}`;
     });
-    return [...kopf, ...zeilen, '', `Dreiecke: ${erste?.dreiecke ?? 0}`].join('\n');
+
+    // Die wichtigste Zeile steht unten, weil sie erst nach dem Flug feststeht.
+    const { hz, anschlag } = this.takt;
+    const letzte = this.ergebnisse[this.ergebnisse.length - 1];
+    const fuss = [`Dreiecke: ${erste?.dreiecke ?? 0}`];
+    if (erste && letzte && letzte !== erste) {
+      const drift = letzte.fps - erste.fps;
+      fuss.push(`Drift über den Flug: ${drift >= 0 ? '+' : ''}${drift.toFixed(1)} Bilder/s`
+        + (Math.abs(drift) > 3 ? ' – so viel ist das Gerät, nicht die Stufe.' : ''));
+    }
+    if (hz) fuss.push(`Schnellstes Bild: ${(1000 / hz).toFixed(1)} ms – das sind ${hz.toFixed(0)} Bilder/s.`);
+    if (anschlag) {
+      fuss.push('');
+      fuss.push('Fast jedes Bild war so schnell: der Flug lief am Anschlag des');
+      fuss.push('Bildschirms. Dann sagen die Abstände in Klammern nichts über');
+      fuss.push('Kosten – dafür müsste erst etwas bremsen. Was hier trotzdem');
+      fuss.push('stört, steht nicht in der Bildrate: das 1-%-Tief und die Zahlen');
+      fuss.push('aus dem laufenden Spiel (spielen, dann ☰ Pause) sind die Stelle.');
+    }
+    return [...kopf, ...zeilen, '', ...fuss].join('\n');
   }
 }
