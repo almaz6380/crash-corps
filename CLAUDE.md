@@ -320,12 +320,22 @@ tools/
   Fotofarbe wird **eingemischt, nicht ersetzt** – sonst sehen zwei Wandstücke
   verschieden aus, weil ihre UV-Inseln verschieden groß sind. Große Flächen
   brauchen `makro`, sonst sieht man das Kachelraster.
-- Texturauflösung ist billiger, als sie aussieht, aber nicht im Speicher. Der
-  Dorfbausatz von 512 auf 1024 kostet **70 KB** Download – WebP packt diese
-  Oberflächen sehr gut –, aber im Gerät das Vierfache an Texturspeicher: acht
-  Texturen sind bei 512 rund 11 MB, bei 1024 rund 43, bei 2048 rund 172. Die
-  Download-Größe ist deshalb das falsche Maß für diese Entscheidung; 1024 ist
-  die Grenze, die ein Handy bequem trägt.
+- **Über Texturauflösung entscheidet die Texeldichte, nicht das Gefühl.** Wie
+  viele Texel je Meter ein Material hat, steht in der UV-Spanne gegen die
+  Bauteilmaße; wie viele Bildpunkte je Meter der Bildschirm hat, ist
+  `hoehePx / (2 · d · tan(fov/2))` – auf dem Handy mit Bildpunkten 2,0 sind das
+  465 auf einem Meter, 232 auf zwei, 93 auf fünf. Ab dem Schnittpunkt liegt die
+  Textur im Überfluss da und eine höhere ändert nichts.
+  Ausgerechnet und ausprobiert: der Dorfbausatz auf 1024 kostet nur 70 KB
+  Download, schiebt die Wände aber bloß von „scharf ab 1,8 m" auf 0,9 m – so
+  dicht steht niemand vor einer Hauswand. Gemessen an zwei Blickpunkten:
+  3,94 → 3,94 und 4,41 → 4,50. Deshalb bleibt das Dorf bei 512.
+  Der Naturbausatz von 256 auf 512 dagegen bleibt: ein Blattkärtchen ist 3,9 m
+  breit und benutzt die Textur einmal, das sind 66 Texel je Meter und „scharf
+  erst ab sieben Metern" – an einem Baum läuft man näher vorbei.
+  Der Speicher ist die zweite Grenze: acht Texturen sind bei 512 rund 11 MB,
+  bei 1024 rund 43, bei 2048 rund 172. Die Download-Größe ist für diese
+  Entscheidung das falsche Maß.
 - Die Vorlade-Liste ist zweigeteilt (`assetGruppen()` in `tools/assets-liste.mjs`):
   Grundpaket (Figuren, Bausatz) unter 8 MB und offline, Realismus-Satz (HDRI,
   Fotooberflächen) nur nachgeladen. Neue Realismus-Assets gehören in die zweite
