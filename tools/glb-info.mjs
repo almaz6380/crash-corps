@@ -19,6 +19,8 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { modellHoehe } from './gangtempo.mjs';
 
 /** JSON-Teil einer GLB-Datei. Aufbau: 12 Byte Kopf, dann Blöcke aus Länge+Typ+Daten. */
 export function glbJson(datei) {
@@ -69,7 +71,7 @@ function knochen(j) {
 const norm = (n) => n.toLowerCase().replace(/[^a-z0-9]/g, '');
 
 /** Rät die Manifest-Knochen aus den vorhandenen Namen. */
-function knochenRaten(liste) {
+export function knochenRaten(liste) {
   const treffer = (...muster) => {
     for (const m of muster) {
       const k = liste.find((b) => norm(b.name) === m) || liste.find((b) => norm(b.name).includes(m));
@@ -79,7 +81,9 @@ function knochenRaten(liste) {
   };
   return {
     hips: treffer('hips', 'pelvis', 'hip'),
-    spine: treffer('abdomen', 'spine01', 'spine1', 'spine'),
+    // 'spine' vor 'spine1': beim Mixamo-Skelett ist `Spine` der unterste
+    // Wirbel und `Spine1` schon der mittlere – die Reihenfolge entscheidet.
+    spine: treffer('abdomen', 'spine01', 'spine', 'spine1'),
     chest: treffer('chest', 'torso', 'spine02', 'spine2', 'upperchest'),
     head: treffer('head'),
     rightArm: treffer('upperarmr', 'rightarm', 'armr', 'shoulderr'),
@@ -124,13 +128,16 @@ function masse(j) {
   return { lo, hi, tris: Math.round(tris), verts, attrBytes };
 }
 
-function bericht(datei, { kurz = false } = {}) {
+export function bericht(datei, { kurz = false } = {}) {
   const { json: j, binLen, dateiLen } = glbJson(datei);
   const jochen = knochen(j);
   const anims = (j.animations || []).map((a) => ({ name: a.name || '(ohne Namen)', dauer: clipDauer(j, a) }));
   const mats = (j.materials || []).map((m) => m.name || '(ohne Namen)');
   const { lo, hi, tris, verts, attrBytes } = masse(j);
-  const hoehe = hi[1] - lo[1];
+  // Höhe mit den Knotenmatrizen, nicht roh aus den Accessoren: three misst im
+  // Spiel eine Box3 der fertigen Szene, und wer die Figur am Wurzelknoten
+  // skaliert, bekäme sonst eine andere Zahl (beim Toon-Soldaten 8.33 statt 2.30).
+  const hoehe = modellHoehe(j) || (hi[1] - lo[1]);
 
   // Anteil der Animationsdaten am Binärteil
   let animBytes = 0;
@@ -193,15 +200,20 @@ function bericht(datei, { kurz = false } = {}) {
   return { datei, hoehe, anims, mats, jochen };
 }
 
-const args = process.argv.slice(2);
-const kurz = args.includes('--kurz');
-const dateien = args.filter((a) => !a.startsWith('--'));
-if (!dateien.length) {
-  console.error('Aufruf: node tools/glb-info.mjs <datei.glb> [weitere …] [--kurz]');
-  process.exit(1);
+// Nur ausführen, wenn direkt aufgerufen – `tools/mixamo-figur.mjs` holt sich
+// `glbJson`, `knochenRaten` und `bericht` als Modul, und dann darf hier nicht
+// die Bedienhilfe losgehen.
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  const args = process.argv.slice(2);
+  const kurz = args.includes('--kurz');
+  const dateien = args.filter((a) => !a.startsWith('--'));
+  if (!dateien.length) {
+    console.error('Aufruf: node tools/glb-info.mjs <datei.glb> [weitere …] [--kurz]');
+    process.exit(1);
+  }
+  for (const d of dateien) {
+    try { bericht(d, { kurz }); }
+    catch (e) { console.error(`\n${d}: ${e.message}`); }
+  }
+  console.log();
 }
-for (const d of dateien) {
-  try { bericht(d, { kurz }); }
-  catch (e) { console.error(`\n${d}: ${e.message}`); }
-}
-console.log();
