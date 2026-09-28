@@ -18,8 +18,12 @@ const ANIM = {
   lookMaxYaw: 1.15,           // max. Kopfdrehung seitlich (rad)
   lookMaxPitch: 0.6,          // max. Kopfneigung (rad)
   rollTimeScale: 1.6,         // Roll-Clip schneller abspielen, sonst dauert die Rolle zu lang
-  walkCycleSpeed: 2.4,        // Tempo, für das der Geh-Clip gebaut ist
-  runCycleSpeed: 6.5,
+  // Rückfall für Modelle ohne `cycle` im Manifest. Die gemessenen Werte der
+  // eingebauten Figuren liegen bei 0,6 und 1,5 m/s – wer hier landet, hat keine
+  // Messung, und dann ist ein Wert in derselben Größenordnung die bessere Wahl
+  // als einer, der vom Blatt stammt.
+  walkCycleSpeed: 0.65,       // Tempo, für das der Geh-Clip gebaut ist
+  runCycleSpeed: 1.5,
 };
 
 const clamp01 = (v) => Math.min(1, Math.max(0, v));
@@ -182,8 +186,13 @@ export class CharacterAnimator {
 
     // ---- Schrittfrequenz ans Tempo koppeln, sonst rutschen die Füße ----
     const cyc = def.cycle || {};
-    const ws = THREE.MathUtils.clamp(speed / (cyc.walkSpeed || ANIM.walkCycleSpeed), 0.6, 1.8);
-    const rs = THREE.MathUtils.clamp(speed / (cyc.runSpeed || ANIM.runCycleSpeed), 0.55, 1.6);
+    // Die Obergrenzen sind hoch, weil die Clips es verlangen: gemessen
+    // (`tools/gangtempo.mjs`) trägt der Lauf-Clip des Barbaren 1,67 m/s, die
+    // Klasse rennt 5,2 – ohne Spielraum nach oben rudern die Beine hinterher
+    // und die Figur rutscht über den Boden. Bei 2,8 ist der Zyklus 0,33 s lang,
+    // rund 180 Schritte je Minute; das ist eine Gangart, darüber wird es Zappeln.
+    const ws = THREE.MathUtils.clamp(speed / (cyc.walkSpeed || ANIM.walkCycleSpeed), 0.6, 2.4);
+    const rs = THREE.MathUtils.clamp(speed / (cyc.runSpeed || ANIM.runCycleSpeed), 0.55, 2.8);
     actions.walk?.setEffectiveTimeScale(ws); actions.aimWalk?.setEffectiveTimeScale(ws);
     for (const k of ['run', 'aimRun', 'runLeft', 'runRight', 'runBack']) actions[k]?.setEffectiveTimeScale(rs);
 

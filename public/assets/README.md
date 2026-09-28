@@ -1,5 +1,10 @@
 # Assets
 
+Eigene Figuren über Mixamo einbauen: **MIXAMO.md** in diesem Ordner. Achtung,
+Mixamo-Inhalte sind *nicht* CC0 – Adobe erlaubt die Nutzung im eigenen Projekt,
+nicht die Weitergabe der Dateien als Asset. Was heute hier liegt, ist CC0 und
+darf bleiben, wie es ist.
+
 Alle Modelle sind **CC0 1.0** (gemeinfrei, auch kommerziell, keine Namensnennung
 nötig). Zwei Quellen: Quaternius (quaternius.com) für die drei Spielfiguren, das
 Dorf und die Arena-Props, Kay Lousberg (kaylousberg.com) für die Figuren auf der

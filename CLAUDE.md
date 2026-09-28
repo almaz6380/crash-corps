@@ -79,6 +79,13 @@ tools/
                     --dreiecke und --textur für Figuren aus Bild-zu-3D-Diensten
   glb-nach-obj.mjs  GLB nach OBJ+MTL+Textur als ZIP – so nimmt Mixamo eine Figur an
   fbx-nach-glb.mjs  Mixamo-FBX zurück nach GLB und alle Clips in eine Datei
+  mixamo-figur.mjs  Ein Ordner voll Mixamo-Downloads → fertige Spielfigur samt
+                    Manifest-Eintrag: wandeln, Clips benennen, zusammenhängen,
+                    `mixamorig:` streichen, Texturen kürzen, messen
+  mixamo-pruefen.mjs Prüft die Namensregeln des Imports gegen das echte
+                    Mixamo-Skelett – ohne Downloads, ohne Browser
+  gangtempo.mjs     Für welches Tempo ist ein Laufclip gebaut, und wohin schaut
+                    die Figur? Beides gemessen statt geraten
   balance.mjs       Rechnet Duelldauern aus Klassen- und Waffenwerten aus und
                     meldet Ausreißer – ohne das Spiel zu starten
   hdri-holen.mjs    Holt eine HDRI von Poly Haven (CC0) als Lichtquelle des
@@ -125,6 +132,21 @@ tools/
   schießt je Kandidat einen Strahl.
 - Kein Server-Code in diesem Repo, bis der Single-Player-Loop sauber ist. Multiplayer kommt als separater Schritt (autoritativer Server, Colyseus oder eigenes WS-Protokoll).
 - Neue Klasse = Eintrag in `classes.js` (inkl. `model`) + ggf. Modell-Eintrag in `assets.js`. Sonst nichts anfassen.
+- **`walkSpeed`/`runSpeed` werden gemessen, nicht geschätzt** (`tools/gangtempo.mjs`).
+  Sie sagen, für welches Tempo der Clip gebaut ist; `animation.js` rechnet daraus
+  die Abspielrate. Steht dort eine erfundene Zahl, rutschen die Füße über den
+  Boden – das ist der Eindruck, den man als „sieht billig aus" beschreibt.
+  Gemessen wird die Strecke, die der Fuß gegen die Hüfte zurücklegt, geteilt
+  durch die Clipdauer, und mal dem Maßstab, auf den das Spiel die Figur bringt.
+  Alle elf Figuren im Repo lagen zwischen zwei- und sechsfach daneben.
+- Mixamo: die Anleitung steht in `public/assets/MIXAMO.md`, der Import ist
+  **ein** Aufruf (`tools/mixamo-figur.mjs`). Zwei Fallen stecken dort schon
+  abgefangen: three streicht Doppelpunkte aus Knotennamen (`mixamorig:LeftArm`
+  wird zu `mixamorigLeftArm`), und `upperBones` vergleicht mit `startsWith` –
+  ein Präfix `Arm` trifft damit auch den Wurzelknoten `Armature` und legt die
+  ganze Figur in die Anschlagsebene. Deshalb leitet der Import `upperBones` aus
+  der Knochenhierarchie ab (alles unterhalb des Wirbels) statt aus einer
+  Namensliste, und `tools/mixamo-pruefen.mjs` hält das fest.
 - Neue Figur: **erst `node tools/glb-info.mjs <datei.glb>`**, dann den Eintrag schreiben.
   Ein falscher Knochenname gibt nur eine Warnung in der Konsole, ein falscher
   Clip-Name gar nichts, und ein `tintMaterials`, das auf kein Material passt,

@@ -26,6 +26,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { createRequire } from 'node:module';
+import { fileURLToPath } from 'node:url';
 import { NodeIO } from '@gltf-transform/core';
 import { ALL_EXTENSIONS } from '@gltf-transform/extensions';
 import { mergeDocuments, prune, dedup, unpartition } from '@gltf-transform/functions';
@@ -33,7 +34,7 @@ import { mergeDocuments, prune, dedup, unpartition } from '@gltf-transform/funct
 const require = createRequire(import.meta.url);
 
 /** Pfad zur mitgelieferten FBX2glTF-Binärdatei für dieses Betriebssystem. */
-function konverter() {
+export function konverter() {
   const wurzel = path.dirname(require.resolve('fbx2gltf/package.json'));
   const datei = os.platform() === 'win32' ? 'FBX2glTF.exe' : 'FBX2glTF';
   const p = path.join(wurzel, 'bin', os.type(), datei);
@@ -46,7 +47,7 @@ function konverter() {
  * FBX nach GLB wandeln. Ist die Eingabe schon eine GLB, bleibt sie, wie sie ist –
  * so lässt sich das Zusammenführen auch ohne Mixamo-Dateien prüfen.
  */
-function nachGlb(datei, ziel) {
+export function nachGlb(datei, ziel) {
   if (/\.(glb|gltf)$/i.test(datei)) return datei;
   execFileSync(konverter(), ['--binary', '--input', datei, '--output', ziel], { stdio: 'pipe' });
   // FBX2glTF hängt je nach Version die Endung selbst an
@@ -62,7 +63,7 @@ function nachGlb(datei, ziel) {
  * von alten zu neuen Objekten. Darüber finden wir genau die Animationen, die
  * gerade dazugekommen sind – ohne raten zu müssen, welche das waren.
  */
-function animationenUebernehmen(basis, quelle, name) {
+export function animationenUebernehmen(basis, quelle, name) {
   const knochen = new Map();
   for (const k of basis.getRoot().listNodes()) knochen.set(k.getName(), k);
 
@@ -100,49 +101,54 @@ function animationenUebernehmen(basis, quelle, name) {
   return { clips: dazu.length, umgehaengt, verloren, entfernt };
 }
 
-const args = process.argv.slice(2);
-const [ziel, ...eingaben] = args;
-if (!ziel || !eingaben.length) {
-  console.error('Aufruf: node tools/fbx-nach-glb.mjs <ziel.glb> <koerper.fbx[=Name]> [weitere.fbx[=Name] …]');
-  console.error('Die erste Datei muss den Körper enthalten (Mixamo: „With Skin").');
-  process.exit(1);
-}
-
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'fbx-'));
-const io = new NodeIO().registerExtensions(ALL_EXTENSIONS);
-let basis = null;
-
-try {
-  for (const [i, eingabe] of eingaben.entries()) {
-    const [datei, wunschname] = eingabe.split('=');
-    const name = wunschname || path.basename(datei).replace(/\.(fbx|glb|gltf)$/i, '');
-    const glb = nachGlb(path.resolve(datei), path.join(tmp, `t${i}.glb`));
-    const doc = await io.read(glb);
-
-    if (!basis) {
-      basis = doc;
-      const anims = basis.getRoot().listAnimations();
-      for (const a of anims) a.setName(name);
-      console.log(`${path.basename(datei).padEnd(28)} Körper + ${anims.length} Clip(s) als „${name}"`);
-      continue;
-    }
-    const r = animationenUebernehmen(basis, doc, name);
-    console.log(`${path.basename(datei).padEnd(28)} ${r.clips} Clip(s) als „${name}"`
-      + `   Kanäle umgehängt ${r.umgehaengt}   Zweitknochen entfernt ${r.entfernt}`
-      + (r.verloren ? `   \x1b[33mohne passenden Knochen: ${r.verloren}\x1b[0m` : ''));
+// Nur als Werkzeug ausführen. `tools/mixamo-figur.mjs` holt sich die Funktionen
+// oben als Modul und bringt seinen eigenen Ablauf mit.
+const direkt = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+if (direkt) {
+  const args = process.argv.slice(2);
+  const [ziel, ...eingaben] = args;
+  if (!ziel || !eingaben.length) {
+    console.error('Aufruf: node tools/fbx-nach-glb.mjs <ziel.glb> <koerper.fbx[=Name]> [weitere.fbx[=Name] …]');
+    console.error('Die erste Datei muss den Körper enthalten (Mixamo: „With Skin").');
+    process.exit(1);
   }
 
-  // Jede eingelesene Datei bringt ihren eigenen Datenpuffer mit, eine GLB darf
-  // aber nur einen haben. `unpartition` legt alles in einen zusammen.
-  await basis.transform(dedup(), prune({ keepAttributes: false, keepLeaves: true }), unpartition());
-  fs.mkdirSync(path.dirname(path.resolve(ziel)), { recursive: true });
-  await io.write(ziel, basis);
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'fbx-'));
+  const io = new NodeIO().registerExtensions(ALL_EXTENSIONS);
+  let basis = null;
 
-  const namen = basis.getRoot().listAnimations().map((a) => a.getName());
-  console.log(`\n${ziel}  ${(fs.statSync(ziel).size / 1048576).toFixed(2)} MB`);
-  console.log(`Clips: ${namen.join(', ')}`);
-  const doppelt = namen.filter((n, i) => namen.indexOf(n) !== i);
-  if (doppelt.length) console.log(`\x1b[33mDoppelte Namen: ${[...new Set(doppelt)].join(', ')} – das Spiel fände nur den ersten.\x1b[0m`);
-} finally {
-  fs.rmSync(tmp, { recursive: true, force: true });
+  try {
+    for (const [i, eingabe] of eingaben.entries()) {
+      const [datei, wunschname] = eingabe.split('=');
+      const name = wunschname || path.basename(datei).replace(/\.(fbx|glb|gltf)$/i, '');
+      const glb = nachGlb(path.resolve(datei), path.join(tmp, `t${i}.glb`));
+      const doc = await io.read(glb);
+
+      if (!basis) {
+        basis = doc;
+        const anims = basis.getRoot().listAnimations();
+        for (const a of anims) a.setName(name);
+        console.log(`${path.basename(datei).padEnd(28)} Körper + ${anims.length} Clip(s) als „${name}"`);
+        continue;
+      }
+      const r = animationenUebernehmen(basis, doc, name);
+      console.log(`${path.basename(datei).padEnd(28)} ${r.clips} Clip(s) als „${name}"`
+        + `   Kanäle umgehängt ${r.umgehaengt}   Zweitknochen entfernt ${r.entfernt}`
+        + (r.verloren ? `   \x1b[33mohne passenden Knochen: ${r.verloren}\x1b[0m` : ''));
+    }
+
+    // Jede eingelesene Datei bringt ihren eigenen Datenpuffer mit, eine GLB darf
+    // aber nur einen haben. `unpartition` legt alles in einen zusammen.
+    await basis.transform(dedup(), prune({ keepAttributes: false, keepLeaves: true }), unpartition());
+    fs.mkdirSync(path.dirname(path.resolve(ziel)), { recursive: true });
+    await io.write(ziel, basis);
+
+    const namen = basis.getRoot().listAnimations().map((a) => a.getName());
+    console.log(`\n${ziel}  ${(fs.statSync(ziel).size / 1048576).toFixed(2)} MB`);
+    console.log(`Clips: ${namen.join(', ')}`);
+    const doppelt = namen.filter((n, i) => namen.indexOf(n) !== i);
+    if (doppelt.length) console.log(`\x1b[33mDoppelte Namen: ${[...new Set(doppelt)].join(', ')} – das Spiel fände nur den ersten.\x1b[0m`);
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
 }

@@ -38,7 +38,7 @@ export const CHARACTER_MODELS = {
     upperBones: ['spine', 'neck', 'Head', 'clavicle', 'upperarm', 'lowerarm',
                  'hand', 'index', 'middle', 'pinky', 'ring', 'thumb'],
     layers: { aim: 'Aim', shoot: 'Shoot', hit: 'Hit' },
-    cycle: { walk: 1.33, run: 0.93, walkSpeed: 1.5, runSpeed: 4.2 },
+    cycle: { walk: 1.33, run: 0.93, walkSpeed: 0.65, runSpeed: 1.67 },   // gemessen: tools/gangtempo.mjs
     waffenform: 'axt',
     grip: { pos: [0, 0.06, 0.02], rot: [-1.5708, 0, 0], scale: 0.9 },
     // Prozedurale Waffen zeigen entlang +z; im Ego-Bild hängt die Waffe vor der
@@ -60,7 +60,7 @@ export const CHARACTER_MODELS = {
     upperBones: ['spine', 'neck', 'Head', 'clavicle', 'upperarm', 'lowerarm',
                  'hand', 'index', 'middle', 'pinky', 'ring', 'thumb'],
     layers: { aim: 'Aim', shoot: 'Shoot', hit: 'Hit' },
-    cycle: { walk: 1.33, run: 0.93, walkSpeed: 1.5, runSpeed: 4.2 },
+    cycle: { walk: 1.33, run: 0.93, walkSpeed: 0.59, runSpeed: 1.50 },   // gemessen: tools/gangtempo.mjs
     waffenform: 'armbrust',
     grip: { pos: [0, 0.06, 0.02], rot: [-1.5708, 0, 0], scale: 0.9 },
     viewmodel: { form: 'armbrust', laenge: 0.62, rot: [0.06, Math.PI, 0.03], pos: [0, 0.0, 0.04] },
@@ -80,7 +80,7 @@ export const CHARACTER_MODELS = {
     upperBones: ['spine', 'neck', 'Head', 'clavicle', 'upperarm', 'lowerarm',
                  'hand', 'index', 'middle', 'pinky', 'ring', 'thumb'],
     layers: { aim: 'Aim', shoot: 'Shoot', hit: 'Hit' },
-    cycle: { walk: 1.33, run: 0.93, walkSpeed: 1.5, runSpeed: 4.2 },
+    cycle: { walk: 1.33, run: 0.93, walkSpeed: 0.60, runSpeed: 1.54 },   // gemessen: tools/gangtempo.mjs
     waffenform: 'stab',
     grip: { pos: [0, 0.06, 0.02], rot: [-1.5708, 0, 0], scale: 0.9 },
     viewmodel: { form: 'stab', laenge: 0.8, rot: [0.1, 2.9, 0.08], pos: [0, -0.03, 0.05] },
@@ -105,7 +105,7 @@ export const CHARACTER_MODELS = {
     upperBones: ['Abdomen', 'Torso', 'Neck', 'Head', 'Shoulder',
                  'UpperArm', 'LowerArm', 'Index', 'Middle', 'Pinky', 'Thumb'],
     layers: { shoot: 'Weapon', hit: 'HitReact' },   // kein `aim`: es gibt keine Zielpose
-    cycle: { walk: 1.0, run: 0.57, walkSpeed: 1.4, runSpeed: 4.5 },
+    cycle: { walk: 1.0, run: 0.57, walkSpeed: 0.65, runSpeed: 0.92 },    // gemessen: tools/gangtempo.mjs
     // Seine Keule ist an die Knochen gewichtet, nicht angehängt – in der dritten
     // Person ideal, fürs Ego-Bild unbrauchbar. Daher `form`: dort eine Axt aus gear.js.
     weapons: { shotgun: 'Orc_Weapon' },
@@ -137,7 +137,7 @@ export const CHARACTER_MODELS = {
     // am Punkt ab – hier stehen also die Stämme.
     upperBones: ['spine', 'chest', 'neck', 'head', 'upperarm', 'lowerarm', 'wrist', 'hand', 'handslot'],
     layers: { aim: '2H_Melee_Idle', shoot: '2H_Ranged_Shoot', hit: 'Hit_A' },
-    cycle: { walk: 1.07, run: 0.8, walkSpeed: 1.5, runSpeed: 4.6 },
+    cycle: { walk: 1.07, run: 0.8, walkSpeed: 0.38, runSpeed: 0.91 },    // gemessen: tools/gangtempo.mjs
     weapons: { shotgun: '2H_Axe' },
     weaponHide: ['1H_Axe', '1H_Axe_Offhand', '2H_Axe', 'Barbarian_Round_Shield', 'Mug'],
     // Die Axt liegt im Modell mit dem Stiel entlang +y; -x kippt ihn nach vorn.
@@ -160,7 +160,7 @@ export const CHARACTER_MODELS = {
     },
     upperBones: ['spine', 'chest', 'neck', 'head', 'upperarm', 'lowerarm', 'wrist', 'hand', 'handslot'],
     layers: { aim: '2H_Ranged_Aiming', shoot: '2H_Ranged_Shoot', hit: 'Hit_A' },
-    cycle: { walk: 1.07, run: 0.8, walkSpeed: 1.5, runSpeed: 4.6 },
+    cycle: { walk: 1.07, run: 0.8, walkSpeed: 0.42, runSpeed: 1.00 },    // gemessen: tools/gangtempo.mjs
     weapons: { smg: '2H_Crossbow' },
     weaponHide: ['1H_Crossbow', '2H_Crossbow', 'Knife', 'Knife_Offhand', 'Throwable'],
     // Die Armbrust zeigt schon entlang +z, muss also nur umgedreht werden.
@@ -183,7 +183,7 @@ export const CHARACTER_MODELS = {
     },
     upperBones: ['spine', 'chest', 'neck', 'head', 'upperarm', 'lowerarm', 'wrist', 'hand', 'handslot'],
     layers: { aim: 'Spellcast_Raise', shoot: 'Spellcast_Shoot', hit: 'Hit_A' },
-    cycle: { walk: 1.07, run: 0.8, walkSpeed: 1.5, runSpeed: 4.6 },
+    cycle: { walk: 1.07, run: 0.8, walkSpeed: 0.30, runSpeed: 0.73 },    // gemessen: tools/gangtempo.mjs
     weapons: { rifle: '2H_Staff' },
     weaponHide: ['1H_Wand', '2H_Staff', 'Spellbook', 'Spellbook_open'],
     // Der Stab liegt entlang +y, wird schräg nach vorn gekippt.
@@ -215,7 +215,7 @@ export const CHARACTER_MODELS = {
     upperBones: ['Torso', 'Chest', 'Neck', 'Head', 'Shoulder', 'UpperArm', 'LowerArm', 'Wrist',
                  'Index', 'Middle', 'Ring', 'Pinky', 'Thumb'],
     layers: { aim: 'Idle_Gun_Pointing', shoot: 'Gun_Shoot', hit: 'HitRecieve' },
-    cycle: { walk: 1.33, run: 0.8, walkSpeed: 1.9, runSpeed: 5.5 },   // Clip-Dauer und Tempo, für das der Zyklus gebaut ist
+    cycle: { walk: 1.33, run: 0.8, walkSpeed: 0.66, runSpeed: 1.30 },    // gemessen: tools/gangtempo.mjs
     grip: { pos: [0, 0.06, 0.02], rot: [-1.5708, 0, 0], scale: 0.62 },
     tintMaterials: ['SciFi_Main'],
   },
@@ -241,7 +241,7 @@ export const CHARACTER_MODELS = {
     upperBones: ['Torso', 'Chest', 'Neck', 'Head', 'Shoulder', 'UpperArm', 'LowerArm', 'Wrist',
                  'Index', 'Middle', 'Ring', 'Pinky', 'Thumb'],
     layers: { aim: 'Idle_Gun_Pointing', shoot: 'Gun_Shoot', hit: 'HitRecieve' },
-    cycle: { walk: 1.33, run: 0.8, walkSpeed: 1.9, runSpeed: 5.5 },   // Clip-Dauer und Tempo, für das der Zyklus gebaut ist
+    cycle: { walk: 1.33, run: 0.8, walkSpeed: 0.64, runSpeed: 1.24 },    // gemessen: tools/gangtempo.mjs
     grip: { pos: [0, 0.06, 0.02], rot: [-1.5708, 0, 0], scale: 0.62 },
     tintMaterials: ['White'],
   },
@@ -267,7 +267,7 @@ export const CHARACTER_MODELS = {
     upperBones: ['Torso', 'Chest', 'Neck', 'Head', 'Shoulder', 'UpperArm', 'LowerArm', 'Wrist',
                  'Index', 'Middle', 'Ring', 'Pinky', 'Thumb'],
     layers: { aim: 'Idle_Gun_Pointing', shoot: 'Gun_Shoot', hit: 'HitRecieve' },
-    cycle: { walk: 1.33, run: 0.8, walkSpeed: 1.9, runSpeed: 5.5 },   // Clip-Dauer und Tempo, für das der Zyklus gebaut ist
+    cycle: { walk: 1.33, run: 0.8, walkSpeed: 0.68, runSpeed: 1.32 },    // gemessen: tools/gangtempo.mjs
     grip: { pos: [0, 0.06, 0.02], rot: [-1.5708, 0, 0], scale: 0.62 },
     tintMaterials: ['Swat'],
   },
