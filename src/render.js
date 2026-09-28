@@ -342,9 +342,19 @@ export class Pipeline {
     this.renderer = renderer; this.camera = camera;
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    // Die Zähler sollen **ein ganzes Bild** zusammenzählen, nicht nur den
+    // letzten Durchgang. Von allein setzt three sie bei jedem `render()`
+    // zurück – und weil das Zusammensetzen ein einzelnes Rechteck ist, stünde
+    // am Ende „1 Zeichenaufruf, 2 Dreiecke“ da.
+    renderer.info.autoReset = false;
     // Tone-Mapping macht der Composite-Shader, nicht der Renderer – siehe dort
     renderer.toneMapping = THREE.NoToneMapping;
 
+    // Der Normalen-Durchgang zeichnet die **ganze Szene ein zweites Mal**. Er
+    // liefert Normalen und Tiefe für Umriss und Umgebungsverdeckung; der
+    // Testflug schaltet ihn ab, um zu messen, was dieser zweite Durchgang
+    // kostet.
+    this.normalAn = true;
     this.color = new THREE.WebGLRenderTarget(1, 1, { samples: 4, type: THREE.HalfFloatType });
     this.normal = new THREE.WebGLRenderTarget(1, 1);
     this.normal.depthTexture = new THREE.DepthTexture(1, 1);
@@ -394,6 +404,11 @@ export class Pipeline {
         invProj: { value: new THREE.Matrix4() },
       },
     });
+    // Die vollen Werte merken: `stufe()` stellt sie wieder her, und ohne sie
+    // bliebe nach dem Testflug alles auf null stehen.
+    this.bloomVoll = this.bloomAn ? bild.bloom : 0;
+    this.aoVoll = useAo;
+    this.pixelVoll = renderer.getPixelRatio();
   }
 
   setSize(w, h, pixelRatio) {
@@ -432,6 +447,30 @@ export class Pipeline {
    * (16 Abtastungen je Bildpunkt). Der Rest – HDR, Kurve, Schatten – bleibt,
    * denn daran hängt das Bild, nicht die Zugabe.
    */
+  /**
+   * Eine Stufe an- oder abschalten – für den Testflug (`mess.js`).
+   *
+   * Das ist bewusst dieselbe Liste wie in `sparsam()`, nur einzeln ansteuerbar:
+   * gemessen wird genau das, woran die Automatik später dreht. Eine Messung,
+   * die andere Knöpfe drückt als das Spiel, misst das falsche Spiel.
+   */
+  stufe(name, an) {
+    const r = this.renderer, u = this.mat.uniforms;
+    if (name === 'bloom') { this.bloomAn = an && this.bloomVoll > 0; u.bloom.value = an ? this.bloomVoll : 0; }
+    else if (name === 'ao') u.ao.value = an ? this.aoVoll : 0;
+    else if (name === 'normal') this.normalAn = an;
+    else if (name === 'schatten') {
+      // Abgeschaltet spart three den ganzen Schattendurchgang. Die Materialien
+      // lesen dann eine leere Karte – das Bild stimmt in diesem Lauf nicht, die
+      // Zeit schon, und darum geht es hier.
+      r.shadowMap.enabled = an;
+    } else if (name === 'halb') {
+      const s = r.getSize(new THREE.Vector2());
+      r.setPixelRatio(an ? this.pixelVoll : this.pixelVoll / 2);
+      this.setSize(s.x, s.y, r.getPixelRatio());
+    }
+  }
+
   sparsam() {
     if (this.bloomAn) { this.bloomAn = false; this.mat.uniforms.bloom.value = 0; return 'Streulicht'; }
     if (this.mat.uniforms.ao.value > 0) { this.mat.uniforms.ao.value = 0; return 'Umgebungsverdeckung'; }
@@ -440,16 +479,19 @@ export class Pipeline {
 
   render(scene, camera) {
     const r = this.renderer;
+    r.info.reset();
     this.mat.uniforms.near.value = camera.near;
     this.mat.uniforms.far.value = camera.far;
     this.mat.uniforms.zeit.value = performance.now() * 0.001;
     this.mat.uniforms.proj.value.copy(camera.projectionMatrix);
     this.mat.uniforms.invProj.value.copy(camera.projectionMatrixInverse);
-    scene.overrideMaterial = this.normalMat;
-    camera.layers.disable(OHNE_UMRISS);
-    r.setRenderTarget(this.normal); r.render(scene, camera);
-    camera.layers.enable(OHNE_UMRISS);
-    scene.overrideMaterial = null;
+    if (this.normalAn) {
+      scene.overrideMaterial = this.normalMat;
+      camera.layers.disable(OHNE_UMRISS);
+      r.setRenderTarget(this.normal); r.render(scene, camera);
+      camera.layers.enable(OHNE_UMRISS);
+      scene.overrideMaterial = null;
+    }
     r.setRenderTarget(this.color); r.render(scene, camera);
     if (this.bloomAn) this.bloomRechnen();
     this.zeichne(this.mat, null);

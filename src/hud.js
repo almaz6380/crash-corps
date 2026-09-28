@@ -25,6 +25,7 @@ export class Hud {
           <button id="gyro" type="button" title="Gyroskop">🧭</button>
           <button id="gyro-um-x" type="button" title="Links/rechts umkehren" hidden>↔</button>
           <button id="gyro-um-y" type="button" title="Oben/unten umkehren" hidden>↕</button>
+          <button id="mess" type="button" title="Leistungstest: misst auf diesem Gerät, was welche Stufe kostet">📊</button>
           <button id="grafik" type="button" title="Grafikstil umschalten"></button>
           <button id="ton" type="button" title="Ton an/aus (M)"></button>
         </div>
@@ -55,6 +56,18 @@ export class Hud {
           <div class="teamstand" id="dom-1"></div>
         </div>
         <div id="ende" hidden></div>
+      </div>
+      <div id="messflug" hidden>
+        <div>
+          <small id="mess-schritt"></small>
+          <h2 id="mess-titel">Leistungstest</h2>
+          <p id="mess-text"></p>
+          <pre id="mess-tabelle" hidden></pre>
+          <div class="reihe">
+            <button id="mess-abbruch" type="button">Abbrechen</button>
+            <button id="mess-kopieren" type="button" hidden>Zahlen kopieren</button>
+          </div>
+        </div>
       </div>
       <div id="kalib" hidden>
         <div>
@@ -172,6 +185,18 @@ export class Hud {
     // verlöre die Runde.
     this.fortsetzenKnopf = root.querySelector('#fortsetzen');
     this.fortsetzenKnopf.onclick = () => this.onFortsetzen?.();
+    // Leistungstest
+    this.messEl = root.querySelector('#messflug');
+    root.querySelector('#mess').onclick = () => this.onMess?.();
+    root.querySelector('#mess-abbruch').onclick = () => this.onMessAus?.();
+    root.querySelector('#mess-kopieren').onclick = async () => {
+      // Zwischenablage kann abgelehnt werden (kein HTTPS, kein Fokus). Dann
+      // bleibt der Text auf dem Bildschirm stehen – abschreiben geht immer.
+      try {
+        await navigator.clipboard.writeText(this.messText || '');
+        root.querySelector('#mess-kopieren').textContent = 'Kopiert';
+      } catch { root.querySelector('#mess-kopieren').textContent = 'Geht nicht – bitte abfotografieren'; }
+    };
     this.hilfeZeile = root.querySelector('#menu .help');
     this.hilfeText = this.hilfeZeile.textContent;
   }
@@ -353,6 +378,40 @@ export class Hud {
 
   /** Läuft im Hintergrund eine angehaltene Runde? Dann gibt es den Rückweg. */
   pause(on) { if (this.fortsetzenKnopf) this.fortsetzenKnopf.hidden = !on; }
+
+  /**
+   * Fortschritt des Testflugs. Während der Messung steht nur eine Zeile da –
+   * eine große Anzeige würde selbst Bildzeit kosten und die Messung verfälschen.
+   */
+  messLauf(schritt, text, anteil) {
+    const q = (x) => this.messEl.querySelector(x);
+    q('#mess-schritt').textContent = schritt;
+    q('#mess-titel').textContent = 'Leistungstest läuft';
+    q('#mess-text').textContent = `${text}  ·  ${Math.round(anteil * 100)} %`;
+    q('#mess-tabelle').hidden = true;
+    q('#mess-kopieren').hidden = true;
+    q('#mess-abbruch').textContent = 'Abbrechen';
+    this.messEl.hidden = false;
+    this.messEl.classList.add('schlank');
+  }
+
+  /** Das Ergebnis: Tabelle zum Lesen, derselbe Text zum Kopieren. */
+  messErgebnis(text) {
+    const q = (x) => this.messEl.querySelector(x);
+    this.messText = text;
+    q('#mess-schritt').textContent = 'fertig';
+    q('#mess-titel').textContent = 'Leistungstest';
+    q('#mess-text').textContent = 'Der Abstand in Klammern sagt, was die Stufe bringt.';
+    q('#mess-tabelle').textContent = text;
+    q('#mess-tabelle').hidden = false;
+    q('#mess-kopieren').hidden = false;
+    q('#mess-kopieren').textContent = 'Zahlen kopieren';
+    q('#mess-abbruch').textContent = 'Fertig';
+    this.messEl.hidden = false;
+    this.messEl.classList.remove('schlank');
+  }
+
+  messAus() { this.messEl.hidden = true; }
   hint(on) { this.root.querySelector('#hint').hidden = !on; }
   kill(text) {
     const el = document.createElement('div'); el.textContent = text; this.feed.prepend(el);
