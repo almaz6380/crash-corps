@@ -416,7 +416,11 @@ export class Pipeline {
     // bliebe nach dem Testflug alles auf null stehen.
     this.bloomVoll = this.bloomAn ? bild.bloom : 0;
     this.aoVoll = useAo;
+    this.umrissAn = useOutline;
     this.pixelVoll = renderer.getPixelRatio();
+    // Was die Automatik abgeschaltet hat, in der Reihenfolge – nur so weiß
+    // `grosszuegig()`, was es zurückgeben darf.
+    this.gespart = [];
   }
 
   setSize(w, h, pixelRatio) {
@@ -472,25 +476,61 @@ export class Pipeline {
       // lesen dann eine leere Karte – das Bild stimmt in diesem Lauf nicht, die
       // Zeit schon, und darum geht es hier.
       r.shadowMap.enabled = an;
-    } else if (name === 'halb') {
-      const s = r.getSize(new THREE.Vector2());
-      r.setPixelRatio(an ? this.pixelVoll : this.pixelVoll / 2);
-      this.setSize(s.x, s.y, r.getPixelRatio());
-    }
+    } else if (name === 'halb') this._pixel(an ? this.pixelVoll : this.pixelVoll / 2);
   }
 
+  /**
+   * Eine Stufe billiger. Gibt zurück, was abgeschaltet wurde, oder `null`,
+   * wenn nichts mehr übrig ist.
+   *
+   * Die Reihenfolge ist die nach Kosten pro sichtbarem Gewinn: Streulicht ist
+   * Zierde, die Verdeckung ist Feinheit (und nimmt den ganzen zweiten
+   * Szenendurchgang mit), Bildpunkte kosten am meisten und fallen am meisten
+   * auf – deshalb zuletzt.
+   */
   sparsam() {
-    if (this.bloomAn) { this.bloomAn = false; this.mat.uniforms.bloom.value = 0; return 'Streulicht'; }
-    if (this.mat.uniforms.ao.value > 0) {
-      this.mat.uniforms.ao.value = 0;
+    const u = this.mat.uniforms;
+    if (this.bloomAn) {
+      this.bloomAn = false; u.bloom.value = 0;
+      this.gespart.push('Streulicht'); return 'Streulicht';
+    }
+    if (u.ao.value > 0) {
+      u.ao.value = 0;
       // Ohne Verdeckung **und** ohne Umriss braucht den Normalen-Durchgang
-      // niemand mehr. Das ist der größte Einzelposten, den die Automatik
-      // abschalten kann: ein ganzer Durchgang über die Szene.
-      this.normalVoll = this.mat.uniforms.outline.value > 0;
+      // niemand mehr – ein ganzer Durchgang über die Szene fällt weg.
+      this.normalVoll = this.umrissAn;
       this.normalAn = this.normalVoll;
-      return 'Umgebungsverdeckung';
+      this.gespart.push('Umgebungsverdeckung'); return 'Umgebungsverdeckung';
+    }
+    if (this.renderer.getPixelRatio() > this.pixelVoll * 0.75) {
+      this._pixel(this.pixelVoll * 0.7);
+      this.gespart.push('Bildpunkte'); return 'schärferes Bild';
     }
     return null;
+  }
+
+  /**
+   * Eine Stufe zurück. Ohne den Rückweg ist die Leiter eine Einbahnstraße: wer
+   * in einem einzigen schweren Moment absteigt, bleibt für den Rest der Runde
+   * unten, auch wenn längst wieder Luft ist.
+   */
+  grosszuegig() {
+    const was = this.gespart.pop();
+    if (!was) return null;
+    const u = this.mat.uniforms;
+    if (was === 'Streulicht') { this.bloomAn = this.bloomVoll > 0; u.bloom.value = this.bloomVoll; }
+    else if (was === 'Umgebungsverdeckung') {
+      u.ao.value = this.aoVoll;
+      this.normalVoll = this.umrissAn || this.aoVoll > 0;
+      this.normalAn = this.normalVoll;
+    } else if (was === 'Bildpunkte') this._pixel(this.pixelVoll);
+    return was === 'Bildpunkte' ? 'schärferes Bild' : was;
+  }
+
+  _pixel(v) {
+    const g = this.renderer.getSize(new THREE.Vector2());
+    this.renderer.setPixelRatio(v);
+    this.setSize(g.x, g.y, v);
   }
 
   render(scene, camera) {
