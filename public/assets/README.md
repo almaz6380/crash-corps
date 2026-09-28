@@ -23,7 +23,28 @@ ein Haus von 6×8 m mit anderthalb Metern Überstand. Ein zu großes Dach auf ei
 kleinen Haus ragt meterweit in die Gasse – `world.js` wählt deshalb nach der
 tatsächlichen Grundfläche und dreht notfalls um 90°.
 
-Mit `--textur=512 --nur-farbe` sind es 1,35 MB statt 6,82 MB.
+Mit `--textur=512 --nur-farbe` sind es 1,41 MB statt 6,82 MB.
+
+**1024 wurde ausprobiert und wieder verworfen.** Der Download kostete nur
+70 KB mehr – WebP packt diese Oberflächen sehr gut –, aber gebracht hat es
+nichts, und das lässt sich ausrechnen statt ansehen. Entscheidend ist die
+Texeldichte gegen die Bildschirmauflösung:
+
+| Material | Texel/m bei 512 | scharf ab |
+|---|---|---|
+| MI_RoundTiles (Dächer) | 165 | 2,8 m |
+| MI_Plaster, MI_Brick, MI_RockTrim, MI_UnevenBrick | 256 | 1,8 m |
+| MI_Vine | 333 | 1,4 m |
+| MI_WoodTrim | 434 | 1,1 m |
+| MI_MetalOrnaments | 1533 | 0,3 m |
+
+„Scharf ab" heißt: ab dieser Entfernung hat der Bildschirm weniger Punkte je
+Meter als die Textur Texel hat, die Textur ist also im Überfluss da. Auf einem
+Handy mit Bildpunkten 2,0 sind das 465 Punkte je Meter auf einem Meter
+Abstand, 232 auf zwei, 93 auf fünf. Die Verdopplung schiebt die Wände von
+1,8 m auf 0,9 m – so dicht steht niemand vor einer Hauswand. Gemessen an zwei
+Blickpunkten: Schärfe 3,94 → 3,94 und 4,41 → 4,50. Dafür hätte sie 32 MB mehr
+Texturspeicher gekostet (43 statt 11).
 Quelle: https://quaternius.itch.io/medieval-village-megakit
 
 Einen Marktstand hat der Bausatz nicht. Die Vordächer darin (`Overhang_*`) sind
@@ -35,8 +56,14 @@ baut `world.js` deshalb selbst aus vier Pfosten, einem Tisch und einem Segeldach
 Waldrand und Grün im Dorf: neun Teile (drei Bäume, zwei Büsche, Farn, Gras,
 Fels, Kiesel) aus einem Bausatz von 68, gepackt wie das Dorf.
 
-Gepackt mit `--textur=256 --nur-farbe --dreiecke=5000 --fehler=0.12
---kanten-frei`: 1,11 MB und 13 457 Dreiecke statt 3,05 MB und 40 000. Laub
+Gepackt mit `--textur=512 --nur-farbe --dreiecke=5000 --fehler=0.12
+--kanten-frei`: 1,24 MB und 13 457 Dreiecke statt 3,05 MB und 40 000.
+Bei 256 waren es 1,16 MB. Die Verdopplung kostet 80 KB und ist hier – anders
+als beim Dorf – gut angelegt: ein Blattkärtchen ist 3,9 m breit und benutzt die
+Textur einmal, das sind bei 256 nur **66 Texel je Meter**. Scharf wäre das erst
+ab sieben Metern Abstand; bei 512 sind es 131 Texel je Meter und 3,5 m. An
+einem Baum läuft man näher vorbei. Dazu kommt, dass die Blattform allein in
+der Alphastufe steckt – zu grob, und die Ränder werden zu Treppen. Laub
 besteht aus einzelnen Blattkärtchen – hält man beim Vereinfachen deren Ränder
 fest (der Normalfall), lässt sich nichts wegnehmen; bei Kulisse ist
 `--kanten-frei` dafür zu verschmerzen.
