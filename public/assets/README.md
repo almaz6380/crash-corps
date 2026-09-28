@@ -23,7 +23,12 @@ ein Haus von 6×8 m mit anderthalb Metern Überstand. Ein zu großes Dach auf ei
 kleinen Haus ragt meterweit in die Gasse – `world.js` wählt deshalb nach der
 tatsächlichen Grundfläche und dreht notfalls um 90°.
 
-Mit `--textur=512 --nur-farbe` sind es 1,35 MB statt 6,82 MB.
+Mit `--textur=1024 --nur-farbe` sind es 1,48 MB. Die Quelltexturen sind
+2048 × 2048; auf 512 verkleinert wären es 1,41 MB – die vierfache Zahl an
+Texturpunkten kostet also **70 KB**, weil WebP diese Oberflächen sehr gut
+packt. 2048 wären 1,73 MB und damit auch bezahlbar, aber acht Texturen
+dieser Größe belegen auf dem Gerät rund 172 MB Texturspeicher statt 43 –
+deshalb 1024.
 Quelle: https://quaternius.itch.io/medieval-village-megakit
 
 Einen Marktstand hat der Bausatz nicht. Die Vordächer darin (`Overhang_*`) sind
@@ -35,8 +40,11 @@ baut `world.js` deshalb selbst aus vier Pfosten, einem Tisch und einem Segeldach
 Waldrand und Grün im Dorf: neun Teile (drei Bäume, zwei Büsche, Farn, Gras,
 Fels, Kiesel) aus einem Bausatz von 68, gepackt wie das Dorf.
 
-Gepackt mit `--textur=256 --nur-farbe --dreiecke=5000 --fehler=0.12
---kanten-frei`: 1,11 MB und 13 457 Dreiecke statt 3,05 MB und 40 000. Laub
+Gepackt mit `--textur=512 --nur-farbe --dreiecke=5000 --fehler=0.12
+--kanten-frei`: 1,24 MB und 13 457 Dreiecke statt 3,05 MB und 40 000.
+Bei 256 waren es 1,16 MB – die Verdopplung kostet 80 KB und ist bei Laub gut
+angelegt, denn dessen Form steckt allein in der Alphastufe: zu grob, und die
+Blattränder werden zu Treppen. Laub
 besteht aus einzelnen Blattkärtchen – hält man beim Vereinfachen deren Ränder
 fest (der Normalfall), lässt sich nichts wegnehmen; bei Kulisse ist
 `--kanten-frei` dafür zu verschmerzen.

@@ -320,6 +320,12 @@ tools/
   Fotofarbe wird **eingemischt, nicht ersetzt** – sonst sehen zwei Wandstücke
   verschieden aus, weil ihre UV-Inseln verschieden groß sind. Große Flächen
   brauchen `makro`, sonst sieht man das Kachelraster.
+- Texturauflösung ist billiger, als sie aussieht, aber nicht im Speicher. Der
+  Dorfbausatz von 512 auf 1024 kostet **70 KB** Download – WebP packt diese
+  Oberflächen sehr gut –, aber im Gerät das Vierfache an Texturspeicher: acht
+  Texturen sind bei 512 rund 11 MB, bei 1024 rund 43, bei 2048 rund 172. Die
+  Download-Größe ist deshalb das falsche Maß für diese Entscheidung; 1024 ist
+  die Grenze, die ein Handy bequem trägt.
 - Die Vorlade-Liste ist zweigeteilt (`assetGruppen()` in `tools/assets-liste.mjs`):
   Grundpaket (Figuren, Bausatz) unter 8 MB und offline, Realismus-Satz (HDRI,
   Fotooberflächen) nur nachgeladen. Neue Realismus-Assets gehören in die zweite
