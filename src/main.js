@@ -399,6 +399,10 @@ function messFertig() { hud.messErgebnis(flug.bericht()); messRaeumen(); }
 
 /** Nach dem Flug: Figuren wieder da, Runde aus, zurück ins Menü. */
 function messRaeumen() {
+  // Der Flug hat alle Stufen wieder angeschaltet; die Leiter darf sich nicht
+  // einbilden, sie hätte noch etwas gespart.
+  pipeline.gespart.length = 0;
+  gutGelaufen = 0;
   figurenAus = false;
   for (const b of bots) b.mesh.visible = true;
   running = false;
@@ -486,23 +490,52 @@ function simulieren(dt) {
  * nächsten Mal im Comic-Stil. Wer den Stil selbst gewählt hat, wird nicht
  * bevormundet – das entscheidet `stilZurueckfallen()`.
  */
-const LEISTUNG = { fenster: 100, sparenUnter: 26, aufgebenUnter: 19 };
+/**
+ * Ziel ist **flüssig vor hübsch**: 60 Bilder. Bleibt die Bildrate darunter,
+ * fällt eine Stufe weg; läuft es lange genug wieder rund, kommt eine zurück.
+ *
+ * `aufgebenUnter` ist bewusst tief: ein Gerät, dessen Bildschirm auf 30 Hz
+ * steht, liefert 30 und ist trotzdem in Ordnung – es soll Stufen sparen, aber
+ * nicht in den Comic-Stil zurückgeworfen werden.
+ */
+const LEISTUNG = {
+  fenster: 90,          // Bilder je Prüfung (bei 60 rund anderthalb Sekunden)
+  sparenUnter: 52,      // darunter wird eine Stufe abgeschaltet
+  zurueckAb: 58,        // darüber darf eine Stufe zurückkommen
+  ruhe: 8,              // so viele gute Prüfungen hintereinander, bevor sie es darf
+  aufgebenUnter: 24,    // darunter beim nächsten Start im Comic-Stil
+};
 const bildzeiten = [];
+let gutGelaufen = 0;
 function leistungPruefen(dt) {
-  if (!REAL) return;
   bildzeiten.push(dt);
   if (bildzeiten.length < LEISTUNG.fenster) return;
   const sortiert = [...bildzeiten].sort((a, b) => a - b);
   const median = sortiert[Math.floor(sortiert.length / 2)];
   bildzeiten.length = 0;
   const fps = 1 / Math.max(median, 1e-4);
-  if (fps >= LEISTUNG.sparenUnter) return;
-  const weg = pipeline.sparsam();
-  if (weg) { hud.kill(`Zu langsam – ${weg} aus`); return; }
-  if (figurenKuerzen()) return;
-  if (fps < LEISTUNG.aufgebenUnter && stilZurueckfallen()) {
-    hud.kill('Zu langsam – nächster Start im Comic-Stil');
+
+  if (fps < LEISTUNG.sparenUnter) {
+    gutGelaufen = 0;
+    const weg = pipeline.sparsam();
+    if (weg) { hud.kill(`Zu langsam – ${weg} aus`); return; }
+    if (figurenKuerzen()) return;
+    // Der Stilwechsel ist der letzte Ausweg und gilt nur für den realen Stil –
+    // aus dem Comic-Stil gibt es nichts mehr, wohin zurückzufallen wäre.
+    if (REAL && fps < LEISTUNG.aufgebenUnter && stilZurueckfallen()) {
+      hud.kill('Zu langsam – nächster Start im Comic-Stil');
+    }
+    return;
   }
+
+  // Der Rückweg. Ohne ihn ist die Leiter eine Einbahnstraße: ein einziger
+  // schwerer Moment – ein Rauchfeld, ein Nachladen der Texturen – kostete den
+  // Rest der Runde die halbe Grafik.
+  if (fps <= LEISTUNG.zurueckAb) { gutGelaufen = 0; return; }
+  if (++gutGelaufen < LEISTUNG.ruhe) return;
+  gutGelaufen = 0;
+  const zurueck = pipeline.grosszuegig();
+  if (zurueck) hud.kill(`Läuft wieder – ${zurueck} an`);
 }
 
 /**

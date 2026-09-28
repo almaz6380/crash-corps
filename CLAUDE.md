@@ -282,10 +282,19 @@ tools/
   Gruppe, sonst wächst das Offline-Paket unbemerkt.
 - `figurlook.js` greift **nur** im Cel-Stil. Saum, gedämpftes Fülllicht und
   Bodenverdunkelung sind Ersatz für Licht, das es im realen Stil wirklich gibt.
-- Läuft der reale Stil zu langsam, schaltet `leistungPruefen()` in `main.js`
-  stufenweise Effekte ab (erst Streulicht, dann Umgebungsverdeckung) und merkt
-  sich erst danach den Rückfall auf Cel. Wer den Stil selbst gewählt hat, wird
-  nicht überstimmt.
+- Die Automatik zielt auf **60 Bilder** – flüssig vor hübsch. `leistungPruefen()`
+  in `main.js` schaltet stufenweise ab: Streulicht, dann Umgebungsverdeckung
+  (die den Normalen-Durchgang mitnimmt), dann Bildpunkte, dann Figuren, zuletzt
+  der Stil. Sie läuft in **beiden** Stilen; vorher stieg sie bei `if (!REAL)
+  return` sofort aus, und auf dem Handy gab es damit gar keine Automatik.
+- Die Leiter hat einen **Rückweg** (`grosszuegig()`). Ohne ihn ist sie eine
+  Einbahnstraße: ein einziger schwerer Moment – ein Rauchfeld, nachgeladene
+  Texturen – kostete den Rest der Runde die halbe Grafik. Zurückgenommen wird
+  erst nach `LEISTUNG.ruhe` guten Prüfungen hintereinander, sonst pendelt es.
+- Der Rückfall auf den Comic-Stil greift nur im realen Stil und erst sehr tief
+  (`aufgebenUnter`): ein Gerät, dessen Bildschirm auf 30 Hz steht, liefert 30
+  und ist trotzdem in Ordnung. Wer den Stil selbst gewählt hat, wird nicht
+  überstimmt.
 - Die Welt ist 240 x 240 m und hat ein **Höhenfeld** (`terrain.js`). Bild,
   Kollision und Wegfindung fragen dieselbe Funktion `hoeheBei()`; wer
   woanders rechnet, baut ein Loch im Boden. Alles in `world.js` rechnet in
