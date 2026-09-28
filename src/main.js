@@ -10,11 +10,12 @@ import { preloadCharacters, preloadProps } from './assets.js';
 import { REAL, stilSetzen, stilZurueckfallen, schwachGemerkt } from './style.js';
 import { preloadTextures } from './surface.js';
 import { Input } from './input.js';
-import { buehneAnpassen, TOUCH, QUALITY } from './device.js';
+import { buehneAnpassen, TOUCH, QUALITY, LOW_END } from './device.js';
 import { Sound } from './sound.js';
 import { Domination, TEAMS } from './domination.js';
 import { Navgitter } from './navgitter.js';
 import { WELT } from './terrain.js';
+import { Testflug, LAEUFE } from './mess.js';
 
 const canvas = document.getElementById('game');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
@@ -93,6 +94,8 @@ const fx = {
 let player = null, bots = [], time = 0, running = false;
 let dom = null;              // Domination-Zustand, null im Deathmatch
 let zuvielFiguren = 0;       // wie viele Bots die Leistungsstufe schon gestrichen hat
+let figurenAus = false;      // Testflug-Stufe „ohne Figuren“
+let messZeiten = { sim: 0, bild: 0 };   // letzte gemessene Bildhälften in ms
 
 function resize() {
   const { w, h } = buehneAnpassen();
@@ -333,6 +336,71 @@ if (input.touch) input.touch.onKalib = () => hud.onGyroKalib();
 hud.onGyroStaerke = (v) => input.gyro.staerke(v);
 hud.onGyroUmkehr = (achse, an) => input.gyro.umkehren(achse, an);
 hud.gyroStand(input.gyro.einst.an && input.gyro.laeuft, input.gyro.einst);
+/**
+ * Der Testflug (`mess.js`). Er fliegt dieselbe Strecke siebenmal und schaltet
+ * je Lauf eine Stufe ab – der Abstand zwischen zwei Läufen ist das, was diese
+ * Stufe auf **diesem** Gerät kostet.
+ */
+const flug = new Testflug({
+  kamera: camera,
+  stufe: (name, an) => {
+    if (name === 'figuren') {
+      figurenAus = !an;
+      for (const b of bots) b.mesh.visible = an;
+    } else pipeline.stufe(name, an);
+  },
+  zaehler: () => ({
+    aufrufe: renderer.info.render.calls,
+    dreiecke: renderer.info.render.triangles,
+  }),
+  // Der Prüfling soll den Flug überleben, und das Match darf nicht mittendrin
+  // enden – ein Sieg würde die Schleife anhalten und die Messung abschneiden.
+  amLeben: () => {
+    if (player) { player.hp = player.cls.hp; player.dead = false; player.respawnIn = 0; }
+    if (dom) { dom.stand[0] = 0; dom.stand[1] = 0; }
+  },
+  geraet: () => {
+    const gl = renderer.getContext();
+    const ext = gl.getExtension('WEBGL_debug_renderer_info');
+    const groesse = renderer.getSize(new THREE.Vector2());
+    return {
+      gpu: ext ? String(gl.getParameter(ext.UNMASKED_RENDERER_WEBGL)) : 'Grafikchip: verrät der Browser nicht',
+      breite: Math.round(groesse.x), hoehe: Math.round(groesse.y),
+      pixelRatio: renderer.getPixelRatio().toFixed(2),
+      stil: REAL ? 'fotoreal' : 'comic',
+      stufe: LOW_END ? 'niedrig' : 'hoch',
+      figuren: bots.length + 1,
+      stand: typeof __BUILD__ !== 'undefined' ? __BUILD__ : '?',
+    };
+  },
+});
+
+hud.onMess = () => {
+  sound.klick();
+  // Gemessen wird der schwerste Fall: Domination mit voller Figurenzahl. Die
+  // Modus-Wahl des Spielers bleibt davon unberührt.
+  const gewaehlt = hud.modus;
+  hud.setModus('domination');
+  start(Object.keys(CLASSES)[0]);
+  hud.setModus(gewaehlt);
+  input.showTouch(false);
+  hud.hint(false);
+  flug.start();
+  hud.messLauf(`Lauf 1 von ${LAEUFE.length}`, LAEUFE[0].name, 0);
+};
+hud.onMessAus = () => { sound.klick(); flug.abbrechen(); messEnde(); };
+
+function messFertig() { hud.messErgebnis(flug.bericht()); messRaeumen(); }
+
+/** Nach dem Flug: Figuren wieder da, Runde aus, zurück ins Menü. */
+function messRaeumen() {
+  figurenAus = false;
+  for (const b of bots) b.mesh.visible = true;
+  running = false;
+  hud.showMenu(true); hud.pause(false);
+}
+function messEnde() { messRaeumen(); hud.messAus(); }
+
 hud.onWeiter = () => { sound.klick(); hud.ende(null); hud.showMenu(true); hud.pause(false); };
 // Zurück in die angehaltene Runde. Sie steht noch komplett da – Figuren,
 // Punktestand, Munition –, es lief nur die Schleife nicht weiter.
@@ -396,7 +464,7 @@ function simulieren(dt) {
   // Stadt gespannt (siehe lichtFolgen in world.js).
   world.lichtFolgen?.(player.pos);
   if (player.dead && player.respawnIn <= 0) player.spawn(pickSpawn(bots, dom ? player.team : null));
-  for (const b of bots) {
+  if (!figurenAus) for (const b of bots) {
     b.update(dt, alle.filter(a => !a.dead && a.team !== b.team), bots, fx, dom);
     if (b.dead && b.respawnIn <= 0) b.spawn(pickSpawn(alle, dom ? b.team : null));
   }
@@ -459,15 +527,30 @@ function loop(now) {
   if (input.takeMute()) hud.tonStand(sound.schalten());
   if (input.takeSicht() && player) { sound.klick(); player.sichtUmschalten(); }
   // Menüknopf (☰ auf dem Handy, Esc am Rechner): die Runde hält an und wartet.
-  if (input.takeMenu() && running) {
+  // Während des Testflugs nicht: die Schleife bliebe stehen, der Flug käme nie
+  // ans Ende, und der einzige Ausweg wäre „Abbrechen“ im Überblendfenster.
+  if (input.takeMenu() && running && !flug.aktiv) {
     running = false; input.showTouch(false); hud.showMenu(true); hud.hint(false); hud.pause(true);
   }
   // Im Menü sammelt sich sonst Drehung an, die beim Start den Blick wegreißt –
   // außer während der Kalibrierung, da liest der Prüfschritt den Puffer selbst.
   if (!running) { if (!kalibLaeuft) input.gyro.leeren(); pipeline.render(scene, camera); return; }
-  leistungPruefen(roh);
+  if (!flug.aktiv) leistungPruefen(roh);
+  // Die Bildzeit wird in zwei Hälften genommen: was die Simulation kostet und
+  // was das Zeichnen kostet. Ohne diese Trennung sagt eine niedrige Bildrate
+  // nicht, ob an Zeichenaufrufen oder an der Bot-KI zu drehen ist.
+  const tA = performance.now();
   for (let i = 0; i < TEMPO && running; i++) simulieren(dt);
+  const tB = performance.now();
   hud.update(player, bots, time);
   pipeline.render(scene, camera);
+  const tC = performance.now();
+  messZeiten = { sim: tB - tA, bild: tC - tB };
+  // Der Flug tickt **nach** dem Zeichnen: so sind die beiden Hälften exakt die
+  // des gerade fertigen Bildes. Die Kamera hinkt dadurch ein Bild hinterher,
+  // und das sieht bei dieser Fluggeschwindigkeit niemand.
+  if (flug.aktiv && flug.tick(roh, messZeiten.sim, messZeiten.bild)) messFertig();
+  else if (flug.aktiv) hud.messLauf(
+    `Lauf ${flug.lauf + 1} von ${LAEUFE.length}`, LAEUFE[flug.lauf].name, flug.fortschritt);
 }
 requestAnimationFrame(loop);
