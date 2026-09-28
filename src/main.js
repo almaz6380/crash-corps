@@ -18,7 +18,12 @@ import { WELT } from './terrain.js';
 import { Testflug, LAEUFE } from './mess.js';
 
 const canvas = document.getElementById('game');
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+// `antialias` wäre hier wirkungslos: gezeichnet wird in Render-Targets, auf den
+// Bildschirm kommt am Ende ein Vollbild-Rechteck, und das hat keine Innenkanten
+// zu glätten. Die Glättung, die wirkt, sitzt am Farb-Target (`samples`).
+// `powerPreference` wählt auf Notebooks mit zwei Grafikchips den schnelleren –
+// ohne die Angabe landet man dort auf dem sparsamen.
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance' });
 renderer.setPixelRatio(Math.min(devicePixelRatio, QUALITY.pixelRatio));
 const scene = new THREE.Scene();
 // Sichtweite auf die 240-m-Welt: von einer Ecke zur anderen sind es 339 m,

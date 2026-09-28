@@ -342,6 +342,12 @@ export class Pipeline {
     this.renderer = renderer; this.camera = camera;
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    // **Einmal** je Bild, nicht zweimal. `render()` unten ruft `renderer.render()`
+    // zweimal auf (Normalen, Farbe), und three baut die Schattenkarte bei jedem
+    // Aufruf neu – ein kompletter zusätzlicher Durchgang über die ganze Szene,
+    // für ein Ergebnis, das sich zwischen den beiden Aufrufen nicht ändert.
+    // Gemessen: 604 von 1024 Zeichenaufrufen je Bild gingen an die Schatten.
+    renderer.shadowMap.autoUpdate = false;
     // Die Zähler sollen **ein ganzes Bild** zusammenzählen, nicht nur den
     // letzten Durchgang. Von allein setzt three sie bei jedem `render()`
     // zurück – und weil das Zusammensetzen ein einzelnes Rechteck ist, stünde
@@ -351,10 +357,12 @@ export class Pipeline {
     renderer.toneMapping = THREE.NoToneMapping;
 
     // Der Normalen-Durchgang zeichnet die **ganze Szene ein zweites Mal**. Er
-    // liefert Normalen und Tiefe für Umriss und Umgebungsverdeckung; der
-    // Testflug schaltet ihn ab, um zu messen, was dieser zweite Durchgang
-    // kostet.
-    this.normalAn = true;
+    // liefert Normalen und Tiefe für Umriss und Umgebungsverdeckung – und lief
+    // bisher auch dann, wenn beides aus ist. Im realen Stil ist der Umriss
+    // grundsätzlich aus; schaltet die Automatik dann noch die Verdeckung ab,
+    // zeichnete das Spiel die Szene weiter zweimal, für nichts.
+    this.normalVoll = useOutline || useAo > 0;
+    this.normalAn = this.normalVoll;
     this.color = new THREE.WebGLRenderTarget(1, 1, { samples: 4, type: THREE.HalfFloatType });
     this.normal = new THREE.WebGLRenderTarget(1, 1);
     this.normal.depthTexture = new THREE.DepthTexture(1, 1);
@@ -458,7 +466,7 @@ export class Pipeline {
     const r = this.renderer, u = this.mat.uniforms;
     if (name === 'bloom') { this.bloomAn = an && this.bloomVoll > 0; u.bloom.value = an ? this.bloomVoll : 0; }
     else if (name === 'ao') u.ao.value = an ? this.aoVoll : 0;
-    else if (name === 'normal') this.normalAn = an;
+    else if (name === 'normal') this.normalAn = an && this.normalVoll;
     else if (name === 'schatten') {
       // Abgeschaltet spart three den ganzen Schattendurchgang. Die Materialien
       // lesen dann eine leere Karte – das Bild stimmt in diesem Lauf nicht, die
@@ -473,13 +481,24 @@ export class Pipeline {
 
   sparsam() {
     if (this.bloomAn) { this.bloomAn = false; this.mat.uniforms.bloom.value = 0; return 'Streulicht'; }
-    if (this.mat.uniforms.ao.value > 0) { this.mat.uniforms.ao.value = 0; return 'Umgebungsverdeckung'; }
+    if (this.mat.uniforms.ao.value > 0) {
+      this.mat.uniforms.ao.value = 0;
+      // Ohne Verdeckung **und** ohne Umriss braucht den Normalen-Durchgang
+      // niemand mehr. Das ist der größte Einzelposten, den die Automatik
+      // abschalten kann: ein ganzer Durchgang über die Szene.
+      this.normalVoll = this.mat.uniforms.outline.value > 0;
+      this.normalAn = this.normalVoll;
+      return 'Umgebungsverdeckung';
+    }
     return null;
   }
 
   render(scene, camera) {
     const r = this.renderer;
     r.info.reset();
+    // Der erste `render()` unten zeichnet die Schattenkarte und setzt die Marke
+    // selbst zurück; der zweite übernimmt sie dann.
+    r.shadowMap.needsUpdate = true;
     this.mat.uniforms.near.value = camera.near;
     this.mat.uniforms.far.value = camera.far;
     this.mat.uniforms.zeit.value = performance.now() * 0.001;

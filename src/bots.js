@@ -29,12 +29,24 @@ const KI = {
   streuungLauf: 0.045,    // Zuschlag, solange der Bot selbst läuft
   deckungAb: 0.35,        // Lebensanteil, ab dem Deckung gesucht wird
   deckungZeit: 2.2,       // Mindestaufenthalt in Deckung
+  zielPruefen: 0.2,       // Sekunden zwischen zwei Zielsuchen (Strahl je Gegner!)
   deckungPruefen: 0.5,    // Sekunden zwischen zwei Deckungssuchen
   deckungWeite: 11,       // wie weit ein Bot nach Deckung sucht
   nachladenAb: 0.3,       // Magazinanteil, ab dem im Gefecht nachgeladen wird
   spezialChance: 0.55,    // Anteil der Gelegenheiten, die genutzt werden
   spezialPruefen: 0.8,    // Sekunden zwischen zwei Prüfungen
 };
+
+/**
+ * Zwischenspeicher für die Schleife. Je Bot und Bild entstanden hier rund ein
+ * Dutzend neue Vektoren; mal zwölf Figuren und sechzig Bilder sind das über
+ * achttausend kurzlebige Objekte je Sekunde. Der Aufräumer holt sie sich
+ * irgendwann zurück – und genau dann ruckelt es. Die Bots laufen nacheinander,
+ * ein gemeinsamer Satz reicht.
+ */
+const _dir = new THREE.Vector3(), _mv = new THREE.Vector3(), _seit = new THREE.Vector3();
+const _weg = new THREE.Vector3(), _look = new THREE.Vector3(), _aim = new THREE.Vector3();
+const _fwd = new THREE.Vector3(), _rechts = new THREE.Vector3();
 
 /** Waffendistanz, auf die ein Bot sich einpendelt. */
 const IDEAL = { shotgun: 4, smg: 9, rifle: 22 };
@@ -93,6 +105,7 @@ export class Bot {
     this.schrittWeg = 0;                         // Strecke seit dem letzten Schritt
     this.zielPunkt = new THREE.Vector3();        // nachgeführtes Zielkreuz
     this.deckung = null; this.deckungBis = 0; this.deckungPruefung = 0; this.deckungWeg = false;
+    this.sicht = null; this.zielPruefung = Math.random() * KI.zielPruefen;   // versetzt, siehe update()
     this.spezialAktiv = 0; this.spezialCool = 0; this.spezialFrage = 0;
     this.gerammt = null;                         // wen der laufende Sturmangriff schon traf
   }
@@ -105,6 +118,7 @@ export class Bot {
     this.weg = null; this.wegZiel = null; this.wegAlter = 0; this.klemmt = 0;
     this.deckung = null; this.deckungWeg = false; this.deckungBis = 0;
     this.spezialAktiv = 0; this.spezialCool = 0; this.spezialFrage = 0; this.gerammt = null;
+    this.sicht = null; this.zielPruefung = Math.random() * KI.zielPruefen;
     this.zielPunkt.set(0, 0, 0);
     this.anim.reset();
   }
@@ -440,7 +454,21 @@ export class Bot {
       return;
     }
 
-    const feind = this.zielSuchen(gegner);
+    // Die Zielsuche ist die teuerste Stelle der KI: sie schießt **einen Strahl
+    // je Gegner**. Ungedrosselt sind das in Domination bis zu 66 Strahlen je
+    // Bild (elf Bots mal sechs Gegner) – die einzige Stelle ohne Zeitgeber,
+    // während Deckungssuche und Wegsuche längst gedrosselt sind.
+    //
+    // Fünfmal je Sekunde reicht: bis der erste Schuss fällt, vergeht ohnehin
+    // `KI.reaktion` (0,6 s). Der Zeitpunkt ist je Bot verschoben, sonst suchen
+    // alle im selben Bild und erzeugen genau die Ruckler, die sie vermeiden
+    // sollen.
+    this.zielPruefung -= dt;
+    if (this.zielPruefung <= 0) {
+      this.zielPruefung = KI.zielPruefen * (0.85 + Math.random() * 0.3);
+      this.sicht = this.zielSuchen(gegner);
+    }
+    const feind = this.sicht && !this.sicht.dead ? this.sicht : null;
     const sees = !!feind;
     this.zielFuehren(feind, dt);
     this.spezialUeberlegen(feind, dt);
@@ -474,7 +502,7 @@ export class Bot {
     const goal = this.deckungWeg && this.deckung ? this.deckung : sees ? feind.pos : this.wander;
     const dst = this.routeTo(goal, dt);
     const climbing = dst !== goal;                 // unterwegs zu einer Rampe
-    const dir = dst.clone().sub(this.pos).setY(0);
+    const dir = _dir.copy(dst).sub(this.pos).setY(0);
     const dist = dir.length();
     const ideal = IDEAL[this.cls.weapon];
     // Auf einem Punkt, der uns noch nicht gehört, wird gehalten statt auf
@@ -483,7 +511,7 @@ export class Bot {
     const halten = dom && !climbing
       && dom.punktUnter(this)?.besitzer !== this.team
       && dom.punktUnter(this) != null;
-    let mv = new THREE.Vector3();
+    const mv = _mv.set(0, 0, 0);
     if (this.deckungWeg && this.deckung) {
       if (dist > 0.6) mv.copy(dir).normalize();
       else this.deckungWeg = false;
@@ -497,7 +525,7 @@ export class Bot {
         else if (dist < ideal - 2) mv.copy(dir).normalize().negate();
       }
       // seitliches Ausweichen – auf dem Punkt kleiner, damit man drin bleibt
-      mv.addScaledVector(new THREE.Vector3(-dir.z, 0, dir.x).normalize(),
+      mv.addScaledVector(_seit.set(-dir.z, 0, dir.x).normalize(),
         Math.sin(performance.now() / 700 + this.pos.x) * (halten ? 0.25 : 0.6));
     } else if (dist > (dom ? 1.2 : 1.5)) mv.copy(dir).normalize();
     // Der Sturmangriff macht seinem Namen Ehre: für seine Dauer schneller
@@ -510,7 +538,7 @@ export class Bot {
     this.applyGravity(dt);
     // Bots untereinander leicht auseinanderdrücken
     if (!climbing) for (const o of others) if (o !== this && !o.dead && Math.abs(o.pos.y - this.pos.y) < 1.2) {
-      const d = this.pos.clone().sub(o.pos).setY(0); const l = d.length();
+      const d = _weg.copy(this.pos).sub(o.pos).setY(0); const l = d.length();
       if (l < 1.4 && l > 0) this.pos.addScaledVector(d.normalize(), (1.4 - l) * 0.5);
     }
     // Steckenbleiben erkennen. Ein Bot, der laufen will und sich über zwei
@@ -535,7 +563,7 @@ export class Bot {
     }
 
     // Blickrichtung: weich drehen statt umschnappen
-    const look = sees && !climbing ? feind.pos : this.pos.clone().add(mv);
+    const look = sees && !climbing ? feind.pos : _look.copy(this.pos).add(mv);
     if (walking || sees) {
       const want = Math.atan2(look.x - this.pos.x, look.z - this.pos.z);
       let d = want - this.mesh.rotation.y;
@@ -544,15 +572,15 @@ export class Bot {
     }
     // Bewegungsrichtung relativ zur Blickrichtung (für Seitwärts-/Rückwärtslaufen)
     const yaw = this.mesh.rotation.y;
-    const fwd = new THREE.Vector3(Math.sin(yaw), 0, Math.cos(yaw));
-    const right = new THREE.Vector3(fwd.z, 0, -fwd.x);
+    const fwd = _fwd.set(Math.sin(yaw), 0, Math.cos(yaw));
+    const right = _rechts.set(fwd.z, 0, -fwd.x);
     const advance = walking ? mv.dot(fwd) : 0;
     const strafe = walking ? mv.dot(right) : 0;
 
     // Schießen mit Reaktionszeit + Streuung
     const aiming = sees && this.reaction > 0.35;
     if (sees && this.reaction > KI.reaktion && this.weapon.canFire() && !this.deckungWeg) {
-      const aim = this.zielPunkt.clone().sub(this.eye).normalize();
+      const aim = _aim.copy(this.zielPunkt).sub(this.eye).normalize();
       // Streuung als Winkel, nicht als Strecke: sonst zielt ein Bot auf 30 m
       // genauer als auf 5 m, weil derselbe Versatz auf einem längeren Vektor
       // einen kleineren Winkel ergibt.
