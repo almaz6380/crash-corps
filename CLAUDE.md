@@ -41,6 +41,9 @@ src/
   leben.js     Was sich bewegt, ohne mitzuspielen: Schornsteinrauch, Banner in
                Mannschaftsfarbe an den Kontrollpunkten, Vögel über dem Dorf
   style.js     Stilumschalter (?stil=real)
+  mess.js      Testflug: feste Strecke, siebenmal geflogen, je Lauf eine Stufe
+               abgeschaltet. Der Abstand zwischen zwei Läufen ist, was die
+               Stufe auf diesem Gerät kostet
   device.js    Touch-Erkennung, Leistungsstufe (Auflösung, Schatten, Verdeckung) und die
                Bühne: Bildmaße, bei hochkant gehaltenem Handy um 90° gedreht
   input.js     Eingabe-Schicht: Tastatur, Maus und Touch gebündelt; Anordnung der
@@ -322,6 +325,38 @@ tools/
   spielt im Tal mit sechs Figuren, Domination auf der ganzen Karte mit zwölf.
   Die Figurenzahl ist der letzte Regler in `leistungPruefen()`, paarweise
   gekürzt, damit das Sparen den Spielstand nicht verschiebt.
+- **Leistung wird gemessen, nicht geschätzt** – und zwar auf dem Gerät, auf dem
+  gespielt wird: der Testbrowser rendert in Software mit rund 0,3 Bildern je
+  Sekunde, und diese Zahl sagt nichts. Der Knopf 📊 im Menü fliegt dieselbe
+  Strecke siebenmal und schaltet je Lauf eine Stufe ab; der **Abstand** zwischen
+  zwei Läufen ist die Antwort. Eine reine Bildratenanzeige verrät nicht, was
+  teuer ist. Gemessen wird Median **und** 1-%-Tief: die schlechtesten Bilder
+  sind das Ruckeln, und ein guter Median versteckt sie.
+  Im Container messbar und deshalb dort zu prüfen: Zeichenaufrufe und Dreiecke
+  je Bild (`renderer.info`, mit `autoReset = false`, sonst zählt nur der letzte
+  Durchgang) und Strahlen je Simulationsschritt.
+- Die Schattenkarte wird **einmal** je Bild gebaut. `Pipeline.render()` ruft
+  `renderer.render()` zweimal (Normalen, Farbe), und three baut sie sonst bei
+  jedem Aufruf neu – gemessen 604 von 1024 Zeichenaufrufen je Bild für ein
+  Ergebnis, das sich dazwischen nicht ändert. Deshalb `shadowMap.autoUpdate =
+  false` und je Bild einmal `needsUpdate = true`.
+- Der Normalen-Durchgang zeichnet die ganze Szene **ein zweites Mal** und läuft
+  nur, wenn Umriss oder Verdeckung ihn brauchen (`normalVoll`). Im realen Stil
+  ist der Umriss aus; schaltet die Automatik die Verdeckung ab, fällt der
+  Durchgang mit weg.
+- `antialias` am Renderer ist wirkungslos – gezeichnet wird in Render-Targets,
+  auf den Bildschirm kommt ein Vollbild-Rechteck ohne Innenkanten. Die Glättung,
+  die wirkt, sitzt als `samples` am Farb-Target.
+- Die Zielsuche der Bots ist die teuerste Stelle der KI: **ein Strahl je
+  Gegner**. Sie läuft mit `KI.zielPruefen` (5 Hz) und je Bot versetzt – alle im
+  selben Bild suchen zu lassen erzeugt genau die Ruckler, die man vermeiden
+  will. Ungedrosselt gemessen: 11,3 Strahlen je Simulationsschritt, gedrosselt
+  2,6, bei gleichem Verhalten (keine Klemmstellen, Punkte werden erobert).
+- In `bots.js` wird in der Schleife **nicht** allokiert: die Zwischenspeicher am
+  Kopf der Datei (`_dir`, `_mv`, …) reichen, weil die Bots nacheinander laufen.
+  Ein Dutzend Vektoren je Bot und Bild sind bei zwölf Figuren über achttausend
+  kurzlebige Objekte je Sekunde – und der Aufräumer holt sie sich genau dann,
+  wenn es gerade eng ist.
 - Nach Änderungen `npm run build` laufen lassen; muss ohne Fehler durchgehen.
 
 ## Roadmap
