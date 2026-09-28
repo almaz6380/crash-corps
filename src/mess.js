@@ -36,7 +36,9 @@ export const LAEUFE = [
   { aus: 'bloom', name: 'ohne Streulicht' },
   { aus: 'ao', name: 'ohne Verdeckung' },
   { aus: 'normal', name: 'ohne Normalen-Durchgang' },
+  { aus: 'kanten', name: 'ohne Kantenglättung' },
   { aus: 'schatten', name: 'ohne Schatten' },
+  { aus: 'schattenkarte', name: 'gröbere Schattenkarte' },
   { aus: 'halb', name: 'halbe Auflösung' },
   { aus: 'figuren', name: 'ohne Figuren' },
 ];

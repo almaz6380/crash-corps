@@ -32,6 +32,7 @@ const camera = new THREE.PerspectiveCamera(80, 1, 0.05, 450);
 camera.userData.canvas = canvas;
 scene.add(camera);
 const pipeline = new Pipeline(renderer, camera);
+globalThis.__mess = { renderer, scene, camera, pipeline };   // NUR MESSUNG, wird entfernt
 
 let world = null;                      // wird nach dem Laden der Props gebaut
 const input = new Input(canvas);
@@ -342,9 +343,10 @@ hud.onGyroStaerke = (v) => input.gyro.staerke(v);
 hud.onGyroUmkehr = (achse, an) => input.gyro.umkehren(achse, an);
 hud.gyroStand(input.gyro.einst.an && input.gyro.laeuft, input.gyro.einst);
 /**
- * Der Testflug (`mess.js`). Er fliegt dieselbe Strecke siebenmal und schaltet
- * je Lauf eine Stufe ab – der Abstand zwischen zwei Läufen ist das, was diese
- * Stufe auf **diesem** Gerät kostet.
+ * Der Testflug (`mess.js`). Er fliegt dieselbe Strecke einmal je Stufe und
+ * schaltet dabei je Lauf eine ab – der Abstand zwischen zwei Läufen ist das,
+ * was diese Stufe auf **diesem** Gerät kostet. Welche Stufen es gibt, steht in
+ * `LAEUFE`, und das ist dieselbe Liste, an der die Sparleiter dreht.
  */
 const flug = new Testflug({
   kamera: camera,
@@ -430,6 +432,9 @@ Promise.all([
 ])
   .then(() => {
     world = buildWorld(scene, renderer);
+    // Die Sparleiter darf an der Schattenkarte drehen – dafür muss sie das
+    // Sonnenlicht kennen, und das gibt es erst, wenn die Welt steht.
+    pipeline.sonneSetzen(world.sonne);
     // Das Navigationsgitter kommt **nach** dem Weltaufbau: es liest die
     // fertigen Kollisionsquader. Gebaut wird es hier und nicht in `world.js`,
     // damit die beiden Module nicht im Kreis voneinander abhängen.
@@ -499,7 +504,9 @@ function simulieren(dt) {
  * nicht in den Comic-Stil zurückgeworfen werden.
  */
 const LEISTUNG = {
-  fenster: 90,          // Bilder je Prüfung (bei 60 rund anderthalb Sekunden)
+  fenster: 90,          // höchstens so viele Bilder je Prüfung
+  sekunden: 1.5,        // oder so lange – was zuerst eintritt
+  mindest: 20,          // darunter ist der Median Zufall
   sparenUnter: 52,      // darunter wird eine Stufe abgeschaltet
   zurueckAb: 58,        // darüber darf eine Stufe zurückkommen
   ruhe: 8,              // so viele gute Prüfungen hintereinander, bevor sie es darf
@@ -509,7 +516,14 @@ const bildzeiten = [];
 let gutGelaufen = 0;
 function leistungPruefen(dt) {
   bildzeiten.push(dt);
-  if (bildzeiten.length < LEISTUNG.fenster) return;
+  // Das Fenster zählt Bilder **und** Zeit. Mit einer reinen Bildzahl dauert
+  // eine Prüfung bei 20 Bildern viereinhalb Sekunden statt anderthalb – und
+  // bis die Leiter unten ankommt, vergeht eine halbe Minute. Genau dann, wenn
+  // es am nötigsten ist, ist sie am langsamsten.
+  const genug = bildzeiten.length >= LEISTUNG.fenster
+    || (bildzeiten.length >= LEISTUNG.mindest
+        && bildzeiten.reduce((a, b) => a + b, 0) >= LEISTUNG.sekunden);
+  if (!genug) return;
   const sortiert = [...bildzeiten].sort((a, b) => a - b);
   const median = sortiert[Math.floor(sortiert.length / 2)];
   bildzeiten.length = 0;

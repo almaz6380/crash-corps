@@ -41,9 +41,9 @@ src/
   leben.js     Was sich bewegt, ohne mitzuspielen: Schornsteinrauch, Banner in
                Mannschaftsfarbe an den Kontrollpunkten, Vögel über dem Dorf
   style.js     Stilumschalter (?stil=real)
-  mess.js      Testflug: feste Strecke, siebenmal geflogen, je Lauf eine Stufe
-               abgeschaltet. Der Abstand zwischen zwei Läufen ist, was die
-               Stufe auf diesem Gerät kostet
+  mess.js      Testflug: feste Strecke, einmal je Stufe geflogen, und in jedem
+               Lauf ist eine Stufe aus. Der Abstand zwischen zwei Läufen ist,
+               was die Stufe auf diesem Gerät kostet
   device.js    Touch-Erkennung, Leistungsstufe (Auflösung, Schatten, Verdeckung) und die
                Bühne: Bildmaße, bei hochkant gehaltenem Handy um 90° gedreht
   input.js     Eingabe-Schicht: Tastatur, Maus und Touch gebündelt; Anordnung der
@@ -309,6 +309,16 @@ tools/
   (die den Normalen-Durchgang mitnimmt), dann Bildpunkte, dann Figuren, zuletzt
   der Stil. Sie läuft in **beiden** Stilen; vorher stieg sie bei `if (!REAL)
   return` sofort aus, und auf dem Handy gab es damit gar keine Automatik.
+- Die Stufen der Leiter stehen in `sparsam()` in `render.js`, nach Kosten je
+  sichtbarem Verlust: Streulicht → Umgebungsverdeckung (nimmt den
+  Normalen-Durchgang mit) → Kantenglättung → Bildpunkte → Schattenschärfe →
+  Bildpunkte tiefer → Figuren → Stil. Die Kantenglättung sitzt **nicht** am
+  Renderer, sondern als `samples` am Farb-Target, und ein Target merkt sich
+  seinen Framebuffer: ohne `dispose()` bleibt die alte Anzahl stehen und der
+  Schalter tut stillschweigend nichts. Dasselbe gilt für die Schattenkarte –
+  `mapSize` allein reicht nicht, die Karte muss weg (`shadow.map = null`).
+- Jede Stufe der Leiter gehört auch in `LAEUFE` in `mess.js`. Eine Messung, die
+  andere Knöpfe drückt als das Spiel, misst das falsche Spiel.
 - Die Leiter hat einen **Rückweg** (`grosszuegig()`). Ohne ihn ist sie eine
   Einbahnstraße: ein einziger schwerer Moment – ein Rauchfeld, nachgeladene
   Texturen – kostete den Rest der Runde die halbe Grafik. Zurückgenommen wird
@@ -359,7 +369,7 @@ tools/
 - **Leistung wird gemessen, nicht geschätzt** – und zwar auf dem Gerät, auf dem
   gespielt wird: der Testbrowser rendert in Software mit rund 0,3 Bildern je
   Sekunde, und diese Zahl sagt nichts. Der Knopf 📊 im Menü fliegt dieselbe
-  Strecke siebenmal und schaltet je Lauf eine Stufe ab; der **Abstand** zwischen
+  Strecke einmal je Stufe und schaltet dabei eine ab; der **Abstand** zwischen
   zwei Läufen ist die Antwort. Eine reine Bildratenanzeige verrät nicht, was
   teuer ist. Gemessen wird Median **und** 1-%-Tief: die schlechtesten Bilder
   sind das Ruckeln, und ein guter Median versteckt sie.

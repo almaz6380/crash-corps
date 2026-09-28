@@ -1224,6 +1224,9 @@ export function buildWorld(scene, renderer) {
 
   return {
     group, colliders, raster, ramps, spawns, punkte, leben, lichtFolgen,
+    // Die Sparleiter darf die Schattenkarte verkleinern; dafür braucht sie das
+    // Licht, und die Welt ist die einzige Stelle, die es hat.
+    sonne: sun,
     zonen, grenze: zonen.ganz,
   };
 }

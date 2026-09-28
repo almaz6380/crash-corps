@@ -421,6 +421,10 @@ export class Pipeline {
     // Was die Automatik abgeschaltet hat, in der Reihenfolge – nur so weiß
     // `grosszuegig()`, was es zurückgeben darf.
     this.gespart = [];
+    // Wird von `sonneSetzen()` nachgereicht, sobald die Welt steht.
+    this.sonne = null;
+    this.schattenVoll = 2048;
+    this.schattenRadiusVoll = 1;
   }
 
   setSize(w, h, pixelRatio) {
@@ -477,6 +481,47 @@ export class Pipeline {
       // Zeit schon, und darum geht es hier.
       r.shadowMap.enabled = an;
     } else if (name === 'halb') this._pixel(an ? this.pixelVoll : this.pixelVoll / 2);
+    else if (name === 'kanten') this._kanten(an ? 4 : 0);
+    else if (name === 'schattenkarte') this._schattenkarte(an ? 1 : 0.5);
+  }
+
+  /**
+   * Kantenglättung am Farb-Target. Sie sitzt nicht am Renderer – gezeichnet
+   * wird in Render-Targets, und `antialias` am Renderer wäre wirkungslos.
+   *
+   * Das Target muss dafür weggeworfen werden: three merkt sich den Framebuffer
+   * je Target, und die Anzahl der Abtastungen steckt darin. Ohne `dispose()`
+   * bleibt die alte Anzahl stehen und der Schalter tut stillschweigend nichts.
+   */
+  _kanten(n) {
+    if (this.color.samples === n) return;
+    this.color.samples = n;
+    this.color.dispose();
+  }
+
+  /**
+   * Schattenkarte gröber. `mapSize` allein reicht nicht: die Karte ist schon
+   * angelegt, und three legt sie nur neu an, wenn keine da ist.
+   */
+  _schattenkarte(faktor) {
+    const s = this.sonne?.shadow;
+    if (!s) return;
+    const n = Math.max(256, Math.round(this.schattenVoll * faktor));
+    if (s.mapSize.x === n) return;
+    s.mapSize.set(n, n);
+    s.map?.dispose(); s.map = null;
+    s.radius = faktor < 1 ? 1 : this.schattenRadiusVoll;
+  }
+
+  /**
+   * Das Sonnenlicht anmelden, dessen Schattenkarte die Leiter verkleinern darf.
+   * Die Welt baut es, die Leiter dreht daran – ohne diese Brücke müsste
+   * `render.js` die Welt kennen.
+   */
+  sonneSetzen(sonne) {
+    this.sonne = sonne;
+    this.schattenVoll = sonne?.shadow?.mapSize?.x || 2048;
+    this.schattenRadiusVoll = sonne?.shadow?.radius ?? 1;
   }
 
   /**
@@ -502,9 +547,27 @@ export class Pipeline {
       this.normalAn = this.normalVoll;
       this.gespart.push('Umgebungsverdeckung'); return 'Umgebungsverdeckung';
     }
+    // Die Kantenglättung kostet auf einem Halbgleitkomma-Target so viel wie
+    // vier Bilder und fällt am wenigsten auf, solange der Composite-Shader
+    // nachschärft. Deshalb vor den Bildpunkten.
+    if (this.color.samples > 0) {
+      this._kanten(0);
+      this.gespart.push('Kantenglättung'); return 'Kantenglättung';
+    }
     if (this.renderer.getPixelRatio() > this.pixelVoll * 0.75) {
       this._pixel(this.pixelVoll * 0.7);
       this.gespart.push('Bildpunkte'); return 'schärferes Bild';
+    }
+    // Eine halb so große Schattenkarte ist ein Viertel der Fläche. Weiche
+    // Ränder gibt es dann nicht mehr, Schatten aber schon – und ein Schatten
+    // mit harter Kante ist immer noch besser als keiner.
+    if (this.sonne && this.sonne.shadow.mapSize.x > this.schattenVoll * 0.75) {
+      this._schattenkarte(0.5);
+      this.gespart.push('Schattenschärfe'); return 'weiche Schatten';
+    }
+    if (this.renderer.getPixelRatio() > this.pixelVoll * 0.6) {
+      this._pixel(this.pixelVoll * 0.55);
+      this.gespart.push('Bildpunkte2'); return 'Auflösung';
     }
     return null;
   }
@@ -523,8 +586,14 @@ export class Pipeline {
       u.ao.value = this.aoVoll;
       this.normalVoll = this.umrissAn || this.aoVoll > 0;
       this.normalAn = this.normalVoll;
-    } else if (was === 'Bildpunkte') this._pixel(this.pixelVoll);
-    return was === 'Bildpunkte' ? 'schärferes Bild' : was;
+    } else if (was === 'Kantenglättung') this._kanten(4);
+    else if (was === 'Schattenschärfe') this._schattenkarte(1);
+    else if (was === 'Bildpunkte') this._pixel(this.pixelVoll);
+    else if (was === 'Bildpunkte2') this._pixel(this.pixelVoll * 0.7);
+    if (was === 'Bildpunkte') return 'schärferes Bild';
+    if (was === 'Bildpunkte2') return 'Auflösung';
+    if (was === 'Schattenschärfe') return 'weiche Schatten';
+    return was;
   }
 
   _pixel(v) {
