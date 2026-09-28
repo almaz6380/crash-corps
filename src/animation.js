@@ -186,13 +186,23 @@ export class CharacterAnimator {
 
     // ---- Schrittfrequenz ans Tempo koppeln, sonst rutschen die Füße ----
     const cyc = def.cycle || {};
-    // Die Obergrenzen sind hoch, weil die Clips es verlangen: gemessen
-    // (`tools/gangtempo.mjs`) trägt der Lauf-Clip des Barbaren 1,67 m/s, die
-    // Klasse rennt 5,2 – ohne Spielraum nach oben rudern die Beine hinterher
-    // und die Figur rutscht über den Boden. Bei 2,8 ist der Zyklus 0,33 s lang,
-    // rund 180 Schritte je Minute; das ist eine Gangart, darüber wird es Zappeln.
-    const ws = THREE.MathUtils.clamp(speed / (cyc.walkSpeed || ANIM.walkCycleSpeed), 0.6, 2.4);
-    const rs = THREE.MathUtils.clamp(speed / (cyc.runSpeed || ANIM.runCycleSpeed), 0.55, 2.8);
+    // Die Obergrenzen sind ein Kompromiss zwischen zwei Fehlern, und die
+    // Rechnung dahinter ist die Schrittfrequenz. **Ein Gangzyklus sind zwei
+    // Schritte** – wer das übersieht, hält die doppelte Zahl für die halbe.
+    //
+    // Gemessen (`tools/gangtempo.mjs`) trägt der Lauf-Clip des Barbaren
+    // 1,67 m/s, die Klasse rennt 5,2. Rudern die Beine hinterher, rutscht die
+    // Figur über den Boden; laufen sie zu schnell, zappelt sie:
+    //
+    //   Rate 1,6 → Zyklus 0,58 s → 206 Schritte/min → 2,53 m/s Rutschen
+    //   Rate 1,9 → Zyklus 0,49 s → 245 Schritte/min → 2,03 m/s Rutschen
+    //   Rate 2,8 → Zyklus 0,33 s → 361 Schritte/min → 0,52 m/s Rutschen
+    //
+    // 361 Schritte je Minute rennt niemand; 245 ist zügig, aber eine Gangart.
+    // Die eigentliche Lösung ist ein schnellerer Clip (bei Mixamo „Fast Run"),
+    // nicht eine höhere Zahl an dieser Stelle.
+    const ws = THREE.MathUtils.clamp(speed / (cyc.walkSpeed || ANIM.walkCycleSpeed), 0.6, 1.8);
+    const rs = THREE.MathUtils.clamp(speed / (cyc.runSpeed || ANIM.runCycleSpeed), 0.55, 1.9);
     actions.walk?.setEffectiveTimeScale(ws); actions.aimWalk?.setEffectiveTimeScale(ws);
     for (const k of ['run', 'aimRun', 'runLeft', 'runRight', 'runBack']) actions[k]?.setEffectiveTimeScale(rs);
 

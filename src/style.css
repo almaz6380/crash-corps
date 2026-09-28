@@ -265,6 +265,13 @@ body.touch #ende > div { font-size: 24px; padding: 18px 28px; }
    Gyro-Zeile einfach die ganze Breite. */
 #t-edit-bar { display: grid; grid-template-columns: auto auto auto auto;
   justify-items: center; max-width: min(96%, 900px); }
+/* Wisch-Empfindlichkeit: eigene Zeile über dem Gyro-Block, damit die
+   vier Spalten der Leiste nicht zerfallen. */
+#t-wisch { grid-column: 1 / -1; display: flex; align-items: center; gap: 8px;
+  padding-top: 7px; font-size: 13px; font-weight: bold; color: var(--ink); }
+#t-wisch input[type="range"] { width: 140px; }
+body.klein #t-wisch { font-size: 12px; padding-top: 4px; }
+body.klein #t-wisch input[type="range"] { width: 100px; }
 #t-gyro { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center;
   padding-top: 7px; border-top: 3px solid rgba(43,33,24,.2);
   font-size: 13px; font-weight: bold; color: var(--ink); }

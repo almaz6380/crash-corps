@@ -132,6 +132,28 @@ tools/
   schießt je Kandidat einen Strahl.
 - Kein Server-Code in diesem Repo, bis der Single-Player-Loop sauber ist. Multiplayer kommt als separater Schritt (autoritativer Server, Colyseus oder eigenes WS-Protokoll).
 - Neue Klasse = Eintrag in `classes.js` (inkl. `model`) + ggf. Modell-Eintrag in `assets.js`. Sonst nichts anfassen.
+- **Ein Gangzyklus sind zwei Schritte.** Die Obergrenze der Abspielrate in
+  `animation.js` ist eine Schrittfrequenz, keine abstrakte Zahl: Rate 1,9 heißt
+  beim Barbaren Zyklus 0,49 s und 245 Schritte je Minute, Rate 2,8 heißt 361 –
+  das rennt niemand, und genau so sah es aus. Wer die Grenze anfasst, rechnet
+  vorher `2 / (Zyklusdauer / Rate) * 60` aus.
+- Die Zielhilfe führt das Fadenkreuz **nur nach, während der Spieler selbst den
+  Blick bewegt** – Wischen oder Gyro, nicht der Laufstick. Mit dem Stick in der
+  Rechnung drehte die Kamera beim bloßen Laufen mit bis zu 50 Grad je Sekunde
+  von allein, sobald ein Gegner im Kegel stand; das fühlt sich an, als gehorche
+  die Steuerung nicht. Umschaltbar ist sie über den Knopf 🎯 im Menü – ob eine
+  Zielhilfe hilft oder im Weg ist, lässt sich nicht messen, das sagt nur der,
+  der sie benutzt.
+- Die **Wisch-Empfindlichkeit** ist einstellbar („Bedienung anpassen", gemerkt
+  in `localStorage`). Auf dem Handy ist Wischen die einzige Art zu zielen, und
+  der richtige Wert hängt an Daumen und Bildschirmgröße – eine feste Zahl ist
+  für die eine Hälfte zäh und für die andere nervös. `player.js` multipliziert
+  sie auf `sens`; der Gyro hat seinen eigenen Regler, weil er Winkel liefert
+  und keine Pixel.
+- `BLICK.ab` ist die Schwelle, ab der „rückwärts" gilt, und sie wird am
+  Laufstick gemessen: -0,3 sind bei voller Auslenkung 17 Grad hinter der
+  Querrichtung, also fast jede seitliche Bewegung. Auf dem Handy ist der Stick
+  analog – damit drehte der Blick ständig von selbst mit.
 - **`walkSpeed`/`runSpeed` werden gemessen, nicht geschätzt** (`tools/gangtempo.mjs`).
   Sie sagen, für welches Tempo der Clip gebaut ist; `animation.js` rechnet daraus
   die Abspielrate. Steht dort eine erfundene Zahl, rutschen die Füße über den

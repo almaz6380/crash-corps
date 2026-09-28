@@ -26,6 +26,7 @@ export class Hud {
           <button id="gyro-um-x" type="button" title="Links/rechts umkehren" hidden>↔</button>
           <button id="gyro-um-y" type="button" title="Oben/unten umkehren" hidden>↕</button>
           <button id="mess" type="button" title="Leistungstest: misst auf diesem Gerät, was welche Stufe kostet">📊</button>
+          ${TOUCH ? '<button id="zielhilfe" type="button" title="Zielhilfe: bremst das Wischen nah am Gegner"></button>' : ''}
           <button id="grafik" type="button" title="Grafikstil umschalten"></button>
           <button id="ton" type="button" title="Ton an/aus (M)"></button>
         </div>
@@ -120,6 +121,8 @@ export class Hud {
       grafik.textContent = REAL ? '📷 Fotoreal' : '✎ Comic';
       grafik.onclick = () => this.onGrafik?.();
     }
+    const zh = root.querySelector('#zielhilfe');
+    if (zh) zh.onclick = () => this.zielhilfeStand(this.onZielhilfe?.());
     this.tonKnoepfe = [root.querySelector('#ton'), root.querySelector('#ton2')];
     for (const b of this.tonKnoepfe) b.onclick = () => this.tonStand(this.onSound?.());
     const anp = root.querySelector('#anpassen');
@@ -379,6 +382,12 @@ export class Hud {
 
   /** Läuft im Hintergrund eine angehaltene Runde? Dann gibt es den Rückweg. */
   pause(on) { if (this.fortsetzenKnopf) this.fortsetzenKnopf.hidden = !on; }
+
+  /** Beschriftung des Zielhilfe-Knopfs. */
+  zielhilfeStand(an) {
+    const el = this.root.querySelector('#zielhilfe');
+    if (el) el.textContent = an ? '🎯 Zielhilfe an' : '🎯 Zielhilfe aus';
+  }
 
   /**
    * Wie die letzte Runde wirklich lief. Steht im Menü, sobald jemand pausiert –

@@ -4,7 +4,7 @@ import { Weapon } from './weapons.js';
 import { SPECIALS } from './classes.js';
 import { buildViewmodel, buildCharacter, trefferQuader } from './characters.js';
 import { ViewmodelAnimator, CharacterAnimator } from './animation.js';
-import { AIM_ASSIST } from './device.js';
+import { zielhilfeAn } from './device.js';
 import { bestTarget, pullToward, ASSIST } from './aimassist.js';
 
 const EYE = 1.6, GRAVITY = 22, JUMP = 8;
@@ -32,7 +32,12 @@ const SCHULTER = { abstand: 2.7, hoehe: 0.3, seite: 0.6, polster: 0.3, nah: 0.5,
  * Hand. `ab` ist, wie weit rückwärts es gehen muss: seitwärts laufen soll den
  * Blick nicht mitziehen, sonst gäbe es kein Ausweichen mehr.
  */
-const BLICK = { tempo: 2.4, pause: 0.7, ab: -0.3 };
+// `ab` ist die Schwelle, ab der „rückwärts" gilt, gemessen am Laufstick.
+// Sie stand auf -0,3: bei voller Auslenkung sind das 17 Grad hinter der
+// Querrichtung – also fast jede seitliche Bewegung. Auf dem Handy, wo der
+// Stick analog ist, drehte der Blick damit ständig von selbst mit. -0,6 sind
+// 37 Grad und heißen wirklich rückwärts.
+const BLICK = { tempo: 2.4, pause: 0.7, ab: -0.6 };
 const SICHT_KEY = 'crashcorps.sicht';
 
 /** Zuletzt gewählte Ansicht. Ab Werk die Verfolgersicht – die Figuren will man sehen. */
@@ -165,9 +170,12 @@ export class Player {
     const inp = this.input;
     // Umsehen: Maus liefert Pixel pro Bewegung, Touch die Zugstrecke
     let [lx, ly] = inp.takeLook();
-    const sens = inp.touch ? 0.0042 : 0.0022;
+    // Die Empfindlichkeit ist auf dem Handy einstellbar („Bedienung anpassen"):
+    // zielen geht dort nur über den Daumen, und was sich richtig anfühlt, hängt
+    // an Daumen und Bildschirmgröße.
+    const sens = (inp.touch ? 0.0042 : 0.0022) * (inp.wisch ?? 1);
     // Zielhilfe: bremst das Wischen nahe am Gegner und führt danach nach
-    const aimed = AIM_ASSIST && !this.dead ? bestTarget(this, targets, this.world) : null;
+    const aimed = zielhilfeAn() && !this.dead ? bestTarget(this, targets, this.world) : null;
     if (aimed) { const s = 1 - ASSIST.friction * aimed.weight; lx *= s; ly *= s; }
     // Gyroskop kommt schon als Winkel und wird von der Zielhilfe genauso gebremst
     let [gx, gy] = inp.takeGyro();
@@ -177,8 +185,15 @@ export class Player {
     this.pitch = Math.max(-1.45, Math.min(1.45, this.pitch));
     if (aimed) {
       // Nur nachführen, solange der Spieler selbst wischt, dreht oder läuft
-      const activity = Math.min(1,
-        (Math.hypot(lx, ly) / 6) + (Math.hypot(gx, gy) * 12) + Math.hypot(inp.moveX, inp.moveY));
+      // Nur eigene **Blick**-Eingabe zählt, nicht der Laufstick.
+      //
+      // Vorher stand hier `+ hypot(moveX, moveY)`: wer lief, bekam die volle
+      // Nachführung: bis 0,9 rad/s, also gut 50 Grad je Sekunde, ohne dass er
+      // die Kamera angefasst hätte. Auf dem Handy ist der Stick beim Laufen
+      // dauerhaft ausgelenkt – die Kamera drehte also praktisch immer von
+      // allein, sobald ein Gegner im Kegel stand. Genau das fühlt sich an, als
+      // würde die Steuerung nicht gehorchen.
+      const activity = Math.min(1, (Math.hypot(lx, ly) / 6) + (Math.hypot(gx, gy) * 12));
       pullToward(this, aimed, dt, activity);
       this.pitch = Math.max(-1.45, Math.min(1.45, this.pitch));
     }

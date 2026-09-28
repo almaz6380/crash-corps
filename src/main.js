@@ -10,7 +10,7 @@ import { preloadCharacters, preloadProps } from './assets.js';
 import { REAL, stilSetzen, stilZurueckfallen, schwachGemerkt } from './style.js';
 import { preloadTextures } from './surface.js';
 import { Input } from './input.js';
-import { buehneAnpassen, TOUCH, QUALITY, LOW_END } from './device.js';
+import { buehneAnpassen, TOUCH, QUALITY, LOW_END, zielhilfeAn, zielhilfeSetzen } from './device.js';
 import { Sound } from './sound.js';
 import { Domination, TEAMS } from './domination.js';
 import { Navgitter } from './navgitter.js';
@@ -227,6 +227,10 @@ hud.onCustomize = () => {
   input.touch.onDone = () => { input.touch.edit(false); hud.showMenu(true); };
   input.touch.edit(true);
 };
+// Zielhilfe umschalten. Sie wirkt sofort – `player.js` fragt bei jedem Bild.
+hud.onZielhilfe = () => { sound.klick(); return zielhilfeSetzen(!zielhilfeAn()); };
+hud.zielhilfeStand(zielhilfeAn());
+
 hud.onPause = () => {
   if (!running) return;
   sound.klick(); running = false; input.showTouch(false);
