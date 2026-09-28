@@ -281,13 +281,24 @@ const COMPOSITE_SHADER = {
 
       // Schärfung: die Differenz zum Mittel der vier Nachbarn dazugeben. Nach
       // dem Tone-Mapping, sonst zieht sie helle Kanten ins Ausbrennen.
+      //
+      // **Nicht auf dem Umriss.** Das Mittel der Nachbarn kommt aus dem rohen
+      // Farbbild und kennt die Abdunklung durch den Umriss nicht. Auf einer
+      // Umrisslinie steht die Farbe deshalb schon auf 12 Prozent, das Mittel
+      // aber noch hell – die Differenz ist stark negativ, und die Schärfung
+      // drückt den Bildpunkt unter Null. Wo viele Linien dicht beieinander
+      // liegen, etwa am Ende einer Gasse, wird daraus ein schwarzer Klumpen:
+      // gemessen stieg der Anteil tiefschwarzer Bildpunkte von 3,7 auf 7,9
+      // Prozent. Genau daran scheitert die Kombination, und genau deshalb
+      // stand die Schärfung im Comic-Stil bisher auf null. Eine Umrisslinie
+      // braucht ohnehin keine – mehr Kontrast als schwarz auf hell gibt es nicht.
       if (schaerfe > 0.0) {
         vec3 um = texture2D(tColor, vUv + vec2(texel.x, 0.0)).rgb
                 + texture2D(tColor, vUv - vec2(texel.x, 0.0)).rgb
                 + texture2D(tColor, vUv + vec2(0.0, texel.y)).rgb
                 + texture2D(tColor, vUv - vec2(0.0, texel.y)).rgb;
         vec3 mitte = agxAn > 0.5 ? agx(um * 0.25 * exposure) : aces(um * 0.25 * exposure);
-        col += (col - mitte) * schaerfe;
+        col = max(col + (col - mitte) * schaerfe * (1.0 - edge * outline), vec3(0.0));
       }
 
       float v = smoothstep(1.25, 0.35, distance(vUv, vec2(0.5)));
@@ -320,7 +331,13 @@ const BILD = {
   // Belichtung nicht geraten, sondern gemessen: das geometrische Mittel der
   // Szenenwerte lag bei 0,22, mittleres Grau liegt bei 0,18 (tools: belichtung).
   real: { belichtung: 0.82, saettigung: 1.05, agx: 1, bloom: 0.5, schwelle: 1.0, korn: 0.012, schaerfe: 0.15 },
-  toon: { belichtung: 1.15, saettigung: 1.05, agx: 0, bloom: 0.0, schwelle: 1.6, korn: 0.0, schaerfe: 0.0 },
+  // `schaerfe` stand im Comic-Stil auf 0 – er hatte also gar keine Schärfung,
+  // obwohl gerade er sie braucht: das Bild wird in ein Render-Target gezeichnet
+  // und von dort auf den Bildschirm skaliert, und auf einem Handy mit
+  // dreifacher Bildpunktdichte ist das eine Vergrößerung um mehr als das
+  // Doppelte. 0.18 ist etwas mehr als im realen Stil, weil dort die
+  // Fotooberflächen schon eigene Hochfrequenz mitbringen.
+  toon: { belichtung: 1.15, saettigung: 1.05, agx: 0, bloom: 0.0, schwelle: 1.6, korn: 0.0, schaerfe: 0.18 },
 };
 
 /**
@@ -363,7 +380,11 @@ export class Pipeline {
     // zeichnete das Spiel die Szene weiter zweimal, für nichts.
     this.normalVoll = useOutline || useAo > 0;
     this.normalAn = this.normalVoll;
-    this.color = new THREE.WebGLRenderTarget(1, 1, { samples: 4, type: THREE.HalfFloatType });
+    // Die Zahl der Abtastungen kommt aus der Leistungsstufe: bei doppelter
+    // Bildpunktdichte auf einem Handy bringt die vierfache Abtastung kaum noch
+    // etwas, kostet aber volle Bandbreite.
+    this.kantenVoll = QUALITY.samples ?? 4;
+    this.color = new THREE.WebGLRenderTarget(1, 1, { samples: this.kantenVoll, type: THREE.HalfFloatType });
     this.normal = new THREE.WebGLRenderTarget(1, 1);
     this.normal.depthTexture = new THREE.DepthTexture(1, 1);
     this.normal.depthTexture.type = THREE.UnsignedIntType;
@@ -481,7 +502,7 @@ export class Pipeline {
       // Zeit schon, und darum geht es hier.
       r.shadowMap.enabled = an;
     } else if (name === 'halb') this._pixel(an ? this.pixelVoll : this.pixelVoll / 2);
-    else if (name === 'kanten') this._kanten(an ? 4 : 0);
+    else if (name === 'kanten') this._kanten(an ? this.kantenVoll : 0);
     else if (name === 'schattenkarte') this._schattenkarte(an ? 1 : 0.5);
   }
 
@@ -607,7 +628,7 @@ export class Pipeline {
       u.ao.value = this.aoVoll;
       this.normalVoll = this.umrissAn || this.aoVoll > 0;
       this.normalAn = this.normalVoll;
-    } else if (was === 'Kantenglättung') this._kanten(4);
+    } else if (was === 'Kantenglättung') this._kanten(this.kantenVoll);
     else if (was === 'Schattenschärfe') this._schattenkarte(1);
     else if (was === 'Bildpunkte') this._pixel(this.pixelVoll);
     else if (was === 'Bildpunkte2') this._pixel(this.pixelVoll * 0.7);

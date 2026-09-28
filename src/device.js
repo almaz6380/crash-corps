@@ -46,11 +46,23 @@ export function zielhilfeSetzen(an) {
 
 
 export const QUALITY = {
-  pixelRatio: LOW_END ? 1.4 : 2,
+  // Auf dem Handy stand hier 1,4, und das ist der Grund, warum das Bild dort
+  // weich aussieht: ein iPhone hat dreifache Bildpunktdichte, gezeichnet wurde
+  // also mit weniger als der halben Auflösung des Schirms, und den Rest hat der
+  // Browser hochskaliert. Ein Testflug hat gezeigt, dass Bildpunkte dort gar
+  // nicht das Teure sind – „halbe Auflösung" brachte null –, also ist der Weg
+  // nach oben frei. Wird es doch zu viel, nimmt die Sparleiter es in zwei
+  // Stufen zurück (0,7 und 0,55), und die reagiert jetzt in anderthalb
+  // Sekunden statt in einer halben Minute.
+  pixelRatio: 2,
   shadowSize: LOW_END ? 1024 : 2048,
   ao: !LOW_END,              // Umgebungsverdeckung kostet 16 Abtastungen je Bildpunkt
   bloom: !LOW_END,           // Streulicht: drei zusätzliche Durchgänge in halber Auflösung
   shadowRadius: LOW_END ? 1 : 3,
+  // Kantenglättung am Farb-Target. Bei doppelter Bildpunktdichte sind die
+  // Bildpunkte auf einem Handy so klein, dass vierfache Abtastung kaum noch
+  // etwas hinzufügt – die Bandbreite steckt man besser in die Auflösung.
+  samples: LOW_END ? 2 : 4,
 };
 
 /**
