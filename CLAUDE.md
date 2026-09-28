@@ -401,6 +401,28 @@ tools/
   spielt im Tal mit sechs Figuren, Domination auf der ganzen Karte mit zwölf.
   Die Figurenzahl ist der letzte Regler in `leistungPruefen()`, paarweise
   gekürzt, damit das Sparen den Spielstand nicht verschiebt.
+- **Schärfung und Umriss vertragen sich nicht ohne Vorkehrung.** Das Mittel der
+  Nachbarn im Composite kommt aus dem rohen Farbbild und kennt die Abdunklung
+  durch den Umriss nicht; auf einer Linie steht die Farbe schon bei 12 Prozent,
+  das Mittel noch hell, und die Schärfung drückt den Bildpunkt unter Null. Wo
+  viele Linien dicht beieinanderliegen, wird daraus ein schwarzer Klumpen –
+  gemessen stieg der Anteil tiefschwarzer Bildpunkte von 3,7 auf 7,9 Prozent.
+  Deshalb `* (1.0 - edge * outline)` und ein `max(…, 0.0)`. Genau daran lag es,
+  dass `schaerfe` im Comic-Stil auf null stand.
+- **Schärfe wird gemessen, nicht beurteilt.** `tools/bild-messen.mjs` nennt den
+  mittleren Betrag des Laplace-Operators: ein hochskaliertes Bild verrät sich
+  dort sofort, weil ihm die Hochfrequenz fehlt. Verglichen wird nur, was gleich
+  groß ist – zwei Bilder verschiedener Auflösung haben verschiedene
+  Hochfrequenz, ohne dass eines schärfer wäre.
+- Drei Stellen entscheiden über die Schärfe, und alle drei standen falsch:
+  `QUALITY.pixelRatio` (auf dem Handy 1,4 bei dreifacher Bildpunktdichte – der
+  Browser skalierte den Rest), `schaerfe` im Comic-Stil (stand auf 0, obwohl
+  gerade der hochskaliert wird) und die **anisotrope Filterung** der
+  Bausatz-Texturen (stand auf 1, dem Standardwert – `world.js` setzt 8 für
+  seine Leinwandtexturen und `surface.js` 4 für die Fotos, aber jede Wand und
+  jede Gasse aus `dorf.glb` bekam nie einen Wert). Ohne Anisotropie nimmt three
+  für eine schräge Fläche die Mipmap-Stufe des stärker verkleinerten Randes –
+  eine Straße bis zum Horizont ist nach wenigen Metern Brei.
 - **Leistung wird gemessen, nicht geschätzt** – und zwar auf dem Gerät, auf dem
   gespielt wird: der Testbrowser rendert in Software mit rund 0,3 Bildern je
   Sekunde, und diese Zahl sagt nichts. Der Knopf 📊 im Menü fliegt dieselbe

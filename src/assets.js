@@ -335,6 +335,7 @@ export async function preloadCharacters(onProgress, ids = Object.keys(CHARACTER_
   for (const id of ids) {
     const def = CHARACTER_MODELS[id];
     const gltf = await loadGltf(loader, def.url);
+    texturenSchaerfen(gltf.scene);
     // Grundhöhe messen, damit sich Figuren später auf die Klassengröße skalieren lassen
     const box = new THREE.Box3().setFromObject(gltf.scene);
     const layers = buildLayerClips(def, gltf.animations);
@@ -505,9 +506,42 @@ const kitLaden = new Map();      // Bausatzname → laufendes Laden
  * unter „<bausatz>:<teil>" im selben Zwischenspeicher wie die Einzel-Props –
  * `spawnProp` merkt keinen Unterschied.
  */
+/**
+ * Anisotrope Filterung für alles, was aus einer Datei kommt.
+ *
+ * Ohne sie steht `anisotropy` auf 1, und three nimmt dann für eine schräg
+ * stehende Fläche die Mipmap-Stufe des **stärker** verkleinerten Randes –
+ * eine Straße, die vom Fuß bis zum Horizont läuft, wird dadurch schon nach
+ * wenigen Metern zu Brei. Genau so sah der Bausatz aus: `world.js` setzt 8 für
+ * seine eigenen Leinwandtexturen und `surface.js` 4 für die Fotooberflächen,
+ * aber die Texturen aus `dorf.glb` und `natur.glb` – also jede Wand, jedes
+ * Dach, jede Gasse – bekamen nie einen Wert.
+ *
+ * 16 ist der übliche Höchstwert; three deckelt selbst auf das, was die
+ * Grafikkarte kann. Kosten entstehen nur dort, wo die Fläche wirklich schräg
+ * steht, und moderne Hardware macht das in der Textureinheit.
+ */
+const ANISO = 16;
+
+function texturenSchaerfen(wurzel) {
+  const fertig = new Set();
+  wurzel.traverse((o) => {
+    if (!o.isMesh) return;
+    for (const mat of Array.isArray(o.material) ? o.material : [o.material]) {
+      if (!mat || fertig.has(mat)) continue;
+      fertig.add(mat);
+      for (const k of ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'emissiveMap', 'aoMap']) {
+        const t = mat[k];
+        if (t && t.anisotropy < ANISO) { t.anisotropy = ANISO; t.needsUpdate = true; }
+      }
+    }
+  });
+}
+
 function ladeKit(loader, kit) {
   if (!kitLaden.has(kit)) {
     kitLaden.set(kit, loadGltf(loader, `assets/props/${kit}.glb`).then((gltf) => {
+      texturenSchaerfen(gltf.scene);
       for (const teil of [...gltf.scene.children]) {
         teil.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
         propCache.set(`${kit}:${teil.name}`, teil);
@@ -535,6 +569,7 @@ export async function preloadProps(names, onProgress) {
     ...list.filter(n => !n.includes(':')).map(async (name) => {
       const gltf = await loadGltf(loader, `assets/props/${name}.glb`);
       const root = gltf.scene;
+      texturenSchaerfen(root);
       root.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
       propCache.set(name, root);
       onProgress?.(++done / schritte, name);
