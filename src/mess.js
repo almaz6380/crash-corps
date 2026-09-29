@@ -286,7 +286,8 @@ export class Testflug {
     const kopf = [
       `Crash Corps · Testflug · Stand ${g.stand}`,
       `${g.gpu}`,
-      `Bild ${g.breite}x${g.hoehe} · Bildpunkte x${g.pixelRatio} · Stil ${g.stil} · Stufe ${g.stufe} · ${g.figuren} Figuren`,
+      `Bild ${g.breite}x${g.hoehe} · Bildpunkte x${g.pixelRatio} (${g.bildpunkte ?? '?'})`
+        + ` · Kanten ${g.kanten ?? '?'}x · Stil ${g.stil} · Stufe ${g.stufe} · ${g.figuren} Figuren`,
       '',
       'Die Bilder je Sekunde sind das Maß. Sim und Bild sind die CPU-Anteile –',
       'was die Grafikkarte danach noch tut, steht in keiner der beiden Zahlen.',

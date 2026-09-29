@@ -165,7 +165,9 @@ body.touch #feed { right: 74px; font-size: 13px; }
   border-radius: 14px; padding: 12px 18px; box-shadow: 5px 5px 0 var(--ink); }
 /* Anpassen und Ton teilen sich eine Zeile – auf niedrigen Bildschirmen ist
    jede zusätzliche Zeile eine, die die Hilfezeile aus dem Bild schiebt. */
-#menuknoepfe { display: flex; gap: 12px; justify-content: center; align-items: center; }
+/* `wrap`, weil die Leiste mit sieben Knöpfen im Querformat eines Handys sonst
+   über den Rand läuft: lieber zwei Zeilen als ein abgeschnittener Knopf. */
+#menuknoepfe { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; align-items: center; }
 /* „Weiter spielen“ steht nur da, wenn eine Runde angehalten wartet. */
 #fortsetzen { font: bold 16px/1 inherit; color: var(--ink); background: var(--sun);
   border: 3px solid var(--ink); border-radius: 12px; padding: 12px 22px; margin: 0 0 6px;

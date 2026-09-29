@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { embeddedBytes } from './embed.js';
+import { ANISO } from './device.js';
 
 /**
  * Oberflächen für den realistischen Stil.
@@ -86,7 +87,7 @@ export async function preloadTextures(onProgress) {
       } else t = await loader.loadAsync(url);
       t.wrapS = t.wrapT = THREE.RepeatWrapping;
       if (srgb) t.colorSpace = THREE.SRGBColorSpace;
-      t.anisotropy = 4;
+      t.anisotropy = ANISO;
       return t;
     };
     const diff = await load('diff', true);
