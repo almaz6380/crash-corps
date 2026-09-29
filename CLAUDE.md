@@ -392,6 +392,26 @@ tools/
   bis der Bereich bei der genannten Leuchtdichte landet – der Mittelwert der
   verbogenen Werte ist nicht der verbogene Mittelwert, ausrechnen geht also
   nicht. Für die Hose: 23 → 60 bei Gamma 0,59, das sind 6 KB je Figur.
+  Im Bild kommt davon ein Drittel an: die Hose rendert mit 11 statt 15 von 255,
+  auf allen drei Figuren gleich gerichtet, und man sieht den Unterschied – der
+  Stoff zeigt seine Falten statt einer schwarzen Fläche. **In der Gasse ist es
+  trotzdem unsichtbar** (2,1 → 2,6), denn dort steht die Figur im Schatten. Das
+  ist kein Widerspruch, sondern dieselbe Regel wie oben: im Schatten ist jede
+  Helligkeitsfrage gegenstandslos.
+- **Prüfstände müssen deterministisch sein, sonst vergleicht man zwei
+  verschiedene Bilder.** Der Versuch, die Figur über `?mess=1` auf feste
+  Weltkoordinaten zu setzen, ist gescheitert: die Kamera folgt weiter dem
+  Spieler, und die Figur hing als Riese über dem Dorf. Was funktioniert, sind
+  die Standbilder aus `vorschau.js` (`figbild.mjs`) – kein Match, kein Spawn,
+  keine Pose-Streuung, 600x760 formatfüllend. Der Gassen-Prüfstand ist
+  ebenfalls brauchbar, weil der Spieler reproduzierbar an derselben Stelle
+  laicht; der Sonnen-Prüfstand nicht, dort stand die Figur je Lauf anders groß
+  im Bild.
+- **Ein durchsichtiger Hintergrund verfälscht jeden Mittelwert.** Die
+  Standbilder der Klassenwahl haben einen Alphakanal, und `removeAlpha()` macht
+  daraus Schwarz. Gemittelt über „alle dunklen Bildpunkte" waren damit 70 %
+  Hintergrund in der Zahl, und aus 11 → 15 wurde 1,5 → 2,0 – ein echter Gewinn
+  sah aus wie Rauschen. Gemessen wird nur, wo `alpha > 200` ist.
 - **Meshnamen sind nicht eindeutig, und das Werkzeug darf nicht raten.** Beim
   Magier heißen Ärmel und nackter Arm beide `Male_Peasant_Arms`, auf
   verschiedenen Materialien und verschiedenen Texturen. `--aufhellen` bricht
