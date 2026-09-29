@@ -347,11 +347,27 @@ tools/
 - **Dichte und Detail reichen beide nicht, wenn das Bild dunkel ist.** Die Hose
   der Figuren liegt mit 194 Texel je Meter unter der Latte und trägt auf 1024
   nachweislich 85 % mehr Detail – im gerenderten Bild kommen davon **1 %** an.
-  Sie rendert mit einer Helligkeit von 19 von 255, und `tintMix: 0.5` mischt
-  die Klassenfarbe zur Hälfte darüber. Darum gehört zu jeder Texturfrage die
-  dritte Messung: wie hell kommt die Fläche überhaupt an? Unter etwa 40 von 255
-  ist jede Auflösungsdebatte gegenstandslos, und der Hebel heißt `tintMix` oder
-  `fuellAnteil`, nicht Texturgröße.
+  Gemessen in der Arena, gleiche Kamera, gleiche Stelle: Schärfe 12,66 gegen
+  11,94, tiefschwarz 46,7 gegen 46,5 Prozent. Darum gehört zu jeder
+  Texturfrage die dritte Messung: wie hell kommt die Fläche überhaupt an?
+- **Und die vierte: woher die Dunkelheit kommt.** Bei der Hose waren drei
+  Verdächtige im Spiel, und zwei davon sind widerlegt. Die Bodenverdunkelung
+  aus `figurlook.js` reicht bis `hoehe · 0.4` = 0,72 m, das Hosen-Mesh beginnt
+  aber erst bei 0,40 m – dort kostet sie höchstens 14 %. Und `tintMix` von 0,5
+  auf 0,3 gesetzt, neu gebaut und gemessen: **2,1 → 2,1 von 255**, also nichts,
+  bei vollem Verlust an Klassenfarbe. Es ist die Zeichnung selbst: unter dem
+  Hosen-Mesh steht die Textur bei **35/21/10**, unter der Haut bei 167/115/80.
+  Sechsmal dunkler, und die Tonwertkurve drückt das auf 2 von 255. Wer die
+  Kleidung heller haben will, muss sie **malen** – Auflösung, Klassenfarbe und
+  Fülllicht sind dort alle drei der falsche Hebel. Gemessen wird das ohne
+  Raten: die UV-Ecken eines Meshes auf die Textur abbilden und genau diese
+  Texel mitteln.
+- **Eine Helligkeitsfrage im Schatten zu messen ist wie ein Testflug am
+  Anschlag.** Der erste Vergleich stand in einer Gasse, und dort rendert die
+  Hose mit 2 von 255 – jeder Regler hätte dasselbe Ergebnis geliefert. Für
+  solche Messungen hebt das Prüfskript die Figur über `?mess=1` um 16 m aus
+  der Verdeckung: Material, Licht, Tone-Mapping und Pose bleiben die des
+  Spiels, nur der Schatten fällt weg.
 - Eine Textur in einer fertigen Figur tauscht `tools/figur-textur.mjs`, **ohne
   die Figur neu zu bauen**: die UVs bleiben ohnehin gleich, nur das Bild wird
   feiner. Neubacken über `figur-bauen.mjs` riskiert Unterschiede am

@@ -46,7 +46,7 @@ export const CHARACTER_MODELS = {
     // Kamera, die nach -z blickt – deshalb ist die Grunddrehung rund um π.
     viewmodel: { form: 'axt', laenge: 0.72, rot: [0.12, 2.75, 0.2], pos: [0, -0.04, 0.05] },
     tintMaterials: ['MI_Peasant'],      // Hose und Stiefel, nicht die nackte Haut
-    tintMix: 0.3,
+    tintMix: 0.5,
   },
 
   qua_schurke: {
@@ -66,7 +66,7 @@ export const CHARACTER_MODELS = {
     grip: { pos: [0, 0.06, 0.02], rot: [-1.5708, 0, 0], scale: 0.9 },
     viewmodel: { form: 'armbrust', laenge: 0.62, rot: [0.06, Math.PI, 0.03], pos: [0, 0.0, 0.04] },
     tintMaterials: ['MI_Ranger'],
-    tintMix: 0.28,
+    tintMix: 0.45,
   },
 
   qua_magier: {
@@ -86,7 +86,7 @@ export const CHARACTER_MODELS = {
     grip: { pos: [0, 0.06, 0.02], rot: [-1.5708, 0, 0], scale: 0.9 },
     viewmodel: { form: 'stab', laenge: 0.8, rot: [0.1, 2.9, 0.08], pos: [0, -0.03, 0.05] },
     tintMaterials: ['MI_Peasant', 'MI_Ranger'],   // Kittel und Kapuze
-    tintMix: 0.3,
+    tintMix: 0.5,
   },
 
   // Quaternius „Ultimate Monsters" (CC0): ein echter Ork. Liegt als Alternative
