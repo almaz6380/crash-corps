@@ -118,6 +118,27 @@ Größen je Figur: rund 9000 Dreiecke, eine 512er-Farbtextur je Material,
 0,98 bis 1,24 MB. Ohne `--nur-farbe` (Normalen- und Rauheitskarten) und ohne
 `resample` (Schlüsselbilder) wären es 2,9 MB.
 
+**Warum die Texturen bei 512 bleiben, obwohl die Quellen 4096 haben.** Seit das
+Spiel auf dem Handy nativ zeichnet, sitzt die Verfolgerkamera 2,7 m vor der
+Figur, und dort hat der Bildschirm 258 Punkte je Meter. Zwei Texturen liegen
+darunter: die Hose (`T_Peasant`, 194 Texel/m) und die Ärmel (`T_Ranger`, 195).
+Auf 1024 gebracht wären es 387 und 390, und die Textur selbst trägt dann
+nachweislich 85 % mehr Detail.
+
+Im Bild ankommen tut davon nichts. Gemessen an den Standbildern der
+Klassenwahl: **+1 %**. Der Grund steht in derselben Messung – die Kleidung
+rendert mit einer Helligkeit von 19 von 255. Sie ist fast schwarz, und
+`tintMix: 0.5` mischt die Klassenfarbe zur Hälfte darüber. Eine feinere
+Zeichnung in einer beinahe schwarzen, halb überblendeten Fläche sieht niemand.
+
+Wer es trotzdem probieren will: `tools/figur-textur.mjs` tauscht eine Textur in
+der fertigen Figur, ohne sie neu zu bauen. Die Quellen liegen im Paket unter
+`Exports/glTF (Godot-Unreal)/Outfits/`.
+
+Der Hebel liegt woanders: nicht bei der Auflösung, sondern bei den 19 von 255.
+`tintMix` in `src/assets.js` und `fuellAnteil` in `src/figurlook.js` kosten
+beide nichts.
+
 ## characters/qua_ork.glb — „Ultimate Monsters" (Alternative, nicht aktiv)
 
 Ein richtiger Ork: grün, Hauer, Irokese, Stachelkeule. Ein Material `Atlas`,

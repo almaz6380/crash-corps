@@ -336,6 +336,50 @@ tools/
   Der Speicher ist die zweite Grenze: acht Texturen sind bei 512 rund 11 MB,
   bei 1024 rund 43, bei 2048 rund 172. Die Download-Größe ist für diese
   Entscheidung das falsche Maß.
+- **Texeldichte allein überflaggt.** Sie sagt, wie viele Texel je Meter ankommen,
+  aber nicht, ob in diesem Ausschnitt überhaupt etwas steht. Bei den Figuren
+  hatten die **schlechtesten** Dichten die nackten Arme – 48 Texel je Meter,
+  aber Detail 2,1: ein Hautton, den keine Auflösung interessanter macht. Die
+  Hose kam auf 194 bei Detail 5,6, und die war wirklich weich. Deshalb beide
+  Zahlen nebeneinander: Dichte aus der UV-Spanne, Detail als Laplace-Mittel
+  über genau diesen Texturausschnitt. Nur wo beides knapp ist, lohnt eine
+  höhere Auflösung. Von sieben Figurentexturen waren das zwei.
+- **Dichte und Detail reichen beide nicht, wenn das Bild dunkel ist.** Die Hose
+  der Figuren liegt mit 194 Texel je Meter unter der Latte und trägt auf 1024
+  nachweislich 85 % mehr Detail – im gerenderten Bild kommen davon **1 %** an.
+  Gemessen in der Arena, gleiche Kamera, gleiche Stelle: Schärfe 12,66 gegen
+  11,94, tiefschwarz 46,7 gegen 46,5 Prozent. Darum gehört zu jeder
+  Texturfrage die dritte Messung: wie hell kommt die Fläche überhaupt an?
+- **Und die vierte: woher die Dunkelheit kommt.** Bei der Hose waren drei
+  Verdächtige im Spiel, und zwei davon sind widerlegt. Die Bodenverdunkelung
+  aus `figurlook.js` reicht bis `hoehe · 0.4` = 0,72 m, das Hosen-Mesh beginnt
+  aber erst bei 0,40 m – dort kostet sie höchstens 14 %. Und `tintMix` von 0,5
+  auf 0,3 gesetzt, neu gebaut und gemessen: **2,1 → 2,1 von 255**, also nichts,
+  bei vollem Verlust an Klassenfarbe. Es ist die Zeichnung selbst: unter dem
+  Hosen-Mesh steht die Textur bei **35/21/10**, unter der Haut bei 167/115/80.
+  Sechsmal dunkler, und die Tonwertkurve drückt das auf 2 von 255. Wer die
+  Kleidung heller haben will, muss sie **malen** – Auflösung, Klassenfarbe und
+  Fülllicht sind dort alle drei der falsche Hebel. Gemessen wird das ohne
+  Raten: die UV-Ecken eines Meshes auf die Textur abbilden und genau diese
+  Texel mitteln.
+- **Eine Helligkeitsfrage im Schatten zu messen ist wie ein Testflug am
+  Anschlag.** Der erste Vergleich stand in einer Gasse, und dort rendert die
+  Hose mit 2 von 255 – jeder Regler hätte dasselbe Ergebnis geliefert. Für
+  solche Messungen hebt das Prüfskript die Figur über `?mess=1` um 16 m aus
+  der Verdeckung: Material, Licht, Tone-Mapping und Pose bleiben die des
+  Spiels, nur der Schatten fällt weg.
+- Eine Textur in einer fertigen Figur tauscht `tools/figur-textur.mjs`, **ohne
+  die Figur neu zu bauen**: die UVs bleiben ohnehin gleich, nur das Bild wird
+  feiner. Neubacken über `figur-bauen.mjs` riskiert Unterschiede am
+  zurechtgeschnittenen Körper, den Häuten und den Clips, um die es gar nicht
+  geht. Das Werkzeug prüft vorher, ob Quelle und eingebautes Bild dasselbe
+  Motiv zeigen (beide auf 256, mittlere Abweichung unter 6 von 255) – sonst
+  Abbruch, denn eine fremde Zeichnung auf der Figur sieht man hinterher und
+  weiß nicht, woher sie kommt. Es räumt auch **nicht** auf: kein `prune`, kein
+  `dedup`, damit der Unterschied genau ein Bild ist und sonst nichts.
+- Die Figuren benutzen `EXT_texture_webp`. Der Bildindex steht damit in
+  `textures[i].extensions.EXT_texture_webp.source`, nicht in `source` – wer nur
+  `source` liest, findet gar keine Textur und hält die Figur für texturlos.
 - Die Vorlade-Liste ist zweigeteilt (`assetGruppen()` in `tools/assets-liste.mjs`):
   Grundpaket (Figuren, Bausatz) unter 8 MB und offline, Realismus-Satz (HDRI,
   Fotooberflächen) nur nachgeladen. Neue Realismus-Assets gehören in die zweite
