@@ -5,6 +5,7 @@ import { REAL } from './style.js';
 import { realisticMaterial, uvSurface, SURFACE_FOR_PROP, SURFACE_FOR_MATERIAL } from './surface.js';
 import { figurMaterial } from './figurlook.js';
 import { embeddedBytes } from './embed.js';
+import { ANISO } from './device.js';
 
 /**
  * Asset-Pipeline für Figuren. Modelle liegen in public/assets/, werden einmal
@@ -507,22 +508,11 @@ const kitLaden = new Map();      // Bausatzname → laufendes Laden
  * `spawnProp` merkt keinen Unterschied.
  */
 /**
- * Anisotrope Filterung für alles, was aus einer Datei kommt.
- *
- * Ohne sie steht `anisotropy` auf 1, und three nimmt dann für eine schräg
- * stehende Fläche die Mipmap-Stufe des **stärker** verkleinerten Randes –
- * eine Straße, die vom Fuß bis zum Horizont läuft, wird dadurch schon nach
- * wenigen Metern zu Brei. Genau so sah der Bausatz aus: `world.js` setzt 8 für
- * seine eigenen Leinwandtexturen und `surface.js` 4 für die Fotooberflächen,
- * aber die Texturen aus `dorf.glb` und `natur.glb` – also jede Wand, jedes
- * Dach, jede Gasse – bekamen nie einen Wert.
- *
- * 16 ist der übliche Höchstwert; three deckelt selbst auf das, was die
- * Grafikkarte kann. Kosten entstehen nur dort, wo die Fläche wirklich schräg
- * steht, und moderne Hardware macht das in der Textureinheit.
+ * Anisotrope Filterung für alles, was aus einer Datei kommt: Bausatzteile und
+ * Figuren. Die Zahl steht in `device.js`, damit `world.js` und `surface.js`
+ * dieselbe benutzen – vorher setzte jede Datei ihre eigene (8, 4, und der
+ * Bausatz gar keine).
  */
-const ANISO = 16;
-
 function texturenSchaerfen(wurzel) {
   const fertig = new Set();
   wurzel.traverse((o) => {

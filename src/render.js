@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { Sky } from 'three/addons/objects/Sky.js';
 import { REAL } from './style.js';
-import { QUALITY } from './device.js';
+import { QUALITY, kantenFuer } from './device.js';
 
 /**
  * Render-Stufe: Cel-Shading, Outline-Pass, Tone-Mapping.
@@ -380,10 +380,11 @@ export class Pipeline {
     // zeichnete das Spiel die Szene weiter zweimal, für nichts.
     this.normalVoll = useOutline || useAo > 0;
     this.normalAn = this.normalVoll;
-    // Die Zahl der Abtastungen kommt aus der Leistungsstufe: bei doppelter
-    // Bildpunktdichte auf einem Handy bringt die vierfache Abtastung kaum noch
-    // etwas, kostet aber volle Bandbreite.
-    this.kantenVoll = QUALITY.samples ?? 4;
+    // Die Zahl der Abtastungen hängt an der tatsächlichen Bildpunktdichte,
+    // nicht an der gewünschten: `renderer.getPixelRatio()` ist schon mit
+    // `devicePixelRatio` gedeckelt. Warum sie bei hoher Dichte auf null geht,
+    // steht bei `kantenFuer` in `device.js`.
+    this.kantenVoll = kantenFuer(renderer.getPixelRatio());
     this.color = new THREE.WebGLRenderTarget(1, 1, { samples: this.kantenVoll, type: THREE.HalfFloatType });
     this.normal = new THREE.WebGLRenderTarget(1, 1);
     this.normal.depthTexture = new THREE.DepthTexture(1, 1);
@@ -642,6 +643,31 @@ export class Pipeline {
     const g = this.renderer.getSize(new THREE.Vector2());
     this.renderer.setPixelRatio(v);
     this.setSize(g.x, g.y, v);
+  }
+
+  /**
+   * Die Auflösung neu setzen, weil jemand die Stufe im Menü gewechselt hat.
+   *
+   * Das wirkt sofort und nicht erst nach dem Neuladen – nur so lässt sich am
+   * Gerät vergleichen, und ob sich die Stufe lohnt, kann hier niemand messen,
+   * das sieht nur der, der davorsitzt.
+   *
+   * Drei Dinge müssen dabei zusammenpassen: `pixelVoll` ist der Bezugswert der
+   * Sparleiter, und stünde dort noch der alte, rechnete sie ihre Stufen gegen
+   * eine Auflösung, die es nicht mehr gibt. Was sie an Bildpunkten schon
+   * gespart hatte, ist mit dem Wechsel gegenstandslos und fliegt aus `gespart`,
+   * sonst gäbe `grosszuegig()` später eine Auflösung zurück, die niemand
+   * gewählt hat. Und die Kantenglättung hängt an der Dichte.
+   *
+   * @param {number} v bereits mit `devicePixelRatio` gedeckelter Wert
+   */
+  bildpunkteSetzen(v) {
+    this.pixelVoll = v;
+    this.gespart = this.gespart.filter((w) => w !== 'Bildpunkte' && w !== 'Bildpunkte2');
+    this.kantenVoll = kantenFuer(v);
+    this._kanten(this.kantenVoll);
+    this._pixel(v);
+    return v;
   }
 
   render(scene, camera) {

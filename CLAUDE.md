@@ -430,6 +430,11 @@ tools/
   dort sofort, weil ihm die Hochfrequenz fehlt. Verglichen wird nur, was gleich
   groß ist – zwei Bilder verschiedener Auflösung haben verschiedene
   Hochfrequenz, ohne dass eines schärfer wäre.
+- Der Messgriff der Prüfskripte hängt an `?mess=1` (`globalThis.__mess` in
+  `main.js`): Kamera fest setzen, Sparleiter von außen durchfahren,
+  Zeichenaufrufe auslesen. Er steht fest im Code, statt ihn je Messung von Hand
+  ein- und auszubauen – ein vergessener Haken wäre sonst irgendwann in einer
+  Auslieferung mitgefahren.
 - Drei Stellen entscheiden über die Schärfe, und alle drei standen falsch:
   `QUALITY.pixelRatio` (auf dem Handy 1,4 bei dreifacher Bildpunktdichte – der
   Browser skalierte den Rest), `schaerfe` im Comic-Stil (stand auf 0, obwohl
@@ -461,6 +466,25 @@ tools/
 - `antialias` am Renderer ist wirkungslos – gezeichnet wird in Render-Targets,
   auf den Bildschirm kommt ein Vollbild-Rechteck ohne Innenkanten. Die Glättung,
   die wirkt, sitzt als `samples` am Farb-Target.
+- **Im Comic-Stil ist die Kantenglättung ihr Geld nicht wert.** Der Umriss – die
+  auffälligste Kante im Bild – wird im Composite aus dem Normalen-Puffer
+  gerechnet, und `this.normal` wird **ohne** `samples` angelegt. Die Glättung am
+  Farb-Target erwischt also nur Polygonkanten, die der schwarze Strich ohnehin
+  überdeckt. Dieselbe Bandbreite in Auflösung gesteckt hilft beidem: 2,0 mit
+  zwei Abtastungen kostet so viel wie 2,45 ohne, und das sind 2068 statt 1688
+  Bildpunkte in der Breite. `kantenFuer()` in `device.js` entscheidet das; auf
+  dem Rechner bleibt es bei vier, denn im realen Stil gibt es keinen Umriss.
+- Die Auflösung hat drei Stufen (`sparsam` 1,4 · `normal` 2,0 · `scharf` nativ),
+  wählbar über ▦ im Menü und gemerkt; `?bildpunkte=` überschreibt zum Prüfen.
+  „Scharf" heißt nativ, nicht dreifach – `main.js` deckelt mit
+  `devicePixelRatio`, und auf einem iPhone trifft das Bild den Bildschirm dann
+  eins zu eins, ohne dass der Browser noch skaliert. Gemessen gegen 2,0 mit
+  Kantenglättung: Schärfe 4,47 → 11,07 am Markt und 3,95 → 8,69 in der Gasse.
+- `Pipeline.bildpunkteSetzen()` muss drei Dinge zusammenhalten: `pixelVoll` als
+  Bezugswert der Sparleiter, die Kantenglättung (hängt an der Dichte) und
+  `gespart` – was die Leiter an Bildpunkten gespart hatte, ist nach einem
+  Wechsel gegenstandslos und muss raus, sonst gibt `grosszuegig()` später eine
+  Auflösung zurück, die niemand gewählt hat.
 - Die Zielsuche der Bots ist die teuerste Stelle der KI: **ein Strahl je
   Gegner**. Sie läuft mit `KI.zielPruefen` (5 Hz) und je Bot versetzt – alle im
   selben Bild suchen zu lassen erzeugt genau die Ruckler, die man vermeiden

@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { celRamp, buildSky, buildRealSky, himmelAusHdri, OHNE_UMRISS } from './render.js';
 import { REAL } from './style.js';
-import { QUALITY } from './device.js';
+import { QUALITY, ANISO } from './device.js';
 import { realisticMaterial, uvSurface, setImage } from './surface.js';
 import { spawnProp } from './assets.js';
 import { Leben } from './leben.js';
@@ -168,7 +168,7 @@ function talBoden(w, d) {
   }
 
   const t = new THREE.CanvasTexture(c);
-  t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8;
+  t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = ANISO;
   return t;
 }
 
@@ -230,7 +230,7 @@ function terrassenBoden(w, d, s) {
     x.fillStyle = g; x.beginPath(); x.arc(ax, ay, r, 0, 7); x.fill();
   }
   const t = new THREE.CanvasTexture(c);
-  t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8;
+  t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = ANISO;
   return t;
 }
 
@@ -272,7 +272,7 @@ export function buildWorld(scene, renderer) {
   }
   const otex = new THREE.CanvasTexture(outer);
   otex.wrapS = otex.wrapT = THREE.RepeatWrapping; otex.repeat.set(30, 30);
-  otex.colorSpace = THREE.SRGBColorSpace; otex.anisotropy = 8;
+  otex.colorSpace = THREE.SRGBColorSpace; otex.anisotropy = ANISO;
   const groundMat = REAL
     // 320 m Boden, Kachel rund 4 m: näher betrachtet sieht man Gras und Steine,
     // von oben eine Wiese statt einer Farbfläche.

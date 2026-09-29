@@ -10,7 +10,10 @@ import { preloadCharacters, preloadProps } from './assets.js';
 import { REAL, stilSetzen, stilZurueckfallen, schwachGemerkt } from './style.js';
 import { preloadTextures } from './surface.js';
 import { Input } from './input.js';
-import { buehneAnpassen, TOUCH, QUALITY, LOW_END, zielhilfeAn, zielhilfeSetzen } from './device.js';
+import {
+  buehneAnpassen, TOUCH, QUALITY, LOW_END, zielhilfeAn, zielhilfeSetzen,
+  bildpunkteStufe, bildpunkteWert, bildpunkteWeiter,
+} from './device.js';
 import { Sound } from './sound.js';
 import { Domination, TEAMS } from './domination.js';
 import { Navgitter } from './navgitter.js';
@@ -32,6 +35,14 @@ const camera = new THREE.PerspectiveCamera(80, 1, 0.05, 450);
 camera.userData.canvas = canvas;
 scene.add(camera);
 const pipeline = new Pipeline(renderer, camera);
+// Griff für die Messskripte: Kamera fest setzen, Sparleiter von außen
+// durchfahren, Zeichenaufrufe auslesen. Nur mit `?mess=1`, damit im
+// ausgelieferten Spiel nichts an den Innereien hängt – und als fester Teil des
+// Codes, weil das Ein- und Ausbauen von Hand eine Fehlerquelle ist: ein
+// vergessener Haken wäre in jeder Auslieferung mitgefahren.
+if (new URLSearchParams(location.search).get('mess') === '1') {
+  globalThis.__mess = { renderer, scene, camera, pipeline };
+}
 
 let world = null;                      // wird nach dem Laden der Props gebaut
 const input = new Input(canvas);
@@ -231,6 +242,20 @@ hud.onCustomize = () => {
 hud.onZielhilfe = () => { sound.klick(); return zielhilfeSetzen(!zielhilfeAn()); };
 hud.zielhilfeStand(zielhilfeAn());
 
+/**
+ * Auflösung umschalten. Gedeckelt wird hier, nicht in `device.js`: die
+ * Bildschirmdichte kennt nur der Browser, und „Scharf" heißt genau deshalb
+ * nativ und nicht dreifach.
+ */
+const bildpunkteStand = (stufe) => ({ stufe, wert: Math.min(devicePixelRatio, bildpunkteWert(stufe)) });
+hud.onBildpunkte = () => {
+  sound.klick();
+  const stand = bildpunkteStand(bildpunkteWeiter());
+  pipeline.bildpunkteSetzen(stand.wert);
+  return stand;
+};
+hud.bildpunkteStand(bildpunkteStand(bildpunkteStufe()));
+
 hud.onPause = () => {
   if (!running) return;
   sound.klick(); running = false; input.showTouch(false);
@@ -386,6 +411,11 @@ const flug = new Testflug({
       gpu: ext ? String(gl.getParameter(ext.UNMASKED_RENDERER_WEBGL)) : 'Grafikchip: verrät der Browser nicht',
       breite: Math.round(groesse.x), hoehe: Math.round(groesse.y),
       pixelRatio: renderer.getPixelRatio().toFixed(2),
+      // Auflösungsstufe und Abtastungen gehören in die Kopfzeile: beide sind
+      // seit dem Knopf im Menü wählbar, und eine Tabelle ohne sie sagt nicht
+      // mehr, was eigentlich gemessen wurde.
+      bildpunkte: bildpunkteStufe(),
+      kanten: pipeline.kantenVoll,
       stil: REAL ? 'fotoreal' : 'comic',
       stufe: LOW_END ? 'niedrig' : 'hoch',
       figuren: bots.length + 1,

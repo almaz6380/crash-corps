@@ -27,6 +27,7 @@ export class Hud {
           <button id="gyro-um-y" type="button" title="Oben/unten umkehren" hidden>↕</button>
           <button id="mess" type="button" title="Leistungstest: misst auf diesem Gerät, was welche Stufe kostet">📊</button>
           ${TOUCH ? '<button id="zielhilfe" type="button" title="Zielhilfe: bremst das Wischen nah am Gegner"></button>' : ''}
+          <button id="bildpunkte" type="button" title="Auflösung: „Scharf&#34; zeichnet so fein wie der Bildschirm ist"></button>
           <button id="grafik" type="button" title="Grafikstil umschalten"></button>
           <button id="ton" type="button" title="Ton an/aus (M)"></button>
         </div>
@@ -123,6 +124,8 @@ export class Hud {
     }
     const zh = root.querySelector('#zielhilfe');
     if (zh) zh.onclick = () => this.zielhilfeStand(this.onZielhilfe?.());
+    const bp = root.querySelector('#bildpunkte');
+    if (bp) bp.onclick = () => this.bildpunkteStand(this.onBildpunkte?.());
     this.tonKnoepfe = [root.querySelector('#ton'), root.querySelector('#ton2')];
     for (const b of this.tonKnoepfe) b.onclick = () => this.tonStand(this.onSound?.());
     const anp = root.querySelector('#anpassen');
@@ -387,6 +390,19 @@ export class Hud {
   zielhilfeStand(an) {
     const el = this.root.querySelector('#zielhilfe');
     if (el) el.textContent = an ? '🎯 Zielhilfe an' : '🎯 Zielhilfe aus';
+  }
+
+  /**
+   * Beschriftung des Auflösungs-Knopfs. Die Zahl dahinter ist die **echte**,
+   * schon mit der Bildschirmdichte gedeckelte – auf einem Rechner mit Dichte 1
+   * stehen alle drei Stufen sonst da, als täten sie etwas.
+   */
+  bildpunkteStand(stand) {
+    const el = this.root.querySelector('#bildpunkte');
+    if (!el || !stand) return;
+    const name = { sparsam: 'Sparsam', normal: 'Normal', scharf: 'Scharf' }[stand.stufe] || stand.stufe;
+    const zahl = stand.wert.toFixed(2).replace(/\.?0+$/, '').replace('.', ',');
+    el.textContent = `▦ ${name} ×${zahl}`;
   }
 
   /**
