@@ -139,28 +139,41 @@ der fertigen Figur, ohne sie neu zu bauen. Die Quellen liegen im Paket unter
 gemessen und freigesprochen: `tintMix` von 0,5 auf 0,3 änderte die Hose um
 2,1 → 2,1 von 255, und die Bodenverdunkelung aus `figurlook.js` reicht bis
 0,72 m, während das Hosen-Mesh erst bei 0,40 m beginnt. Die Textur selbst steht
-unter dem Hosen-Mesh bei 35/21/10 – sechsmal dunkler als die Haut derselben
-Figur (167/115/80).
+unter dem Hosen-Mesh bei 33/20/9 – sechsmal dunkler als die Haut derselben
+Figur (167/117/82).
 
 Auch das Paket half nicht. Es enthält zwei weitere Farbvarianten, die im
 glTF-Export fehlen und nur unter `Textures/` liegen:
 
-| | Hose | Kapuze | Wams | Stiefel |
-|---|---|---|---|---|
-| `T_Peasant` → `T_Peasant_2` | 23 → 25 | – | 76 → 54 | 51 → 39 |
-| `T_Ranger` → `T_Ranger_3` | 25 → 89 | 58 → 24 | 90 → 63 | 122 → 85 |
+| | Hose | Ärmel | Kapuze | Wams | Stiefel |
+|---|---|---|---|---|---|
+| `T_Peasant` → `T_Peasant_2` | 21 → 23 | 44 → 26 | – | 103 → 42 | 49 → 37 |
+| `T_Ranger` → `T_Ranger_3` | 24 → **87** | 40 → **89** | 65 → 26 | 64 → 39 | 63 → 36 |
 
-Peasant_2 ist überall dunkler. Ranger_3 löst die Hose des Schurken und macht
-dafür seine Kapuze schwarz – eine dunkle Stelle gegen eine andere.
+Peasant_2 ist überall dunkler. Ranger_3 löst Hose und Ärmel des Schurken und
+macht dafür Kapuze, Wams, Gürtel und Stiefel dunkler – eine dunkle Stelle gegen
+vier andere.
 
 Aufgehellt wird deshalb selbst, mit
-`tools/figur-textur.mjs --aufhellen=<Mesh>:<Leuchtdichte>`: nur der UV-Bereich
-des genannten Meshes, geweitet um vier Bildpunkte gegen den Nahtrand, aber
-nicht in die Inseln der Nachbarteile. Die Hose steht damit bei 60 von 255,
-alles andere unverändert; es kostet 6 KB je Figur.
+`tools/figur-textur.mjs --aufhellen=<Mesh>[@<Material>]:<Leuchtdichte>`: nur der
+UV-Bereich des genannten Meshes, geweitet um vier Bildpunkte gegen den Nahtrand,
+aber nicht in die Inseln der Nachbarteile.
 
-    node tools/figur-textur.mjs public/assets/characters/qua_barbar.glb \
-      --aufhellen=Male_Peasant_Legs:60
+| | Hose | Ärmel | Stiefel | Kapuze |
+|---|---|---|---|---|
+| Barbar | 22 → **59** | – | 49 → **62** | – |
+| Schurke | 24 → **57** | 41 → **62** | 63 (reicht) | 65 (reicht) |
+| Magier | 22 → **59** | 45 → **62** | 49 → **62** | 65 (reicht) |
+
+Alles andere bleibt unverändert – nachgewiesen je Primitiv mit
+`tools/figur-helligkeit.mjs <alt.glb> <neu.glb>`. Es kostet 6 bis 7 KB je Figur.
+
+    node tools/figur-textur.mjs public/assets/characters/qua_magier.glb \
+      --aufhellen=Male_Peasant_Arms@MI_Peasant:62 \
+      --aufhellen=Male_Peasant_Feet:62
+
+Der Materialzusatz ist beim Ärmel nötig: Ärmel und nackter Arm heißen beide
+`Male_Peasant_Arms`. Ohne ihn bricht das Werkzeug ab, statt zu raten.
 
 ## characters/qua_ork.glb — „Ultimate Monsters" (Alternative, nicht aktiv)
 

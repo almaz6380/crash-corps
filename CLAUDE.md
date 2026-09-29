@@ -361,17 +361,29 @@ tools/
   aber erst bei 0,40 m – dort kostet sie höchstens 14 %. Und `tintMix` von 0,5
   auf 0,3 gesetzt, neu gebaut und gemessen: **2,1 → 2,1 von 255**, also nichts,
   bei vollem Verlust an Klassenfarbe. Es ist die Zeichnung selbst: unter dem
-  Hosen-Mesh steht die Textur bei **35/21/10**, unter der Haut bei 167/115/80.
+  Hosen-Mesh steht die Textur bei **33/20/9**, unter der Haut bei 167/117/82.
   Sechsmal dunkler, und die Tonwertkurve drückt das auf 2 von 255. Wer die
   Kleidung heller haben will, muss sie **malen** – Auflösung, Klassenfarbe und
-  Fülllicht sind dort alle drei der falsche Hebel. Gemessen wird das ohne
-  Raten: die UV-Ecken eines Meshes auf die Textur abbilden und genau diese
-  Texel mitteln.
+  Fülllicht sind dort alle drei der falsche Hebel.
   Das Paket selbst half dabei nicht. Es liefert zwei weitere Farbvarianten
   (`T_Peasant_2`, `T_Ranger_3`, im Ordner `Textures/`, nicht im glTF-Export):
-  Peasant_2 ist überall dunkler, Ranger_3 hebt die Hose des Schurken von 25 auf
-  89, drückt dafür aber seine Kapuze von 58 auf 24. Eine dunkle Stelle gegen
-  eine andere zu tauschen ist keine Lösung – aufgehellt wird selbst.
+  Peasant_2 ist überall dunkler, Ranger_3 hebt Hose und Ärmel des Schurken von
+  24 auf 87 und von 40 auf 89 – drückt dafür aber Wams (64 → 39), Gürtel
+  (84 → 52), Stiefel (63 → 36) und Kapuze (65 → 26). Eine dunkle Stelle gegen
+  vier andere zu tauschen ist keine Lösung – aufgehellt wird selbst.
+- **Gemessen wird die Fläche, nicht die Ecken.** `figur-helligkeit.mjs` hat die
+  Leuchtdichte eines Teils lange aus seinen **UV-Ecken** geschätzt. Das ist
+  billig und war falsch: die Ecken liegen an den Rändern der UV-Insel, oft schon
+  in der hellen Polsterfläche daneben. Beim Peasant-Atlas fiel es nicht auf
+  (Hose 23 gegen 22), beim Ranger-Atlas um Längen: **Stiefel 122 statt 63,
+  Wams 91 statt 64, Gürtel 124 statt 85.** Die Stiefel galten damit als das
+  hellste Kleidungsstück und sind in Wahrheit so dunkel wie die Hose – eine
+  ganze Entscheidung stand auf dieser Zahl.
+  Richtig ist, die UV-Dreiecke zu **rastern** und über alle belegten Texel zu
+  mitteln. Genau das tut `uvFlaeche`, und die Funktion lebt deshalb nur noch
+  einmal: in `figur-helligkeit.mjs`, von wo `figur-textur.mjs` sie importiert.
+  Zwei Werkzeuge, die dieselbe Größe verschieden messen, melden irgendwann
+  verschiedene Wahrheiten über dieselbe Figur.
 - **Eine Helligkeitsfrage im Schatten zu messen ist wie ein Testflug am
   Anschlag.** Der erste Vergleich stand in einer Gasse, und dort rendert die
   Hose mit 2 von 255 – jeder Regler hätte dasselbe Ergebnis geliefert. Für
@@ -379,19 +391,25 @@ tools/
   der Verdeckung: Material, Licht, Tone-Mapping und Pose bleiben die des
   Spiels, nur der Schatten fällt weg.
 - **Gemalte Dunkelheit hellt man auf, wo sie sitzt.** Der Hebel dafür ist
-  `tools/figur-textur.mjs --aufhellen=<Mesh>:<Leuchtdichte>`. Zwei Dinge macht
-  es anders, als man es von Hand täte:
+  `tools/figur-textur.mjs --aufhellen=<Mesh>[@<Material>]:<Leuchtdichte>`.
+  Vier Dinge macht es anders, als man es von Hand täte:
   **Es hellt nicht die Textur auf, sondern den Bereich eines Meshes.** Auf
-  derselben Textur liegt beim Magier der Kittel mit 76, und der ist in Ordnung.
+  derselben Textur liegt beim Magier der Kittel mit 104, und der ist in Ordnung.
   Den Bereich liefert das Mesh selbst: seine UV-Dreiecke werden in eine Maske
   gerastert. Geweitet wird sie um vier Bildpunkte, weil UV-Inseln an der Naht
   enden und der Filter sonst einen dunklen Rand um jedes Hosenbein zieht – aber
   **nicht in die Inseln der anderen Teile**. Ohne diese Sperre stiegen beim
   Schurken Gürtel, Stiefel und Wams um ein bis zwei Stufen mit.
+  **Gemessen wird der Kern, aufgetragen auf die geweitete Maske.** Die Weitung
+  greift leere Polsterfläche mit, und die ist oft hell; als Messgrundlage würde
+  sie den Ausgangswert schönen.
   **Gesagt wird das Ziel, nicht die Kurve.** Der Gamma-Wert wird eingegabelt,
   bis der Bereich bei der genannten Leuchtdichte landet – der Mittelwert der
   verbogenen Werte ist nicht der verbogene Mittelwert, ausrechnen geht also
-  nicht. Für die Hose: 23 → 60 bei Gamma 0,59, das sind 6 KB je Figur.
+  nicht. Für die Hose: 22 → 59 bei Gamma 0,59, das sind 6 KB je Figur.
+  **Je Textur wird einmal kodiert.** Beim Magier liegen Ärmel, Stiefel und Hose
+  alle auf `T_Peasant`; drei Aufträge hießen sonst drei WebP-Durchgänge auf
+  demselben Bild, also dreifacher Generationsverlust für nichts.
   Im Bild kommt davon ein Drittel an: die Hose rendert mit 11 statt 15 von 255,
   auf allen drei Figuren gleich gerichtet, und man sieht den Unterschied – der
   Stoff zeigt seine Falten statt einer schwarzen Fläche. **In der Gasse ist es
@@ -413,9 +431,10 @@ tools/
   Hintergrund in der Zahl, und aus 11 → 15 wurde 1,5 → 2,0 – ein echter Gewinn
   sah aus wie Rauschen. Gemessen wird nur, wo `alpha > 200` ist.
 - **Meshnamen sind nicht eindeutig, und das Werkzeug darf nicht raten.** Beim
-  Magier heißen Ärmel und nackter Arm beide `Male_Peasant_Arms`, auf
-  verschiedenen Materialien und verschiedenen Texturen. `--aufhellen` bricht
-  deshalb ab, wenn mehrere Meshes den Namen tragen, und nennt beide. Wer sich
+  Magier heißen Ärmel und nackter Arm beide `Male_Peasant_Arms`, beim Schurken
+  beide `Male_Ranger_Arms`, auf verschiedenen Materialien und verschiedenen
+  Texturen. `--aufhellen` bricht deshalb ab, wenn mehrere Meshes den Namen
+  tragen, und nennt die Aufrufe, die es auflösen (`Mesh@Material`). Wer sich
   still den ersten greift, hellt irgendwann eine Hand auf. Dasselbe gilt für
   Prüfskripte: eine `Map` nach Meshnamen überschreibt den einen Treffer mit dem
   anderen und versteckt genau das Teil, um das es geht – Schlüssel ist Mesh
