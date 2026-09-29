@@ -49,6 +49,7 @@
 import fs from 'node:fs';
 import { NodeIO } from '@gltf-transform/core';
 import { ALL_EXTENSIONS } from '@gltf-transform/extensions';
+import { uvFlaeche } from './figur-helligkeit.mjs';
 
 
 const kb = (n) => `${(n / 1024).toFixed(0)} KB`;
@@ -68,48 +69,6 @@ async function gleichesMotiv(sharp, a, b) {
     if (d > groesste) groesste = d;
   }
   return { mittel: summe / x.length, groesste };
-}
-
-/**
- * Die UV-Fläche eines Primitivs in eine Maske rastern.
- *
- * Gerastert wird über Schwerpunktkoordinaten, Dreieck für Dreieck. Danach wird
- * die Maske geweitet: UV-Inseln enden genau an der Naht, und ein Bildpunkt, der
- * beim Filtern von außerhalb dazugeholt wird, bliebe sonst dunkel und zöge
- * einen Rand um jedes Hosenbein.
- */
-function uvFlaeche(prim, breite, hoehe) {
-  const uv = prim.getAttribute('TEXCOORD_0');
-  const idx = prim.getIndices();
-  const anzahl = idx ? idx.getCount() : uv.getCount();
-  const ecke = (k) => {
-    const i = idx ? idx.getScalar(k) : k;
-    const a = [0, 0];
-    uv.getElement(i, a);
-    return [a[0] * breite, a[1] * hoehe];
-  };
-
-  const maske = new Uint8Array(breite * hoehe);
-  for (let k = 0; k + 2 < anzahl; k += 3) {
-    const [p0, p1, p2] = [ecke(k), ecke(k + 1), ecke(k + 2)];
-    const x0 = Math.max(0, Math.floor(Math.min(p0[0], p1[0], p2[0])));
-    const x1 = Math.min(breite - 1, Math.ceil(Math.max(p0[0], p1[0], p2[0])));
-    const y0 = Math.max(0, Math.floor(Math.min(p0[1], p1[1], p2[1])));
-    const y1 = Math.min(hoehe - 1, Math.ceil(Math.max(p0[1], p1[1], p2[1])));
-    const fl = (p1[0] - p0[0]) * (p2[1] - p0[1]) - (p2[0] - p0[0]) * (p1[1] - p0[1]);
-    if (Math.abs(fl) < 1e-9) continue;
-    for (let y = y0; y <= y1; y++) {
-      for (let x = x0; x <= x1; x++) {
-        const px = x + 0.5, py = y + 0.5;
-        const a = ((p1[0] - px) * (p2[1] - py) - (p2[0] - px) * (p1[1] - py)) / fl;
-        const b = ((p2[0] - px) * (p0[1] - py) - (p0[0] - px) * (p2[1] - py)) / fl;
-        const c = 1 - a - b;
-        if (a >= -1e-6 && b >= -1e-6 && c >= -1e-6) maske[y * breite + x] = 1;
-      }
-    }
-  }
-
-  return maske;
 }
 
 /**
@@ -193,18 +152,27 @@ const auftraege = args.filter((a) => a.startsWith('--bild='))
     return { name: s.slice(0, i), datei: s.slice(i + 1) };
   });
 
-// `--aufhellen=Mesh:Leuchtdichte`, mehrfach erlaubt
+// `--aufhellen=Mesh[@Material]:Leuchtdichte`, mehrfach erlaubt.
+// Der Materialzusatz ist nötig, weil Meshnamen nicht eindeutig sind: Ärmel und
+// nackter Arm heißen beide `Male_Peasant_Arms`. Ohne ihn bricht das Werkzeug
+// bei solchen Namen ab, statt zu raten.
 const hellen = args.filter((a) => a.startsWith('--aufhellen='))
   .map((a) => a.slice('--aufhellen='.length))
   .map((t) => {
     const i = t.lastIndexOf(':');
-    return { mesh: t.slice(0, i), ziel: +t.slice(i + 1) };
+    const wer = t.slice(0, i);
+    const at = wer.indexOf('@');
+    return {
+      mesh: at < 0 ? wer : wer.slice(0, at),
+      material: at < 0 ? null : wer.slice(at + 1),
+      ziel: +t.slice(i + 1),
+    };
   });
 const weitenSchritte = +(opt('weiten') ?? 4);
 
 if (!quelle || (!auftraege.length && !hellen.length)) {
   console.error('Aufruf: node tools/figur-textur.mjs <figur.glb> --bild=<Texturname>=<quelle.png> [--textur=1024] [--ziel=<datei.glb>]');
-  console.error('       node tools/figur-textur.mjs <figur.glb> --aufhellen=<Mesh>:<Leuchtdichte> [--weiten=4] [--ziel=<datei.glb>]');
+  console.error('       node tools/figur-textur.mjs <figur.glb> --aufhellen=<Mesh>[@<Material>]:<Leuchtdichte> [--weiten=4] [--ziel=<datei.glb>]');
   console.error('  Welche Texturen und Meshes eine Figur hat, zeigt `node tools/glb-info.mjs <figur.glb>`.');
   process.exit(1);
 }
@@ -254,74 +222,112 @@ for (const { name, datei } of auftraege) {
   getauscht++;
 }
 
-// Aufhellen: je genannter Mesh seinen UV-Bereich in der eigenen Textur anheben.
-for (const { mesh, ziel: zielWert } of hellen) {
-  // Alle Treffer sammeln, nicht den ersten nehmen. Namen sind in diesen
-  // Modellen nicht eindeutig: beim Magier heißen Ärmel und nackter Arm beide
-  // `Male_Peasant_Arms`, und sie liegen auf verschiedenen Texturen. Wer sich
-  // still den ersten greift, hellt irgendwann eine Hand auf.
+/**
+ * Welches Primitiv ist gemeint?
+ *
+ * Alle Treffer sammeln, nicht den ersten nehmen. Namen sind in diesen Modellen
+ * nicht eindeutig: beim Magier heißen Ärmel und nackter Arm beide
+ * `Male_Peasant_Arms`, und sie liegen auf verschiedenen Texturen. Wer sich
+ * still den ersten greift, hellt irgendwann eine Hand auf. Bleibt mehr als
+ * einer übrig, bricht es ab und nennt die Materialien – mit denen lässt sich
+ * der Auftrag dann eindeutig machen (`Mesh@Material`).
+ */
+function primitivSuchen(doc, mesh, material) {
   const treffer = [];
   for (const m of doc.getRoot().listMeshes()) {
     if (m.getName() !== mesh) continue;
     for (const pr of m.listPrimitives()) {
-      const t = pr.getMaterial()?.getBaseColorTexture();
-      if (pr.getAttribute('TEXCOORD_0') && t) treffer.push({ prim: pr, tex: t, mat: pr.getMaterial() });
+      const mat = pr.getMaterial();
+      const t = mat?.getBaseColorTexture();
+      if (!pr.getAttribute('TEXCOORD_0') || !t) continue;
+      if (material && mat.getName() !== material) continue;
+      treffer.push({ prim: pr, tex: t, mat });
     }
   }
+  const wer = mesh + (material ? `@${material}` : '');
   if (!treffer.length) {
     const namen = doc.getRoot().listMeshes().map((m) => m.getName()).join(', ');
-    console.error(`  \x1b[31m${mesh}: kein Mesh dieses Namens mit Textur.\x1b[0m Vorhanden: ${namen}`);
+    console.error(`  \x1b[31m${wer}: kein Mesh dieses Namens mit Textur.\x1b[0m Vorhanden: ${namen}`);
     process.exit(1);
   }
   if (treffer.length > 1) {
-    console.error(`  \x1b[31m${mesh}: ${treffer.length} Meshes tragen diesen Namen.\x1b[0m`);
-    for (const t of treffer) console.error(`    Material ${t.mat.getName()}, Textur ${t.tex.getName()}`);
-    console.error('  Welches gemeint ist, kann das Werkzeug nicht wissen – Abbruch.');
+    console.error(`  \x1b[31m${wer}: ${treffer.length} Meshes tragen diesen Namen.\x1b[0m`);
+    for (const t of treffer) console.error(`    ${mesh}@${t.mat.getName()}   Textur ${t.tex.getName()}`);
+    console.error('  Welches gemeint ist, sagt der Materialzusatz – Abbruch.');
     process.exit(1);
   }
-  const { prim, tex } = treffer[0];
+  return treffer[0];
+}
 
+// Aufhellen, **nach Textur gruppiert**: beim Magier liegen Ärmel, Stiefel und
+// Hose alle auf `T_Peasant`. Jeden Auftrag einzeln zu schreiben hieße, dasselbe
+// Bild dreimal hintereinander als WebP zu kodieren – dreifacher
+// Generationsverlust für nichts. Also einmal dekodieren, alle Masken darauf,
+// einmal kodieren.
+const nachTextur = new Map();
+for (const auftrag of hellen) {
+  const { prim, tex } = primitivSuchen(doc, auftrag.mesh, auftrag.material);
+  if (!nachTextur.has(tex)) nachTextur.set(tex, []);
+  nachTextur.get(tex).push({ ...auftrag, prim });
+}
+
+for (const [tex, jobs] of nachTextur) {
   const bild = sharp(Buffer.from(tex.getImage()));
   const { width, height } = await bild.metadata();
   const buf = await bild.removeAlpha().raw().toBuffer();
-  // Sperrgebiet: alles, was andere Teile auf derselben Textur belegen.
-  const gesperrt = new Uint8Array(width * height);
-  for (const m of doc.getRoot().listMeshes()) {
-    for (const pr of m.listPrimitives()) {
-      if (pr === prim) continue;
-      if (pr.getMaterial()?.getBaseColorTexture() !== tex) continue;
-      if (!pr.getAttribute('TEXCOORD_0')) continue;
-      const f = uvFlaeche(pr, width, height);
-      for (let i = 0; i < f.length; i++) if (f[i]) gesperrt[i] = 1;
+  const altGroesse = tex.getImage().byteLength;
+  let angefasst = false;
+
+  for (const { mesh, ziel: zielWert, prim } of jobs) {
+    // Sperrgebiet: alles, was andere Teile auf derselben Textur belegen. Es
+    // begrenzt nur das Weiten der Maske, nicht die Maske selbst.
+    const gesperrt = new Uint8Array(width * height);
+    for (const m of doc.getRoot().listMeshes()) {
+      for (const pr of m.listPrimitives()) {
+        if (pr === prim) continue;
+        if (pr.getMaterial()?.getBaseColorTexture() !== tex) continue;
+        if (!pr.getAttribute('TEXCOORD_0')) continue;
+        const f = uvFlaeche(pr, width, height);
+        for (let i = 0; i < f.length; i++) if (f[i]) gesperrt[i] = 1;
+      }
     }
-  }
-  const maske = weiten(uvFlaeche(prim, width, height), gesperrt, width, height, weitenSchritte);
-  const flaeche = maske.reduce((a, b) => a + b, 0);
-  const vorher = leuchtdichte(buf, maske);
-  const { gamma, erreicht } = gammaFuer(buf, maske, zielWert);
+    // **Gemessen wird der Kern, aufgetragen auf die geweitete Maske.** Die
+    // Weitung greift die leere Polsterfläche um die UV-Insel mit – die ist oft
+    // hell und schönt den Ausgangswert. Bei der Kapuze log die Maske um sieben
+    // Stufen (65 statt 58), und das Ziel wäre entsprechend verfehlt worden.
+    // Die Zahl soll sagen, was auf dem Mesh ankommt, nicht was im Atlas liegt.
+    const kern = uvFlaeche(prim, width, height);
+    const maske = weiten(kern.slice(), gesperrt, width, height, weitenSchritte);
+    const flaeche = maske.reduce((a, b) => a + b, 0);
+    const vorher = leuchtdichte(buf, kern);
+    const { gamma, erreicht } = gammaFuer(buf, kern, zielWert);
 
-  if (gamma >= 1) {
-    console.log(`  ${mesh.padEnd(24)} liegt schon bei ${vorher.toFixed(0)} – nichts zu tun.`);
-    continue;
+    if (gamma >= 1) {
+      console.log(`  ${mesh.padEnd(24)} liegt schon bei ${vorher.toFixed(0)} – nichts zu tun.`);
+      continue;
+    }
+
+    // Die Kurve wirkt nur innerhalb der Maske. Außerhalb bleibt jeder Bildpunkt,
+    // wie er war – auf derselben Textur liegen Teile, die in Ordnung sind.
+    const kurve = new Uint8Array(256);
+    for (let v = 0; v < 256; v++) kurve[v] = Math.round(255 * Math.pow(v / 255, gamma));
+    for (let i = 0; i < maske.length; i++) {
+      if (!maske[i]) continue;
+      const k = i * 3;
+      buf[k] = kurve[buf[k]]; buf[k + 1] = kurve[buf[k + 1]]; buf[k + 2] = kurve[buf[k + 2]];
+    }
+    angefasst = true;
+
+    console.log(`  ${mesh.padEnd(24)} ${tex.getName()}  ${width}x${height}`
+      + `   Fläche ${(100 * flaeche / maske.length).toFixed(1)} % der Textur`);
+    console.log(`  ${''.padEnd(24)} Leuchtdichte ${vorher.toFixed(0)} → ${erreicht.toFixed(0)} (Ziel ${zielWert})`
+      + `   Gamma ${gamma.toFixed(3)}`);
   }
 
-  // Die Kurve wirkt nur innerhalb der Maske. Außerhalb bleibt jeder Bildpunkt,
-  // wie er war – auf derselben Textur liegen Teile, die in Ordnung sind.
-  const kurve = new Uint8Array(256);
-  for (let v = 0; v < 256; v++) kurve[v] = Math.round(255 * Math.pow(v / 255, gamma));
-  for (let i = 0; i < maske.length; i++) {
-    if (!maske[i]) continue;
-    const k = i * 3;
-    buf[k] = kurve[buf[k]]; buf[k + 1] = kurve[buf[k + 1]]; buf[k + 2] = kurve[buf[k + 2]];
-  }
-
-  const alt = tex.getImage().byteLength;
+  if (!angefasst) continue;
   const neu = await sharp(buf, { raw: { width, height, channels: 3 } }).webp({ quality: 90 }).toBuffer();
   tex.setImage(neu).setMimeType('image/webp');
-  console.log(`  ${mesh.padEnd(24)} ${tex.getName()}  ${width}x${height}`
-    + `   Fläche ${(100 * flaeche / maske.length).toFixed(1)} % der Textur`);
-  console.log(`  ${''.padEnd(24)} Leuchtdichte ${vorher.toFixed(0)} → ${erreicht.toFixed(0)} (Ziel ${zielWert})`
-    + `   Gamma ${gamma.toFixed(3)}   ${kb(alt)} → ${kb(neu.byteLength)}`);
+  console.log(`  ${''.padEnd(24)} ${tex.getName()}: ${kb(altGroesse)} → ${kb(neu.byteLength)}, einmal kodiert`);
   getauscht++;
 }
 
