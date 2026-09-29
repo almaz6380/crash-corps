@@ -336,6 +336,34 @@ tools/
   Der Speicher ist die zweite Grenze: acht Texturen sind bei 512 rund 11 MB,
   bei 1024 rund 43, bei 2048 rund 172. Die Download-Größe ist für diese
   Entscheidung das falsche Maß.
+- **Texeldichte allein überflaggt.** Sie sagt, wie viele Texel je Meter ankommen,
+  aber nicht, ob in diesem Ausschnitt überhaupt etwas steht. Bei den Figuren
+  hatten die **schlechtesten** Dichten die nackten Arme – 48 Texel je Meter,
+  aber Detail 2,1: ein Hautton, den keine Auflösung interessanter macht. Die
+  Hose kam auf 194 bei Detail 5,6, und die war wirklich weich. Deshalb beide
+  Zahlen nebeneinander: Dichte aus der UV-Spanne, Detail als Laplace-Mittel
+  über genau diesen Texturausschnitt. Nur wo beides knapp ist, lohnt eine
+  höhere Auflösung. Von sieben Figurentexturen waren das zwei.
+- **Dichte und Detail reichen beide nicht, wenn das Bild dunkel ist.** Die Hose
+  der Figuren liegt mit 194 Texel je Meter unter der Latte und trägt auf 1024
+  nachweislich 85 % mehr Detail – im gerenderten Bild kommen davon **1 %** an.
+  Sie rendert mit einer Helligkeit von 19 von 255, und `tintMix: 0.5` mischt
+  die Klassenfarbe zur Hälfte darüber. Darum gehört zu jeder Texturfrage die
+  dritte Messung: wie hell kommt die Fläche überhaupt an? Unter etwa 40 von 255
+  ist jede Auflösungsdebatte gegenstandslos, und der Hebel heißt `tintMix` oder
+  `fuellAnteil`, nicht Texturgröße.
+- Eine Textur in einer fertigen Figur tauscht `tools/figur-textur.mjs`, **ohne
+  die Figur neu zu bauen**: die UVs bleiben ohnehin gleich, nur das Bild wird
+  feiner. Neubacken über `figur-bauen.mjs` riskiert Unterschiede am
+  zurechtgeschnittenen Körper, den Häuten und den Clips, um die es gar nicht
+  geht. Das Werkzeug prüft vorher, ob Quelle und eingebautes Bild dasselbe
+  Motiv zeigen (beide auf 256, mittlere Abweichung unter 6 von 255) – sonst
+  Abbruch, denn eine fremde Zeichnung auf der Figur sieht man hinterher und
+  weiß nicht, woher sie kommt. Es räumt auch **nicht** auf: kein `prune`, kein
+  `dedup`, damit der Unterschied genau ein Bild ist und sonst nichts.
+- Die Figuren benutzen `EXT_texture_webp`. Der Bildindex steht damit in
+  `textures[i].extensions.EXT_texture_webp.source`, nicht in `source` – wer nur
+  `source` liest, findet gar keine Textur und hält die Figur für texturlos.
 - Die Vorlade-Liste ist zweigeteilt (`assetGruppen()` in `tools/assets-liste.mjs`):
   Grundpaket (Figuren, Bausatz) unter 8 MB und offline, Realismus-Satz (HDRI,
   Fotooberflächen) nur nachgeladen. Neue Realismus-Assets gehören in die zweite
