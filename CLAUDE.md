@@ -75,6 +75,11 @@ tools/
                     eine GLB mit geteilten Texturen
   glb-info.mjs      Liest den JSON-Teil einer GLB: Knochen, Clips, Materialien,
                     Maße – und druckt eine Vorlage für den Manifest-Eintrag
+  figur-helligkeit.mjs  Wie hell kommt jedes Teil einer Figur an? Je Mesh der
+                    Texturausschnitt, den es wirklich benutzt – nicht der
+                    Mittelwert des Atlas, der keinem Teil gehört
+  figur-textur.mjs  Tauscht eine Textur in einer fertigen Figur oder hellt den
+                    UV-Bereich eines einzelnen Meshes auf, ohne sie neu zu bauen
   glb-schlanken.mjs Wirft alle Clips außer einer Liste weg und packt neu; dazu
                     --dreiecke und --textur für Figuren aus Bild-zu-3D-Diensten
   glb-nach-obj.mjs  GLB nach OBJ+MTL+Textur als ZIP – so nimmt Mixamo eine Figur an
@@ -362,12 +367,59 @@ tools/
   Fülllicht sind dort alle drei der falsche Hebel. Gemessen wird das ohne
   Raten: die UV-Ecken eines Meshes auf die Textur abbilden und genau diese
   Texel mitteln.
+  Das Paket selbst half dabei nicht. Es liefert zwei weitere Farbvarianten
+  (`T_Peasant_2`, `T_Ranger_3`, im Ordner `Textures/`, nicht im glTF-Export):
+  Peasant_2 ist überall dunkler, Ranger_3 hebt die Hose des Schurken von 25 auf
+  89, drückt dafür aber seine Kapuze von 58 auf 24. Eine dunkle Stelle gegen
+  eine andere zu tauschen ist keine Lösung – aufgehellt wird selbst.
 - **Eine Helligkeitsfrage im Schatten zu messen ist wie ein Testflug am
   Anschlag.** Der erste Vergleich stand in einer Gasse, und dort rendert die
   Hose mit 2 von 255 – jeder Regler hätte dasselbe Ergebnis geliefert. Für
   solche Messungen hebt das Prüfskript die Figur über `?mess=1` um 16 m aus
   der Verdeckung: Material, Licht, Tone-Mapping und Pose bleiben die des
   Spiels, nur der Schatten fällt weg.
+- **Gemalte Dunkelheit hellt man auf, wo sie sitzt.** Der Hebel dafür ist
+  `tools/figur-textur.mjs --aufhellen=<Mesh>:<Leuchtdichte>`. Zwei Dinge macht
+  es anders, als man es von Hand täte:
+  **Es hellt nicht die Textur auf, sondern den Bereich eines Meshes.** Auf
+  derselben Textur liegt beim Magier der Kittel mit 76, und der ist in Ordnung.
+  Den Bereich liefert das Mesh selbst: seine UV-Dreiecke werden in eine Maske
+  gerastert. Geweitet wird sie um vier Bildpunkte, weil UV-Inseln an der Naht
+  enden und der Filter sonst einen dunklen Rand um jedes Hosenbein zieht – aber
+  **nicht in die Inseln der anderen Teile**. Ohne diese Sperre stiegen beim
+  Schurken Gürtel, Stiefel und Wams um ein bis zwei Stufen mit.
+  **Gesagt wird das Ziel, nicht die Kurve.** Der Gamma-Wert wird eingegabelt,
+  bis der Bereich bei der genannten Leuchtdichte landet – der Mittelwert der
+  verbogenen Werte ist nicht der verbogene Mittelwert, ausrechnen geht also
+  nicht. Für die Hose: 23 → 60 bei Gamma 0,59, das sind 6 KB je Figur.
+  Im Bild kommt davon ein Drittel an: die Hose rendert mit 11 statt 15 von 255,
+  auf allen drei Figuren gleich gerichtet, und man sieht den Unterschied – der
+  Stoff zeigt seine Falten statt einer schwarzen Fläche. **In der Gasse ist es
+  trotzdem unsichtbar** (2,1 → 2,6), denn dort steht die Figur im Schatten. Das
+  ist kein Widerspruch, sondern dieselbe Regel wie oben: im Schatten ist jede
+  Helligkeitsfrage gegenstandslos.
+- **Prüfstände müssen deterministisch sein, sonst vergleicht man zwei
+  verschiedene Bilder.** Der Versuch, die Figur über `?mess=1` auf feste
+  Weltkoordinaten zu setzen, ist gescheitert: die Kamera folgt weiter dem
+  Spieler, und die Figur hing als Riese über dem Dorf. Was funktioniert, sind
+  die Standbilder aus `vorschau.js` (`figbild.mjs`) – kein Match, kein Spawn,
+  keine Pose-Streuung, 600x760 formatfüllend. Der Gassen-Prüfstand ist
+  ebenfalls brauchbar, weil der Spieler reproduzierbar an derselben Stelle
+  laicht; der Sonnen-Prüfstand nicht, dort stand die Figur je Lauf anders groß
+  im Bild.
+- **Ein durchsichtiger Hintergrund verfälscht jeden Mittelwert.** Die
+  Standbilder der Klassenwahl haben einen Alphakanal, und `removeAlpha()` macht
+  daraus Schwarz. Gemittelt über „alle dunklen Bildpunkte" waren damit 70 %
+  Hintergrund in der Zahl, und aus 11 → 15 wurde 1,5 → 2,0 – ein echter Gewinn
+  sah aus wie Rauschen. Gemessen wird nur, wo `alpha > 200` ist.
+- **Meshnamen sind nicht eindeutig, und das Werkzeug darf nicht raten.** Beim
+  Magier heißen Ärmel und nackter Arm beide `Male_Peasant_Arms`, auf
+  verschiedenen Materialien und verschiedenen Texturen. `--aufhellen` bricht
+  deshalb ab, wenn mehrere Meshes den Namen tragen, und nennt beide. Wer sich
+  still den ersten greift, hellt irgendwann eine Hand auf. Dasselbe gilt für
+  Prüfskripte: eine `Map` nach Meshnamen überschreibt den einen Treffer mit dem
+  anderen und versteckt genau das Teil, um das es geht – Schlüssel ist Mesh
+  **und** Material.
 - Eine Textur in einer fertigen Figur tauscht `tools/figur-textur.mjs`, **ohne
   die Figur neu zu bauen**: die UVs bleiben ohnehin gleich, nur das Bild wird
   feiner. Neubacken über `figur-bauen.mjs` riskiert Unterschiede am
